@@ -1,0 +1,48 @@
+{
+  "name": "openclaw-platform",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "check-types": "turbo run check-types",
+    "db:migrate": "tsx scripts/db/migrate.ts",
+    "db:seed": "tsx scripts/db/seed.ts",
+    "db:verify": "tsx scripts/db/verify.ts",
+    "db:reset": "tsx scripts/db/reset.ts",
+    "db:types": "tsx scripts/db/gen-types.ts",
+    "db:create-admin": "tsx scripts/db/create-admin.ts",
+    "db:confirm-admin": "tsx scripts/db/confirm-admin.ts",
+    "db:seed-user": "tsx scripts/db/seed-user.ts",
+    "db:setup": "pnpm db:migrate && pnpm db:seed && pnpm db:verify",
+    "db:swap": "tsx scripts/db/swap.ts",
+    "ai:smoke": "tsx scripts/ai/smoke.ts",
+    "postiz:check": "node scripts/postiz/check-setup.mjs",
+    "processing:smoke": "node scripts/processing/smoke-realtime.mjs",
+    "ai:http-smoke": "node scripts/ai/http-smoke.mjs",
+    "memory:smoke": "tsx scripts/memory/smoke.ts",
+    "prompts:pack": "node scripts/ai/pack-prompts.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.104.1",
+    "@types/node": "^20.11.30",
+    "@types/pg": "^8.11.10",
+    "cross-env": "^10.1.0",
+    "dotenv": "^16.4.5",
+    "prettier": "^3.7.4",
+    "tsx": "^4.19.2",
+    "turbo": "^2.9.6",
+    "typescript": "5.9.2",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,1217 @@
+﻿{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e5aa0e6b-67ff-4ebe-a394-5bb650d8a6f4",
+      "name": "On Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -11984,
+        5456
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build HMAC-signed S03 alert — fires on any unhandled A06 error.\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst e = $json;\n\nlet brand_id = null;\ntry { brand_id = $('Verify HMAC + parse').first().json.brand_id ?? null; } catch (_) {}\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst makeUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n  const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\n\nconst body = JSON.stringify({\n  anomaly_id:   makeUUID(),\n  anomaly_type: 'extraction_failed',\n  severity:     'error',\n  source_flow:  'N8N-A06',\n  brand_id,\n  message:      e.execution?.error?.message || 'A06 extraction flow failed',\n  details: {\n    failed_node:  e.execution?.lastNodeExecuted ?? null,\n    error_name:   e.execution?.error?.name      ?? null,\n    execution_id: e.execution?.id               ?? null,\n  },\n  timestamp: new Date().toISOString(),\n});\n\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  _body: body,\n  _headers: {\n    'content-type':     'application/json',\n    'x-n8n-signature':  sig,\n    'x-n8n-request-id': `${$execution.id}-err-a06`,\n    'x-n8n-timestamp':  new Date().toISOString(),\n  },\n};"
+      },
+      "id": "3e5f9faf-50b4-4d4a-8c3a-355d6984b3fc",
+      "name": "Build S03 alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11792,
+        5456
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogztudios.app.n8n.cloud/webhook-test/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "9f4de8ed-9e1f-4146-ac33-b059c7f43e21",
+      "name": "POST · S03 anomaly-alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -11584,
+        5456
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "openclaw-extraction",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "acceeebc-143e-4fa2-8277-813a147ba579",
+      "name": "Webhook · /openclaw-extraction1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -12176,
+        5040
+      ],
+      "webhookId": "392f0e69-6fb6-4c8b-a9c0-c0f33bf5360b"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify HMAC + parse the inbound request from Next.js submitSeed.\n// HARDCODED webhook secret + APP_BASE_URL for paste-and-run import. The\n// downstream HTTP nodes use the same secret to sign their callbacks.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\n\nconst crypto = require('crypto');\nconst headers = $input.first().json.headers || {};\nconst given = headers['x-n8n-signature'];\nconst ts    = headers['x-n8n-timestamp'];\nconst rid   = headers['x-n8n-request-id'];\nif (!given || !ts || !rid) throw new Error('Missing required HMAC headers');\n\nconst drift = Math.abs(Date.now() - Date.parse(ts));\nif (drift > 5 * 60 * 1000) throw new Error(`Timestamp drift ${drift}ms > 5 min`);\n\nconst rawBody = JSON.stringify($input.first().json.body);\nconst expected = crypto.createHmac('sha256', WEBHOOK_SECRET).update(rawBody).digest('hex');\nif (expected !== given) throw new Error('HMAC signature mismatch');\n\nconst body = $input.first().json.body || {};\nif (!body.brand_id) throw new Error('brand_id required');\n\nreturn { json: {\n  brand_id: body.brand_id,\n  slug: body.slug || null,\n  instagram_handle: body.instagram_handle || null,\n  website_url: body.website_url || null,\n  place_search: body.place_search || { name: '', city: '' },\n  request_id: rid,\n}};"
+      },
+      "id": "86788f2f-df0d-42a3-b59d-b926780a4957",
+      "name": "Verify HMAC + parse1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11984,
+        5040
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"brand_id\": \"{{ $json.brand_id }}\", \"queued\": true }",
+        "options": {}
+      },
+      "id": "de7f778d-19a8-44a6-89ae-2e19b4c61be1",
+      "name": "Respond 202 · queued1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -11808,
+        5040
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign extraction_started stage callback.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\nconst body = JSON.stringify({ brand_id: $json.brand_id, stage: 'extraction_started' });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: { ...$json, _stage_url: APP_BASE_URL + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "df503e02-e0f2-4072-a4d8-3bd549435e3e",
+      "name": "Sign · stage_extraction_started1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11632,
+        5040
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 5000
+        }
+      },
+      "id": "c476ff91-26e3-4e80-a441-6bf2480a8ebe",
+      "name": "POST · stage_extraction_started1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -11392,
+        5040
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign the wrapper call to /api/extraction/run.\n// This single endpoint runs all 3 scrapers in parallel via Promise.allSettled\n// and returns the combined normalised payload — replaces the old\n// 'Build jobs → Prep · IG/Web/Places → Apify HTTP nodes' chain.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\n\nconst src = $('Verify HMAC + parse1').first().json;\nconst body = JSON.stringify({\n  brand_id:         src.brand_id,\n  slug:             src.slug || null,\n  instagram_handle: src.instagram_handle || null,\n  website_url:      src.website_url || null,\n  place_search:     src.place_search || { name: '', city: '' },\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: { ...$json,\n  _run_url: APP_BASE_URL + '/api/extraction/run',\n  _run_body: body,\n  _run_headers: {\n    'content-type':'application/json',\n    'x-n8n-signature':sig,\n    'x-n8n-request-id':reqId,\n    'x-n8n-timestamp':ts,\n  },\n}};"
+      },
+      "id": "ab5118e5-d4a9-4902-ae8e-b336296360b4",
+      "name": "Sign · /api/extraction/run1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11152,
+        5040
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._run_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._run_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._run_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._run_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._run_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._run_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 300000
+        }
+      },
+      "id": "6e9b4460-40e3-4afa-aeb3-862ab28858c2",
+      "name": "POST · /api/extraction/run1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -10960,
+        5040
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split the wrapper response into 3 ITEMS (one per branch). Each item\n// carries:\n//   • raw         — FULL untouched Apify / Places response (this is what\n//                    we write to source_records.raw_payload — no field loss)\n//   • normalised  — compact summary (used by UI for live extraction screen)\n//   • persist_ig  — IG-only enrichment (post observations, signatures,\n//                    channel profile, palette URLs, mentions, brand replies)\n//\n// Three items + sibling lanes via the Switch node = true parallel persistence.\nconst src = $('Verify HMAC + parse1').first().json;\nconst run = $json;\nconst result = run.body || run; // n8n responseFormat:'json' may wrap in body\n\nconst raw        = result.raw        || { instagram: null, website: null, places: null };\nconst normalised = result.normalised || { instagram: null, website: null, places: null };\nconst status     = result.status     || { instagram: 'skipped', website: 'skipped', places: 'skipped' };\nconst enrichment = result.enrichment || {};\nconst timing     = result.timing     || null;\n\n// Optional log so the n8n execution view shows the wrapper's parallelism numbers\nconsole.log('[A06] wrapper timing:', JSON.stringify({\n  wall_ms: timing?.wall_time_ms,\n  overlap_ms: timing?.parallel_overlap_ms,\n  lanes: timing?.lanes,\n}));\n\nreturn [\n  { json: {\n    branch: 'instagram',\n    brand_id: src.brand_id,\n    skipped: status.instagram !== 'done',\n    // FULL raw scraper output — written to source_records.raw_payload AS-IS.\n    raw: raw.instagram,\n    // Compact summary for the live UI / persist-ig signer.\n    normalised: normalised.instagram,\n    persist_ig: status.instagram === 'done' ? {\n      ig_post_observations: enrichment.ig_post_observations || [],\n      brand_reply_samples:  enrichment.brand_reply_samples  || [],\n      signature_hashtags:   enrichment.signature_hashtags   || [],\n      signature_phrases:    enrichment.signature_phrases    || [],\n      // Enrich the channel_profile with the rich IG profile fields the\n      // normaliser already produced (biography, full_name, profile_pic,\n      // external_url, business_category, follows_count, joined_recently)\n      // so persist-ig can write them all into channel_profiles (mig 0028).\n      channel_profile: enrichment.channel_profile ? Object.assign({}, enrichment.channel_profile, {\n        full_name:          normalised.instagram?.profile?.full_name          || null,\n        biography:          normalised.instagram?.profile?.biography          || null,\n        profile_pic_url:    normalised.instagram?.profile?.profile_pic_url    || null,\n        external_url:       normalised.instagram?.profile?.external_url       || null,\n        business_category:  normalised.instagram?.profile?.business_category  || null,\n        follows_count:      normalised.instagram?.profile?.follows_count      || null,\n        is_private:         !!normalised.instagram?.profile?.is_private,\n        joined_recently:    !!normalised.instagram?.profile?.joined_recently,\n        has_channel:        !!normalised.instagram?.profile?.has_channel,\n        raw_profile:        raw.instagram?.details        || null,\n        normalised_profile: normalised.instagram?.profile || null,\n        posts_sample:       normalised.instagram?.posts_sample || null,\n      }) : null,\n      palette_image_urls:   enrichment.palette_image_urls   || [],\n      mentions:             enrichment.mentions             || [],\n    } : null,\n  }},\n  { json: {\n    branch: 'website',\n    brand_id: src.brand_id,\n    skipped: status.website !== 'done',\n    raw: raw.website,\n    normalised: normalised.website,\n  }},\n  { json: {\n    branch: 'places',\n    brand_id: src.brand_id,\n    skipped: status.places !== 'done',\n    raw: raw.places,\n    normalised: normalised.places,\n  }},\n];"
+      },
+      "id": "0671f354-2af8-4ba1-b98f-92ff6d7736b5",
+      "name": "Build branches1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10784,
+        5040
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.branch }}",
+                    "rightValue": "instagram",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "instagram"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.branch }}",
+                    "rightValue": "website",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "website"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.branch }}",
+                    "rightValue": "places",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "places"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f600fd54-cfe7-4798-9bd8-fd3ed1aaa450",
+      "name": "Switch · by branch1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        -10592,
+        5040
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign /api/extraction/persist-source-record body for the IG branch.\n// Migration 0028 splits the payload into explicit `raw` + `normalised`\n// columns (queryable by the live status route + COO Pass 2). raw_payload\n// is kept as the original blob for backward-compat / audit.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\nconst typeMap = { instagram: 'instagram', website: 'website', places: 'google_places' };\nconst body = JSON.stringify({\n  brand_id: $json.brand_id,\n  source_type: typeMap[$json.branch] || $json.branch,\n  branch: $json.branch,\n  skipped: !!$json.skipped,\n  raw: $json.raw,                // FULL Apify response (no field loss)\n  normalised: $json.normalised,  // compact summary used by UI\n  raw_payload: { branch: $json.branch, skipped: !!$json.skipped, raw: $json.raw, normalised: $json.normalised },\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: { ...$json,\n  _sr_url: APP_BASE_URL + '/api/extraction/persist-source-record',\n  _sr_body: body,\n  _sr_headers: { 'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts }\n}};"
+      },
+      "id": "92718a0b-3202-408f-97dc-36165fc8ba4e",
+      "name": "Sign · source_record (IG)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10160,
+        4864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign /api/extraction/persist-source-record body. Migration 0028 splits\n// the payload into explicit `raw` + `normalised` + `branch` + `skipped`\n// columns so the live status route and COO Pass 2 can read them directly\n// without parsing raw_payload. raw_payload is kept as the audit blob.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\nconst typeMap = { instagram: 'instagram', website: 'website', places: 'google_places' };\nconst body = JSON.stringify({\n  brand_id: $json.brand_id,\n  source_type: typeMap[$json.branch] || $json.branch,\n  branch: $json.branch,\n  skipped: !!$json.skipped,\n  raw: $json.raw,                // FULL Apify / Places response (no field loss)\n  normalised: $json.normalised,  // compact summary used by the UI\n  raw_payload: {\n    branch: $json.branch,\n    skipped: !!$json.skipped,\n    raw: $json.raw,\n    normalised: $json.normalised,\n  },\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: { ...$json,\n  _sr_url: APP_BASE_URL + '/api/extraction/persist-source-record',\n  _sr_body: body,\n  _sr_headers: { 'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts }\n}};"
+      },
+      "id": "f92b18bf-0d9c-425c-9f85-e86de5b3dbf9",
+      "name": "Sign · source_record (Web)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10160,
+        5072
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign /api/extraction/persist-source-record body. Migration 0028 splits\n// the payload into explicit `raw` + `normalised` + `branch` + `skipped`\n// columns so the live status route and COO Pass 2 can read them directly\n// without parsing raw_payload. raw_payload is kept as the audit blob.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\nconst typeMap = { instagram: 'instagram', website: 'website', places: 'google_places' };\nconst body = JSON.stringify({\n  brand_id: $json.brand_id,\n  source_type: typeMap[$json.branch] || $json.branch,\n  branch: $json.branch,\n  skipped: !!$json.skipped,\n  raw: $json.raw,                // FULL Apify / Places response (no field loss)\n  normalised: $json.normalised,  // compact summary used by the UI\n  raw_payload: {\n    branch: $json.branch,\n    skipped: !!$json.skipped,\n    raw: $json.raw,\n    normalised: $json.normalised,\n  },\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: { ...$json,\n  _sr_url: APP_BASE_URL + '/api/extraction/persist-source-record',\n  _sr_body: body,\n  _sr_headers: { 'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts }\n}};"
+      },
+      "id": "9d93e190-4939-4daf-837f-2c3568bdfb70",
+      "name": "Sign · source_record (Places)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10160,
+        5264
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._sr_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._sr_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._sr_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._sr_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._sr_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._sr_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 65000
+        }
+      },
+      "id": "331560de-947b-4837-8331-58621ad3fb82",
+      "name": "POST · source_record (IG)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -9984,
+        4864
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._sr_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._sr_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._sr_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._sr_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._sr_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._sr_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "98917158-9384-4f56-9868-3a3ab607eae4",
+      "name": "POST · source_record (Web)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -9984,
+        5072
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._sr_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._sr_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._sr_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._sr_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._sr_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._sr_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "d80a0e9e-249e-454b-b35d-3ea2a1ed6106",
+      "name": "POST · source_record (Places)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -9984,
+        5264
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// IG-only: sign /api/extraction/persist-ig (full enrichment).\n// Skips when skipped or no enrichment payload.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\n\nconst seed = $('Build branches1').all().map(i => i.json).find(b => b.branch === 'instagram');\nconst pi = seed?.persist_ig;\nif (!pi || !pi.channel_profile) {\n  return { json: { ...$json, _persist_skip: true } };\n}\nconst payload = {\n  brand_id: $json.brand_id,\n  source_record_id: null,\n  ig_post_observations: pi.ig_post_observations || [],\n  brand_reply_samples:  pi.brand_reply_samples  || [],\n  signature_hashtags:   pi.signature_hashtags   || [],\n  signature_phrases:    pi.signature_phrases    || [],\n  channel_profile:      pi.channel_profile,\n  palette_image_urls:   pi.palette_image_urls   || [],\n  mentions:             pi.mentions             || [],\n};\nconst body = JSON.stringify(payload);\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: { ...$json,\n  _persist_url: APP_BASE_URL + '/api/extraction/persist-ig',\n  _persist_body: body,\n  _persist_headers: { 'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts }\n}};"
+      },
+      "id": "dd3fadd4-1d08-4b2b-b8e4-683ae1d71852",
+      "name": "Sign · persist-ig1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9808,
+        4864
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._persist_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._persist_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._persist_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._persist_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._persist_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._persist_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "c44a6353-7da2-4d03-a07d-d3a267bf4813",
+      "name": "POST · persist-ig1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -9616,
+        4864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign per-branch stage callback (IG). After POST·persist-ig, $json holds\n// the API response — `branch` was stripped. Recover it from Build branches\n// by index 0 (instagram). brand_id survives in API response.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\nconst seed = $('Build branches1').all().map(i => i.json).find(b => b.branch === 'instagram');\nconst brand_id = seed?.brand_id || $json.brand_id;\nconst body = JSON.stringify({ brand_id, stage: 'extraction.instagram_complete' });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: { brand_id, branch: 'instagram', _stage_url: APP_BASE_URL + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "baa77d99-27bd-46a4-8235-17a5196abb0f",
+      "name": "Sign · stage (IG)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9440,
+        4864
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign per-branch stage callback (Web). After POST·source_record, $json is\n// the API response — `branch` is gone. Recover from Build branches.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\nconst seed = $('Build branches1').all().map(i => i.json).find(b => b.branch === 'website');\nconst brand_id = seed?.brand_id || $json.brand_id;\nconst body = JSON.stringify({ brand_id, stage: 'extraction.website_complete' });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: { brand_id, branch: 'website', _stage_url: APP_BASE_URL + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "11496402-a362-4f90-b5e8-434028dc0627",
+      "name": "Sign · stage (Web)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9808,
+        5072
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign per-branch stage callback (Places).\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\nconst seed = $('Build branches1').all().map(i => i.json).find(b => b.branch === 'places');\nconst brand_id = seed?.brand_id || $json.brand_id;\nconst body = JSON.stringify({ brand_id, stage: 'extraction.places_complete' });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: { brand_id, branch: 'places', _stage_url: APP_BASE_URL + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "bb457158-dd2e-4c19-b085-d75a5d36720b",
+      "name": "Sign · stage (Places)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9808,
+        5264
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 5000
+        }
+      },
+      "id": "5d8080b1-f6b9-4b00-8fe8-e90d3535ccfd",
+      "name": "POST · stage (IG)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -9264,
+        4864
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 5000
+        }
+      },
+      "id": "381c1764-d57e-4719-bba8-8e405d784552",
+      "name": "POST · stage (Web)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -9616,
+        5072
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 5000
+        }
+      },
+      "id": "2eb99bd0-785a-4974-a26e-925240f19184",
+      "name": "POST · stage (Places)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -9616,
+        5264
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "id": "eb0b5f0e-4561-44c2-9a96-494b7bb75d25",
+      "name": "Merge all branches1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        -9088,
+        5072
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign /api/extraction/mark-done — flips brand_profiles.onboarding_status\n// to 'extraction_done'. Replaces the old Supabase UPDATE node so n8n needs\n// no DB credentials.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\nconst src = $('Verify HMAC + parse1').first().json;\nconst body = JSON.stringify({ brand_id: src.brand_id });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: {\n  brand_id: src.brand_id,\n  _md_url: APP_BASE_URL + '/api/extraction/mark-done',\n  _md_body: body,\n  _md_headers: { 'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts }\n}};"
+      },
+      "id": "5b2e2975-fbc0-4c2c-92e7-eb9884efabe2",
+      "name": "Sign · mark-done1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8896,
+        5072
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._md_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._md_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._md_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._md_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._md_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._md_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "27f86529-4498-40a8-9114-19e9445688de",
+      "name": "POST · mark-done1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -8720,
+        5072
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst crypto = require('crypto');\nconst body = JSON.stringify({ brand_id: $json.brand_id, stage: 'extraction_complete' });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');\nreturn { json: { brand_id: $json.brand_id, _stage_url: APP_BASE_URL + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "6a444d65-e1d6-4710-8126-daa3e30380dc",
+      "name": "Sign · extraction_complete1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8544,
+        5072
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 5000
+        }
+      },
+      "id": "a440b0f8-8036-401c-bb29-1480430bb6c2",
+      "name": "POST · stage_extraction_complete1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -8320,
+        5072
+      ]
+    }
+  ],
+  "connections": {
+    "On Error": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build S03 alert": {
+      "main": [
+        [
+          {
+            "node": "POST · S03 anomaly-alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook · /openclaw-extraction1": {
+      "main": [
+        [
+          {
+            "node": "Verify HMAC + parse1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify HMAC + parse1": {
+      "main": [
+        [
+          {
+            "node": "Respond 202 · queued1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 202 · queued1": {
+      "main": [
+        [
+          {
+            "node": "Sign · stage_extraction_started1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage_extraction_started1": {
+      "main": [
+        [
+          {
+            "node": "POST · stage_extraction_started1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage_extraction_started1": {
+      "main": [
+        [
+          {
+            "node": "Sign · /api/extraction/run1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · /api/extraction/run1": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/extraction/run1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/extraction/run1": {
+      "main": [
+        [
+          {
+            "node": "Build branches1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build branches1": {
+      "main": [
+        [
+          {
+            "node": "Switch · by branch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch · by branch1": {
+      "main": [
+        [
+          {
+            "node": "Sign · source_record (IG)1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sign · source_record (Web)1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sign · source_record (Places)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · source_record (IG)1": {
+      "main": [
+        [
+          {
+            "node": "POST · source_record (IG)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · source_record (Web)1": {
+      "main": [
+        [
+          {
+            "node": "POST · source_record (Web)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · source_record (Places)1": {
+      "main": [
+        [
+          {
+            "node": "POST · source_record (Places)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · source_record (IG)1": {
+      "main": [
+        [
+          {
+            "node": "Sign · persist-ig1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · source_record (Web)1": {
+      "main": [
+        [
+          {
+            "node": "Sign · stage (Web)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · source_record (Places)1": {
+      "main": [
+        [
+          {
+            "node": "Sign · stage (Places)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · persist-ig1": {
+      "main": [
+        [
+          {
+            "node": "POST · persist-ig1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · persist-ig1": {
+      "main": [
+        [
+          {
+            "node": "Sign · stage (IG)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage (IG)1": {
+      "main": [
+        [
+          {
+            "node": "POST · stage (IG)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage (Web)1": {
+      "main": [
+        [
+          {
+            "node": "POST · stage (Web)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage (Places)1": {
+      "main": [
+        [
+          {
+            "node": "POST · stage (Places)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage (IG)1": {
+      "main": [
+        [
+          {
+            "node": "Merge all branches1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage (Web)1": {
+      "main": [
+        [
+          {
+            "node": "Merge all branches1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "POST · stage (Places)1": {
+      "main": [
+        [
+          {
+            "node": "Merge all branches1",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge all branches1": {
+      "main": [
+        [
+          {
+            "node": "Sign · mark-done1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · mark-done1": {
+      "main": [
+        [
+          {
+            "node": "POST · mark-done1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · mark-done1": {
+      "main": [
+        [
+          {
+            "node": "Sign · extraction_complete1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · extraction_complete1": {
+      "main": [
+        [
+          {
+            "node": "POST · stage_extraction_complete1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6b82bfa883d8b0ed7859b6f0ce362a41be2730aad080ae279216f1911379c19c"
+  }
+}

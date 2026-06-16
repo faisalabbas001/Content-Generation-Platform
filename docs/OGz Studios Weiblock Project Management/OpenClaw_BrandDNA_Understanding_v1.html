@@ -1,0 +1,1289 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenClaw — BrandDNA Understanding & Verification Document</title>
+  <style>
+    /* ── Reset + base ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: #1a1d24;
+      background: #f7f5f0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────── */
+    .page {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 64px 56px 96px;
+      background: #ffffff;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.04);
+    }
+    @media (max-width: 720px) {
+      .page { padding: 40px 24px; }
+    }
+
+    /* ── Typography ────────────────────────────────────────────── */
+    h1, h2, h3, h4 { font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; color: #0f1115; }
+    h1 { font-size: 34px; margin: 0 0 8px; letter-spacing: -0.025em; }
+    h2 {
+      font-size: 22px; margin: 56px 0 16px; padding-bottom: 12px;
+      border-bottom: 1px solid #e8e4dc;
+    }
+    h3 { font-size: 17px; margin: 32px 0 10px; color: #2a2d35; }
+    h4 { font-size: 14px; margin: 20px 0 6px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b6f78; font-weight: 600; }
+    p  { margin: 0 0 14px; }
+    strong { color: #0f1115; font-weight: 600; }
+    code {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 13px;
+      background: #f1efe9;
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: #4a3a2a;
+    }
+    a { color: #1854b8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Header banner ─────────────────────────────────────────── */
+    .header {
+      margin-bottom: 48px;
+      padding-bottom: 28px;
+      border-bottom: 2px solid #1a1d24;
+    }
+    .header .meta {
+      display: flex; gap: 18px; flex-wrap: wrap;
+      font-size: 12px; color: #6b6f78; text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+    .header .meta span { display: inline-flex; align-items: center; gap: 6px; }
+    .header .meta span::before { content: ""; width: 4px; height: 4px; border-radius: 50%; background: #c9a96f; }
+    .header .subtitle { font-size: 16px; color: #4a4d56; max-width: 640px; margin-top: 14px; }
+
+    /* ── Pillbox / badges ──────────────────────────────────────── */
+    .pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      vertical-align: middle;
+    }
+    .pill.new   { background: #fef3c7; color: #92400e; }
+    .pill.kept  { background: #d1fae5; color: #065f46; }
+    .pill.shift { background: #ddd6fe; color: #5b21b6; }
+    .pill.q     { background: #fee2e2; color: #991b1b; }
+
+    /* ── Callout boxes ─────────────────────────────────────────── */
+    .callout {
+      margin: 22px 0;
+      padding: 18px 22px;
+      border-left: 4px solid #c9a96f;
+      background: #faf7ef;
+      border-radius: 0 6px 6px 0;
+    }
+    .callout.note    { border-color: #1854b8; background: #f0f6ff; }
+    .callout.warn    { border-color: #d97706; background: #fff7ed; }
+    .callout.success { border-color: #059669; background: #ecfdf5; }
+    .callout.danger  { border-color: #dc2626; background: #fef2f2; }
+    .callout p:last-child { margin-bottom: 0; }
+    .callout .title { font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+
+    /* ── Tables ────────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 11px 14px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid #ece8e0;
+    }
+    th {
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6b6f78;
+      background: #faf7ef;
+      border-bottom: 2px solid #e0d8c8;
+    }
+    tr:hover td { background: #fafafa; }
+    td.compact { white-space: nowrap; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    td.center { text-align: center; }
+
+    /* ── Stage cards ───────────────────────────────────────────── */
+    .stages {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      margin: 28px 0;
+    }
+    .stage-card {
+      padding: 20px 22px;
+      border: 1px solid #e8e4dc;
+      border-radius: 8px;
+      background: #fcfaf5;
+    }
+    .stage-card .num {
+      display: inline-block;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: #1a1d24; color: #c9a96f;
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center; line-height: 28px;
+      margin-bottom: 12px;
+    }
+    .stage-card h3 { margin: 0 0 8px; font-size: 16px; }
+    .stage-card p { font-size: 14px; color: #4a4d56; line-height: 1.55; margin: 0; }
+
+    /* ── Pipeline diagram (ASCII-style) ────────────────────────── */
+    .pipeline {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      background: #1a1d24;
+      color: #e8e4dc;
+      padding: 24px 28px;
+      border-radius: 6px;
+      overflow-x: auto;
+      white-space: pre;
+      margin: 22px 0;
+    }
+    .pipeline .new-line { color: #fbbf24; }
+    .pipeline .arrow    { color: #c9a96f; }
+    .pipeline .label    { color: #93c5fd; }
+
+    /* ── Q&A list ──────────────────────────────────────────────── */
+    .qa {
+      margin: 18px 0;
+      padding: 18px 22px;
+      background: #fffbf5;
+      border-radius: 8px;
+      border: 1px solid #f5e8d2;
+    }
+    .qa .q-num {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #c9a96f;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+    .qa h4 { margin: 0 0 10px; color: #0f1115; font-size: 15px; text-transform: none; letter-spacing: 0; }
+    .qa p { font-size: 14px; }
+    .qa .verify {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #f5e8d2;
+      font-size: 13px;
+      color: #6b6f78;
+    }
+    .qa .verify strong { color: #92400e; }
+
+    /* ── Lists ─────────────────────────────────────────────────── */
+    ul, ol { padding-left: 22px; margin: 10px 0 16px; }
+    li { margin-bottom: 6px; }
+    ul.checks { list-style: none; padding-left: 0; }
+    ul.checks li { padding-left: 28px; position: relative; }
+    ul.checks li::before {
+      content: "✓"; position: absolute; left: 6px; top: 0;
+      color: #059669; font-weight: 700;
+    }
+
+    /* ── TOC ───────────────────────────────────────────────────── */
+    .toc {
+      margin: 32px 0;
+      padding: 22px 26px;
+      background: #faf7ef;
+      border: 1px solid #e8e4dc;
+      border-radius: 8px;
+    }
+    .toc h4 { margin-top: 0; color: #0f1115; }
+    .toc ol { margin: 8px 0 0; padding-left: 22px; }
+    .toc li { margin-bottom: 4px; font-size: 14px; }
+    .toc a { color: #2a2d35; }
+
+    /* ── Section headers with section number ───────────────────── */
+    .section-num {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #c9a96f;
+      letter-spacing: 0.1em;
+      margin-right: 10px;
+    }
+
+    /* ── Print ─────────────────────────────────────────────────── */
+    @media print {
+      body { background: #fff; }
+      .page { box-shadow: none; max-width: 100%; padding: 24px; }
+      .pipeline { background: #f5f5f5; color: #1a1d24; }
+      a { color: inherit; }
+    }
+
+    /* ── Footer ────────────────────────────────────────────────── */
+    .footer {
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid #e8e4dc;
+      font-size: 12px;
+      color: #6b6f78;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  HEADER                                                       -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<header class="header">
+  <div class="meta">
+    <span>OpenClaw</span>
+    <span>BrandDNA v1</span>
+    <span>Understanding &amp; Verification Document</span>
+    <span>Internal — for client review</span>
+  </div>
+  <h1>BrandDNA — How we understand the new framework</h1>
+  <p class="subtitle">
+    A clean rewrite of the BrandDNA loop based on the
+    <em>Three-Axis Creative Direction Framework v2</em>. This document captures what we
+    believe the new requirement is, the implementation flow we propose, the open
+    questions that need your verification, and the edge cases we want to lock down
+    before we lift schema and prompts.
+  </p>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  TOC                                                          -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<nav class="toc">
+  <h4>What this document covers</h4>
+  <ol>
+    <li><a href="#shift">What's shifted — old understanding vs new</a></li>
+    <li><a href="#fields">The new BrandDNA Family A schema</a></li>
+    <li><a href="#three-axes">The three axes — archetype, lifecycle, intent</a></li>
+    <li><a href="#methods">Methods as composable patterns (the architectural shift)</a></li>
+    <li><a href="#composition">The Composition Matrix — auto-method-selection</a></li>
+    <li><a href="#flow">The end-to-end BrandDNA flow we propose</a></li>
+    <li><a href="#onboarding">The 3-section onboarding form</a></li>
+    <li><a href="#dependencies">Dependency order — why extraction comes first</a></li>
+    <li><a href="#edge-cases">Edge cases &amp; questions for the client</a></li>
+    <li><a href="#prompts">Agent prompts we need from you (resend / revise)</a></li>
+    <li><a href="#summary">What's locked, what's open, what's next</a></li>
+  </ol>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  1. WHAT'S SHIFTED                                            -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="shift"><span class="section-num">01</span>What's shifted — old understanding vs new</h2>
+
+<p>
+  The original <code>doc.txt</code> spec defined BrandDNA as a 10-field "BrandDNA Lite"
+  identity: dialect, formality, religious sensitivity, price position, etc. That
+  schema is still the foundation — none of those fields go away. What
+  <strong>v2 of the framework adds</strong> is a second layer above it:
+  <em>creative direction</em> — the deliberate composition of voice, diagnostic, visual
+  idiom, cadence, and closing pattern that makes a brand's content feel like
+  <em>that brand</em> instead of generic Saudi-SME content.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 32%">Concept</th>
+      <th style="width: 34%">Original understanding</th>
+      <th style="width: 34%">New understanding (v2)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>BrandDNA scope</strong></td>
+      <td>10 critical identity fields per brand.</td>
+      <td>10 identity fields <strong>plus</strong> a creative-direction layer (archetype × lifecycle × intent → composed method profile).</td>
+    </tr>
+    <tr>
+      <td><strong>Voice / tone</strong></td>
+      <td>One free-text "brand_differentiator" + tone anti-attributes.</td>
+      <td>Voice register is one of <strong>5 method-anatomy components</strong>, separately addressable, sourced from any of 6 methods.</td>
+    </tr>
+    <tr>
+      <td><strong>Method assignment</strong></td>
+      <td>Implicit. COO inferred a generic tone from form + scrapers.</td>
+      <td>Explicit. The <strong>Composition Matrix</strong> scores 6 methods against the brand's (archetype × stage × intent) tuple and picks one or composes a hybrid.</td>
+    </tr>
+    <tr>
+      <td><strong>Archetype</strong></td>
+      <td>Not modelled.</td>
+      <td>One of 12 Jungian archetypes. Primary required, secondary optional. Drives 70% of voice signal.</td>
+    </tr>
+    <tr>
+      <td><strong>Lifecycle stage</strong></td>
+      <td>Not modelled.</td>
+      <td>One of 5 (Launch, Growth, Maturity, Transition, Renewal). Inferred mostly from Instagram + website signals.</td>
+    </tr>
+    <tr>
+      <td><strong>Intent state</strong></td>
+      <td>Implicit in <code>primary_kpi_type</code> + occasion logic.</td>
+      <td>Explicit field with 5 enum values. Most fluid — can change month to month.</td>
+    </tr>
+    <tr>
+      <td><strong>Onboarding form</strong></td>
+      <td>21 fields, single screen.</td>
+      <td><strong>3 sections</strong> with explicit dependencies: Section 2 needs scrape data from Section 1 to be useful.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout note">
+  <div class="title">Important — this is not a contradiction with <code>doc.txt</code></div>
+  <p>
+    The new framework <em>extends</em> Family A; it doesn't replace anything. The 4
+    Hard Rules (CEO routes first, Memory Controller is the sole writer, Arabic never
+    in image prompts, no Weavy URLs in DB) all still apply. The 11 n8n flows still
+    exist with the same purpose. What changes is <strong>what COO produces during
+    onboarding</strong> and <strong>what fields BrandDNA carries forward</strong>.
+  </p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  2. NEW BRANDDNA SCHEMA                                       -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="fields"><span class="section-num">02</span>The new BrandDNA Family A schema</h2>
+
+<p>
+  Three new columns on <code>brand_profiles</code>, plus one new table for the method
+  profile. All of them are written exclusively by the Memory Controller (Hard Rule #2
+  preserved).
+</p>
+
+<h3>New columns on <code>brand_profiles</code></h3>
+<table>
+  <thead>
+    <tr><th>Field</th><th>Type</th><th>Source</th><th>Confidence floor</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>archetype_primary</code> <span class="pill new">new</span></td>
+      <td>enum (12)</td>
+      <td>COO Pass 2 — inferred from form sector + Instagram caption tone + visual cues</td>
+      <td><code>inferred_medium</code> minimum</td>
+    </tr>
+    <tr>
+      <td><code>archetype_secondary</code> <span class="pill new">new</span></td>
+      <td>enum (12), nullable</td>
+      <td>COO Pass 2 — only set when dual-archetype detected with high agreement</td>
+      <td><code>inferred_high</code> required (otherwise null)</td>
+    </tr>
+    <tr>
+      <td><code>lifecycle_stage</code> <span class="pill new">new</span></td>
+      <td>enum (5): Launch, Growth, Maturity, Transition, Renewal</td>
+      <td>COO Pass 2 — inferred from Instagram account age + post frequency over time + follower trajectory</td>
+      <td><code>inferred_medium</code> minimum</td>
+    </tr>
+    <tr>
+      <td><code>intent_state</code> <span class="pill new">new</span></td>
+      <td>enum (5): Brand-Building, Awareness-Attraction, Differentiation-Loyalty, Conversion-Promotional, Refresh-Relaunch</td>
+      <td>COO Pass 2 — inferred from <code>primary_kpi_type</code> + active occasions + lifecycle stage</td>
+      <td><code>explicitly_confirmed</code> by user via dropdown (recommended) or inferred</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>New table: <code>brand_method_profiles</code></h3>
+<p>
+  One row per brand. Holds the result of the Composition Matrix scoring. Each
+  component is a separately-addressable pattern ID — patterns can be sourced from
+  different methods simultaneously (the architectural shift v2 makes possible).
+</p>
+
+<table>
+  <thead>
+    <tr><th>Column</th><th>Type</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>brand_id</code></td><td>uuid (FK)</td><td>One profile per brand.</td></tr>
+    <tr><td><code>voice_register</code></td><td>enum</td><td>e.g. <code>intimate_humble</code>, <code>authoritative_warm</code>, <code>ironic_observer</code>, <code>devotional_serene</code>.</td></tr>
+    <tr><td><code>diagnostic_pattern</code></td><td>enum</td><td>How posts open. e.g. <code>story_opener</code>, <code>question_opener</code>, <code>contradiction_opener</code>.</td></tr>
+    <tr><td><code>visual_idiom</code></td><td>enum</td><td>Imagery vocabulary. e.g. <code>minimal_natural_light</code>, <code>archive_film_grain</code>, <code>flat_graphic_warm</code>.</td></tr>
+    <tr><td><code>cadence_rule</code></td><td>enum</td><td>Pacing within a calendar. e.g. <code>steady_drumbeat</code>, <code>burst_then_quiet</code>, <code>narrative_arc</code>.</td></tr>
+    <tr><td><code>closing_pattern</code></td><td>enum</td><td>CTA style. e.g. <code>soft_invitation</code>, <code>direct_ask</code>, <code>open_question</code>.</td></tr>
+    <tr><td><code>composition_blend</code></td><td>jsonb</td><td>Per-component method source: <code>{ voice: "Authenticity", diagnostic: "Paradox", visual: "Heritage", … }</code>.</td></tr>
+    <tr><td><code>composition_score</code></td><td>int (0-100)</td><td>How confident COO is in this composition.</td></tr>
+    <tr><td><code>creative_direction_text</code></td><td>text</td><td>The <em>written</em> creative direction object the framework references — a 200-400-word brief in plain language.</td></tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  3. THREE AXES                                                -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="three-axes"><span class="section-num">03</span>The three axes — archetype, lifecycle, intent</h2>
+
+<p>
+  The framework's central insight: every brand sits at the intersection of three
+  <strong>independent</strong> variables. <code>12 archetypes × 5 stages × 5 intents = 300 distinct
+  configurations.</code> No single method covers all 300 — which is why composition matters.
+</p>
+
+<h3>Axis 1 — Brand Archetype (the 12 Jungian patterns)</h3>
+<p>
+  4 archetypes account for ~70% of Saudi SME frequency. The other 8 appear in
+  specific verticals or as secondary accents on dual-archetype brands.
+</p>
+<table>
+  <thead><tr><th>Archetype</th><th>Saudi SME frequency</th><th>Default method affinity</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Caregiver</strong> (high frequency)</td><td>~22%</td><td>Authenticity primary · Vulnerability for launch</td></tr>
+    <tr><td><strong>Everyman</strong> (high)</td><td>~18%</td><td>Authenticity · Vulnerability · Paradox accents</td></tr>
+    <tr><td><strong>Sage</strong> (high)</td><td>~16%</td><td>Authenticity primary · Heritage for tradition</td></tr>
+    <tr><td><strong>Lover</strong> (high)</td><td>~14%</td><td>Paradox · Vulnerability · Authenticity secondary</td></tr>
+    <tr><td>Magician</td><td>~6%</td><td>Paradox primary · Diagnostic upstream</td></tr>
+    <tr><td>Ruler</td><td>~6%</td><td>Heritage primary · Diagnostic for pitch</td></tr>
+    <tr><td>Hero</td><td>~5%</td><td>Paradox primary · Vulnerability for launch</td></tr>
+    <tr><td>Creator</td><td>~5%</td><td>Metaphor primary · Paradox accents</td></tr>
+    <tr><td>Innocent</td><td>~3%</td><td>Authenticity · Vulnerability for launch</td></tr>
+    <tr><td>Outlaw</td><td>~2%</td><td>Paradox primary · Vulnerability for launch</td></tr>
+    <tr><td>Explorer</td><td>~2%</td><td><span class="pill q">GAP</span> Vulnerability closest fit, requires composition</td></tr>
+    <tr><td>Jester</td><td>~1%</td><td><span class="pill q">GAP</span> Composition required, no current full method</td></tr>
+  </tbody>
+</table>
+
+<h3>Axis 2 — Lifecycle Stage</h3>
+<p>
+  Each stage carries a distinct voice modulation and vulnerability permission level —
+  independent of archetype. Inferred from Instagram account age, post frequency over
+  time, and follower trajectory.
+</p>
+<table>
+  <thead><tr><th>Stage</th><th>Detection signals</th><th>Default voice modulation</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Launch</strong></td><td>Account age &lt; 6 months OR post count &lt; 30</td><td>Diagnostic upstream only — establish identity before promoting</td></tr>
+    <tr><td><strong>Growth</strong></td><td>6-24 months · accelerating post cadence · follower growth &gt; 5%/mo</td><td>Vulnerability Method · Authenticity</td></tr>
+    <tr><td><strong>Maturity</strong></td><td>2+ years · stable cadence · follower growth 0-3%/mo</td><td>Authenticity · Paradox</td></tr>
+    <tr><td><strong>Transition</strong></td><td>Recent rebrand signals · gap in posting · changed handle/name</td><td>Heritage · Metaphor · Paradox</td></tr>
+    <tr><td><strong>Renewal</strong></td><td>Account 2+ years but low recent activity, attempting comeback</td><td>Paradox · Authenticity</td></tr>
+  </tbody>
+</table>
+
+<h3>Axis 3 — Intent State</h3>
+<p>
+  The most fluid axis. A brand can shift intent month to month while archetype and
+  stage remain stable. Each intent governs a distinct chain-mix and creative
+  emphasis.
+</p>
+<table>
+  <thead><tr><th>Intent</th><th>Chain-mix focus</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Brand-Building</strong></td><td>30% brand story · 35% product · 15% discovery · 10% conversion · 10% engagement</td></tr>
+    <tr><td><strong>Awareness-Attraction</strong></td><td>40% product crave · 25% brand/lifestyle · 15% promotional · 15% occasion · 5% new</td></tr>
+    <tr><td><strong>Differentiation-Loyalty</strong></td><td>30% differentiator · 25% loyalty/proof · 20% product hero · 15% occasion · 10% conversion</td></tr>
+    <tr><td><strong>Conversion-Promotional</strong></td><td>40% product · 25% conversion · 20% promotional · 10% occasion · 5% loyalty</td></tr>
+    <tr><td><strong>Refresh-Relaunch</strong></td><td>35% renewed identity · 25% testimonial/proof · 20% behind-the-scenes · 10% comeback launch · 10% occasion</td></tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  4. METHODS AS COMPOSABLE PATTERNS                            -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="methods"><span class="section-num">04</span>Methods as composable patterns</h2>
+
+<p>
+  This is the architectural shift v2 of the framework introduces. The change in one
+  sentence:
+</p>
+
+<div class="callout">
+  <p>
+    A method is <strong>not</strong> a person and <strong>not</strong> a monolithic
+    style. A method is a <strong>composed instruction set with five independently
+    classifiable components</strong>. Each component is separately addressable,
+    separately swappable, and can be sourced from different methods simultaneously.
+  </p>
+</div>
+
+<h3>The 5 components every method exposes</h3>
+<table>
+  <thead><tr><th>Component</th><th>What it controls</th><th>Example values</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Voice register</strong></td><td>Linguistic posture</td><td><code>intimate_humble</code> · <code>authoritative_warm</code> · <code>ironic_observer</code> · <code>devotional_serene</code></td></tr>
+    <tr><td><strong>Diagnostic pattern</strong></td><td>How a post opens</td><td><code>story_opener</code> · <code>question_opener</code> · <code>claim_opener</code> · <code>contradiction_opener</code></td></tr>
+    <tr><td><strong>Visual idiom</strong></td><td>Imagery vocabulary</td><td><code>minimal_natural_light</code> · <code>archive_film_grain</code> · <code>flat_graphic_warm</code></td></tr>
+    <tr><td><strong>Cadence rule</strong></td><td>Pacing within a calendar</td><td><code>steady_drumbeat</code> · <code>burst_then_quiet</code> · <code>narrative_arc</code></td></tr>
+    <tr><td><strong>Closing pattern</strong></td><td>CTA style</td><td><code>soft_invitation</code> · <code>direct_ask</code> · <code>open_question</code></td></tr>
+  </tbody>
+</table>
+
+<h3>The 6 methods (5 existing + 1 new)</h3>
+<table>
+  <thead><tr><th>Method</th><th>Coverage</th><th>Best for archetypes</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Authenticity</strong></td><td>~50% of 300 configs</td><td>Caregiver · Everyman · Sage · Innocent</td></tr>
+    <tr><td><strong>Heritage</strong></td><td>~25%</td><td>Sage · Ruler · Creator (institutional)</td></tr>
+    <tr><td><strong>Metaphor</strong></td><td>~20%</td><td>Creator · Magician · Sage</td></tr>
+    <tr><td><strong>Paradox</strong></td><td>~30%</td><td>Magician · Hero · Outlaw · Lover</td></tr>
+    <tr><td><strong>Diagnostic</strong></td><td>~25%</td><td>Upstream-only — used as opening pass for any archetype at Launch stage</td></tr>
+    <tr><td><strong>Vulnerability</strong> <span class="pill new">new</span></td><td>~20% (additive — lifts total coverage from 60% → 80%)</td><td>Caregiver · Everyman · Hero · Innocent · all Launch stages</td></tr>
+  </tbody>
+</table>
+
+<div class="callout note">
+  <p>
+    The framework explicitly says: <strong>Vulnerability is the highest-leverage
+    addition possible in Phase 1</strong>. But it must be built <em>after</em> the
+    composable architecture exists, not before. Building Vulnerability first means
+    rebuilding it once the (archetype × stage × intent) plumbing arrives.
+  </p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  5. COMPOSITION MATRIX                                        -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="composition"><span class="section-num">05</span>The Composition Matrix — auto-method-selection</h2>
+
+<p>
+  For every <code>(archetype × lifecycle_stage × intent_state)</code> triple — 300 total
+  combinations — the system scores all 6 methods 0-100 and either picks the single
+  top scorer (clean assignment, ~180 of 300 cases) or composes a hybrid by taking
+  specific components from multiple methods (~120 cases).
+</p>
+
+<h3>Example scoring rows from the 14 most common Saudi SME configs</h3>
+<table>
+  <thead>
+    <tr><th>Configuration</th><th>Diagnostic</th><th>Metaphor</th><th>Paradox</th><th>Authenticity</th><th>Heritage</th><th>Vulnerability</th><th>Verdict</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Caregiver × Launch × Brand-Building</td>
+      <td class="center">50</td><td class="center">20</td><td class="center">45</td><td class="center">78</td><td class="center">30</td><td class="center"><strong>85</strong></td>
+      <td><strong>Vulnerability</strong> primary</td>
+    </tr>
+    <tr>
+      <td>Sage × Maturity × Differentiation-Loyalty</td>
+      <td class="center">65</td><td class="center">25</td><td class="center">45</td><td class="center"><strong>85</strong></td><td class="center">75</td><td class="center">50</td>
+      <td><strong>Authenticity</strong> + Heritage accent</td>
+    </tr>
+    <tr>
+      <td>Everyman × Growth × Awareness</td>
+      <td class="center">65</td><td class="center">35</td><td class="center">60</td><td class="center"><strong>78</strong></td><td class="center">35</td><td class="center">75</td>
+      <td><strong>Authenticity</strong> + Vulnerability accent</td>
+    </tr>
+    <tr>
+      <td>Magician × Growth × Differentiation</td>
+      <td class="center">60</td><td class="center">68</td><td class="center"><strong>85</strong></td><td class="center">50</td><td class="center">40</td><td class="center">25</td>
+      <td><strong>Paradox</strong> + Metaphor accent</td>
+    </tr>
+    <tr>
+      <td>Lover × Maturity × Conversion</td>
+      <td class="center">35</td><td class="center">68</td><td class="center"><strong>75</strong></td><td class="center">65</td><td class="center">50</td><td class="center">55</td>
+      <td><strong>Paradox</strong> primary</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  Where no method scores above 80, the system falls back to <strong>composition</strong>
+  — pulling the highest-scoring component for each of the five method-anatomy slots
+  from whichever methods are strongest in that dimension.
+</p>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  6. END-TO-END FLOW                                           -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="flow"><span class="section-num">06</span>The end-to-end BrandDNA flow we propose</h2>
+
+<p>
+  The sequence below is what we'd run when a client submits the new 3-section
+  onboarding form. <span class="pill new">new</span> markers show what's added in v2;
+  everything else is preserved from the current implementation.
+</p>
+
+<div class="pipeline">
+<span class="label">[ Browser ]</span>
+   Section 1 submit  ──── client identity + handles
+        <span class="arrow">│</span>
+        <span class="arrow">▼</span>
+<span class="label">[ Server action ]</span>
+   1. Insert brand_profiles (status = scraping)
+   2. Fire async <span class="new-line">Section 1 → background extraction</span>
+   3. Return: redirect to Section 2 with placeholder data
+        <span class="arrow">│</span>
+        <span class="arrow">▼</span>
+<span class="label">[ Background — N8N-A03 Pass 1 ]</span> <span class="new-line">NEW: extraction-first</span>
+   • Apify Instagram scraper (30 posts + timestamps + handle stats)
+   • Multi-strategy website scraper (HTML + meta + color)
+   • Google Places API (rating, review count, category)
+   • Returns within 30-60 seconds → store in source_records
+        <span class="arrow">│</span>
+        <span class="arrow">▼</span>
+<span class="label">[ Browser ]</span>
+   Section 2 form  ── PRE-FILLED from extraction
+   <span class="new-line">User confirms or corrects: brand_name_en, dialect, channels, etc.</span>
+        <span class="arrow">│</span>
+        <span class="arrow">▼</span>
+<span class="label">[ Browser ]</span>
+   Section 3 form  ── voice + intent + occasion preferences
+        <span class="arrow">│</span>
+        <span class="arrow">▼</span>
+<span class="label">[ Server action ]</span>
+   Final submit → trigger N8N-A03 main pipeline (HMAC-signed)
+        <span class="arrow">│</span>
+        <span class="arrow">▼</span>
+<span class="label">[ N8N-A03 ]</span>
+   1. Verify HMAC + parse
+   2. CEO classify → RoutingDecision (unchanged)
+   3. Already-extracted data fetched from source_records
+   4. COO build_branddna  (now <strong>4 passes</strong>)            <span class="new-line">CHANGED</span>
+        <span class="arrow">│</span>
+        <span class="arrow">▼</span>
+<span class="label">[ COO Pass 1 ]</span> Build BrandDNA Lite (10 critical fields, unchanged)
+<span class="label">[ COO Pass 2 ]</span> <span class="new-line">NEW</span> Infer archetype_primary/secondary, lifecycle_stage,
+                 intent_state from form + scraper signals
+<span class="label">[ COO Pass 3 ]</span> <span class="new-line">NEW</span> Score 6 methods via Composition Matrix; emit
+                 method_profile (5 components + composition_blend)
+<span class="label">[ COO Pass 4 ]</span> <span class="new-line">NEW</span> Write the creative_direction_text — a 200-400
+                 word brief in plain language that the client and
+                 every downstream chain can read
+        <span class="arrow">│</span>
+        <span class="arrow">▼</span>
+<span class="label">[ Memory Controller ]</span>
+   Validates + writes:
+     • brand_profiles: 10 lite fields + 4 new axis fields
+     • brand_method_profiles: full method profile + creative direction
+     • evidence_bundles: per-field confidence
+     • branddna_event_log: append-only audit
+        <span class="arrow">│</span>
+        <span class="arrow">▼</span>
+<span class="label">[ Qdrant ]</span> Set up per-brand namespace for CaptionContext cache
+<span class="label">[ Snapshot ]</span> Final brand_snapshots row → realtime UI advance
+<span class="label">[ A01 trigger ]</span> If completeness ≥ 40 AND dialect_confirmed → fire calendar generation
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  7. ONBOARDING FORM IN 3 SECTIONS                             -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="onboarding"><span class="section-num">07</span>The 3-section onboarding form</h2>
+
+<p>
+  We propose splitting the existing 21-field single-screen form into three
+  sequenced sections. The reason isn't UX cosmetic — it's <strong>technical
+  dependency</strong>: Section 2 needs the scrape data from Section 1 to be useful, and
+  Section 3 needs both. This sequencing is what makes "extraction first"
+  architecturally enforced rather than just polite.
+</p>
+
+<div class="stages">
+  <div class="stage-card">
+    <span class="num">1</span>
+    <h3>Section 1 — Identity &amp; data sources</h3>
+    <p>
+      The minimum we need to start scraping. Submitting this section kicks off
+      Apify, the website scraper, and Google Places in the background while the
+      user fills the next section.
+    </p>
+    <p style="margin-top: 12px;">
+      <strong>Fields:</strong> brand_name_ar, brand_name_en (optional),
+      sector, city_primary, instagram_handle, website_url, place_search.name.
+    </p>
+    <p style="margin-top: 12px;">
+      <strong>Estimated time:</strong> ~45 seconds.
+    </p>
+  </div>
+
+  <div class="stage-card">
+    <span class="num">2</span>
+    <h3>Section 2 — Voice &amp; identity confirmation</h3>
+    <p>
+      Pre-filled from extraction. The user reviews and corrects rather than types
+      from scratch. If extraction returned high-confidence values (e.g. dialect
+      detected from Instagram captions), those are pre-selected; the user clicks
+      to confirm or change.
+    </p>
+    <p style="margin-top: 12px;">
+      <strong>Fields:</strong> arabic_dialect (pre-filled), price_position,
+      brand_differentiator, formality_level, humor_tolerance, religious_sensitivity,
+      bilingual_ratio, tone_anti_attribute_ids, primary_color_hex, logo upload.
+    </p>
+    <p style="margin-top: 12px;">
+      <strong>Estimated time:</strong> ~2-3 minutes.
+    </p>
+  </div>
+
+  <div class="stage-card">
+    <span class="num">3</span>
+    <h3>Section 3 — Audience &amp; intent</h3>
+    <p>
+      Strategic intent + occasion priorities + audience mix. This section drives
+      <strong>intent_state</strong> directly and feeds the Composition Matrix.
+    </p>
+    <p style="margin-top: 12px;">
+      <strong>Fields:</strong> primary_channel, primary_kpi_type, intent_state
+      (new dropdown), audience gender mix, 5 occasion relevance selects.
+    </p>
+    <p style="margin-top: 12px;">
+      <strong>Estimated time:</strong> ~1-2 minutes.
+    </p>
+  </div>
+</div>
+
+<div class="callout success">
+  <div class="title">Why this ordering matters technically</div>
+  <p>
+    Today, the form submit fires N8N-A03 with <em>everything</em> at once. That means
+    the user types things like "Instagram handle" and then has to wait 60-90 seconds
+    on a processing screen before seeing anything. With the 3-section split, scraping
+    happens <strong>during</strong> Section 2 — the user is already moving forward
+    while Apify runs. By the time they reach Section 3, the data is back, and
+    Section 3's voice/intent questions can be informed by what we already know.
+  </p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  8. DEPENDENCY ORDER                                          -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="dependencies"><span class="section-num">08</span>Dependency order — why extraction comes first</h2>
+
+<p>
+  When we sequence the build work, certain things must land before others or
+  downstream changes break. This is the order we propose:
+</p>
+
+<table>
+  <thead><tr><th>#</th><th>Step</th><th>Depends on</th><th>Why this order</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>Schema migration: add 4 new fields to brand_profiles + new brand_method_profiles table</td>
+      <td>—</td>
+      <td>COO has nowhere to write until columns exist.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Pattern catalog: enums for the 5 method-anatomy components</td>
+      <td>step 1</td>
+      <td>COO output can't be validated without a closed enum.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Apify config update: capture post timestamps for lifecycle inference</td>
+      <td>—</td>
+      <td>Without timestamps, COO can't tell Launch from Growth from Maturity.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Onboarding form refactor: 3 sections + Section 1 background-extraction trigger</td>
+      <td>step 3</td>
+      <td>Form must call the right pre-extraction endpoint.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>COO prompt rewrite: add archetype, lifecycle, intent inference + Composition Matrix + 5-component output</td>
+      <td>steps 1, 2, 3</td>
+      <td>Prompt depends on knowing what schema, enum, and signals are available.</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>Memory Controller whitelist update + recompute critical-fields constant (12 fields, not 10)</td>
+      <td>step 1</td>
+      <td>Existing field_update path must accept the new field paths.</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>UI updates: snapshot/profile/admin show archetype + method profile</td>
+      <td>steps 1, 5</td>
+      <td>Display depends on data shape being final.</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>CCO + DeepSeek prompts: consume method profile in CaptionContext</td>
+      <td>step 5</td>
+      <td>Downstream chains can't use what doesn't exist yet.</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>Vulnerability Method (the 6th method) added to the matrix and prompts</td>
+      <td>steps 1-8</td>
+      <td>Build the method into a working architecture, not the other way round.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  9. EDGE CASES + QUESTIONS                                    -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="edge-cases"><span class="section-num">09</span>Edge cases &amp; questions for you to verify</h2>
+
+<p>
+  These are the cases that aren't obvious from the framework document and that we
+  need your call on before we lock the schema and prompts. Each one has our
+  proposed answer and what it would cost to do something different.
+</p>
+
+<div class="qa">
+  <span class="q-num">Q1</span>
+  <h4>What if the user has no Instagram account?</h4>
+  <p>
+    Roughly 15-20% of Saudi SMEs we'd onboard don't have a meaningful Instagram
+    presence (new businesses, B2B, government suppliers). Without Instagram we lose
+    our richest archetype and lifecycle signal source.
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li>Mark Section 1's <code>instagram_handle</code> as optional (already is).</li>
+    <li>If empty: COO falls back to website-only + Google Places + form answers. Confidence floor for archetype caps at <code>inferred_medium</code> (never <code>inferred_high</code>) — we never claim certainty without two sources.</li>
+    <li>Lifecycle defaults to <strong>Launch</strong> for any brand with no Instagram, no website, and account creation date &lt; 12 months. If the user pushes back, we add a manual lifecycle dropdown to Section 3.</li>
+    <li>Section 3 adds a confirmation question: "We couldn't find an Instagram for your brand — is that intentional?" Helps us tag B2B vs new vs intentional-low-presence.</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> is the Launch-default acceptable, or do you want a manual override always shown when Instagram is missing?</div>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q2</span>
+  <h4>What if Google Places returns zero results?</h4>
+  <p>
+    Pure-online brands (e-commerce, SaaS, services without physical location) won't
+    have a Places record. Currently the scraper branch silently skips with no
+    fallback signal.
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li>Treat "no Places result" as a <strong>positive signal for online-native</strong>, not a missing-data failure.</li>
+    <li>The COO prompt receives <code>places_extraction: null</code> with a flag <code>{"online_native": true}</code> attached.</li>
+    <li>Online-native brands get a slight bias toward Explorer/Magician archetype, Growth or Launch lifecycle, and Conversion-Promotional intent unless other signals contradict.</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> are there sectors where missing Places should block onboarding (e.g. F&amp;B that <em>must</em> have a physical location)? If yes, we add a sector-specific check.</div>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q3</span>
+  <h4>What if the website returns 0 useful signal? (404, password-protected, single-page coming-soon)</h4>
+  <p>
+    This is more common than expected — many SMEs have an SSL'd holding page or
+    Linktree-style URL. The website scraper returns HTML but no extractable signal.
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li>Detect via heuristics: HTML &lt; 5KB, no <code>&lt;p&gt;</code> tags, no meta description, only "coming soon" / "under construction" keyword detected.</li>
+    <li>If detected: pass <code>website_extraction: { has_website: true, content_extracted: false, reason: "holding_page" }</code> to COO.</li>
+    <li>Lifecycle inference biases toward <strong>Launch</strong> if Instagram also confirms early-stage.</li>
+    <li>Don't penalize completeness_score — the user did provide a URL, they just don't have content yet.</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> should we surface this in the snapshot ("Your website needs content — here's what we'd recommend") as part of the BrandDNA report?</div>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q4</span>
+  <h4>What if Instagram is in a non-Arabic language? (English, mixed, emoji-only)</h4>
+  <p>
+    Arabic dialect is the highest-leverage BrandDNA field. If Instagram captions
+    aren't in Arabic, we lose our single best dialect signal.
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li>If &gt; 70% of captions are non-Arabic: <code>dialect_confirmed = false</code>, mark <code>arabic_dialect</code> as <code>missing</code> regardless of form answer until user confirms.</li>
+    <li>Section 2 form shows the dialect question with extra prominence and a note: "We couldn't auto-detect this from your Instagram. Please confirm."</li>
+    <li>This blocks A01 auto-trigger (the gate already requires <code>dialect_confirmed</code>).</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> is "user confirms manually" sufficient, or should we send the captions to a separate dialect-classifier model first?</div>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q5</span>
+  <h4>What if extraction returns conflicting signals? (form says "Najdi", Instagram says "Hejazi")</h4>
+  <p>
+    The framework treats this as a real signal — disagreement between sources is
+    information. But the system needs to handle it somewhere.
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li>Memory Controller already supports <code>conflict_flag</code> on evidence bundles. We use it.</li>
+    <li>COO Pass 2 marks the field as <code>inferred_low</code> with <code>conflict_flag = true</code>.</li>
+    <li>The brand falls into <code>confidence_mode = Cautious</code> for that field.</li>
+    <li>Section 2 surfaces a "We see disagreement here — please confirm" prompt with both options visible.</li>
+    <li>Logged to <code>branddna_event_log</code> as <code>contradiction_detected</code>.</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> is the Cautious-mode-with-prompt the right behavior, or should we hard-block until resolved?</div>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q6</span>
+  <h4>What if archetype detection scores below the confidence floor?</h4>
+  <p>
+    We require <code>inferred_medium</code> minimum on archetype. If signals are weak
+    enough that COO can't reach that floor, we have to do something safe.
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li>Default to the most common archetype for the brand's sector (Caregiver for healthcare, Sage for finance, Everyman for F&amp;B, etc.).</li>
+    <li>Mark as <code>inferred_low</code> with a flag for human review.</li>
+    <li>Surface in <code>/[slug]/profile</code> under "Archetype" with a "Confirm or correct" prompt — same correction flow as other low-confidence fields.</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> sector-default archetype map below — please confirm or correct.</div>
+  <table style="margin-top: 12px; font-size: 13px;">
+    <thead><tr><th>Sector</th><th>Default archetype</th></tr></thead>
+    <tbody>
+      <tr><td>F&amp;B</td><td>Everyman</td></tr>
+      <tr><td>Retail</td><td>Lover (premium) or Everyman (mid-market)</td></tr>
+      <tr><td>Beauty &amp; Wellness</td><td>Lover</td></tr>
+      <tr><td>Healthcare</td><td>Caregiver</td></tr>
+      <tr><td>Finance</td><td>Sage</td></tr>
+      <tr><td>Government</td><td>Ruler</td></tr>
+      <tr><td>Other</td><td>Caregiver (safest)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q7</span>
+  <h4>What if all 6 methods score below 80 in the Composition Matrix?</h4>
+  <p>
+    The framework calls these "GAP" cases — they require composition. We need a
+    policy for what composition means in code.
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li>Take each of the 5 method-anatomy components independently.</li>
+    <li>For each component, pick the highest-scoring method's pattern for that slot. Different methods can win different components.</li>
+    <li>Set <code>composition_score</code> to the average of the winning component scores.</li>
+    <li>If average &lt; 60: flag for human review (Production Copilot picks it up).</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> 60 floor reasonable, or should it be tighter (70+)?</div>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q8</span>
+  <h4>How does intent_state change over time, and who triggers the change?</h4>
+  <p>
+    The framework calls intent_state "the most fluid axis — can shift month to
+    month." But who decides the shift, and when does the system pick it up?
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li><strong>Default path:</strong> intent_state set at onboarding stays until the user changes it via <code>/[slug]/profile</code> (correction form).</li>
+    <li><strong>Auto-suggest path:</strong> N8N-A05 (monthly cycle) detects when current intent's chain-mix is producing low CCO scores and suggests an intent change. This goes to Production Copilot for human approval.</li>
+    <li><strong>Calendar override:</strong> user can pick a different intent for a single calendar via the calendar generation UI (e.g. "this Ramadan calendar should be Awareness-Attraction even though my default is Differentiation-Loyalty"). Per-calendar override doesn't change the brand default.</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> is the per-calendar override important to launch, or can it wait for Phase 2?</div>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q9</span>
+  <h4>How do existing brands (already in DB before this v2 ship) get backfilled?</h4>
+  <p>
+    Today's <code>brand_profiles</code> rows have no archetype, no lifecycle, no method
+    profile. They'll all be NULL after migration. What's the right backfill?
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li>One-time backfill script: for each existing brand, run COO Pass 2-4 once using their existing form data + any cached scraper output in <code>source_records</code>.</li>
+    <li>Mark all backfilled values as <code>inferred_medium</code> max — we never claim certainty on a backfill since we may not have current data.</li>
+    <li>Surface in admin Branddna inspector with a "Backfilled — needs review" badge for ops to walk through.</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> acceptable, or do you want existing brands to re-run the full extraction (more accurate but costs API credits per brand)?</div>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q10</span>
+  <h4>What about secondary archetypes — when do we set them?</h4>
+  <p>
+    The framework supports dual-archetype brands but doesn't say when secondary is
+    appropriate vs noise.
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li>Set <code>archetype_secondary</code> only when:
+      <ul>
+        <li>Two archetypes both score above 60 in COO's signal-matching, AND</li>
+        <li>Their combined score &gt; 140, AND</li>
+        <li>The gap between #1 and #2 is &lt; 15 points.</li>
+      </ul>
+    </li>
+    <li>Otherwise leave NULL. A weak secondary is worse than none — it dilutes content direction.</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> threshold reasonable, or should it be tighter?</div>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q11</span>
+  <h4>How do we display the new fields to the end user?</h4>
+  <p>
+    The user might not know what "archetype" or "Vulnerability Method" mean.
+    Showing raw enum values would feel like jargon.
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li><code>/[slug]/snapshot</code>: show archetype as a friendly label with a 1-line description ("The Caregiver — your brand serves and protects"). Show method as the <code>creative_direction_text</code> COO writes — that's already plain language by design.</li>
+    <li><code>/[slug]/profile</code>: shows component-level breakdown for users who want to drill in. Each of the 5 components has a short tooltip.</li>
+    <li><code>/admin/branddna/[brand_id]</code>: shows raw enums + composition_score + composition_blend JSON for ops debugging.</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> do you want to use Arabic translations of the archetype names, or keep English-only on the front-end?</div>
+</div>
+
+<div class="qa">
+  <span class="q-num">Q12</span>
+  <h4>What does the snapshot UI show during the extraction wait (Section 1 → Section 2)?</h4>
+  <p>
+    The 30-60 second extraction window is dead air for the user if we don't fill it.
+  </p>
+  <p style="margin-top: 8px;"><strong>Our proposed answer:</strong></p>
+  <ul>
+    <li>While Section 2 form is loading: show a real-time "We're looking up your brand…" panel with 3 progress lights (Instagram, Website, Google Places).</li>
+    <li>As each scraper returns, the corresponding light flips green AND the relevant Section 2 fields get pre-filled.</li>
+    <li>If a scraper returns nothing useful: that light goes amber and the field stays empty. User fills manually.</li>
+  </ul>
+  <div class="verify"><strong>Verify with client:</strong> is this UX acceptable, or do you want us to skip the per-scraper detail and just show "Loading…"?</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  9b. AGENT PROMPTS REQUEST (CLIENT DELIVERABLE)               -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="prompts"><span class="section-num">10</span>Agent prompts we need from you (resend / revise)</h2>
+
+<p>
+  The new framework changes what each AI agent must produce. The current prompts
+  in our <code>prompts/</code> folder were authored against the original
+  <code>doc.txt</code> — they don't reference archetype, lifecycle stage, intent
+  state, the Composition Matrix, the 5-component method anatomy, or the Vulnerability
+  Method. We need updated prompts from you, written in the same authoritative
+  voice and structure as the originals you provided, so we can drop them in via
+  <code>SEC-06</code> (env-only, never source-code).
+</p>
+
+<div class="callout warn">
+  <div class="title">What we cannot do without your re-sent prompts</div>
+  <p>
+    We can wire the schema, the data flow, and the composition logic ourselves.
+    But the <strong>creative judgment</strong> encoded in the prompt — how COO
+    detects archetype from caption tone, how it scores Vulnerability vs
+    Authenticity, how it writes the creative-direction brief in <em>your house
+    voice</em> — must come from you. If we generate prompt text ourselves we'll
+    drift from your editorial intent, and the BrandDNA outputs will reflect our
+    voice, not yours.
+  </p>
+</div>
+
+<h3>Prompts we need updated, in priority order</h3>
+
+<table>
+  <thead>
+    <tr><th>Agent</th><th>Current file</th><th>What needs updating</th><th>Priority</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>COO</strong> (Job 1: build_branddna)</td>
+      <td><code>OGzStudios_COO_Prompt_v1.md</code></td>
+      <td>
+        Add the 12 archetype detection rules with Saudi-SME caption-tone
+        signals · the 5 lifecycle stages with detection rules · intent_state
+        inference · the Composition Matrix scoring rule · the 5-component
+        method anatomy · output schema with 4 new fields · how to write the
+        <code>creative_direction_text</code> brief.
+      </td>
+      <td>🔴 Highest</td>
+    </tr>
+    <tr>
+      <td><strong>COO</strong> (Job 2: compile_caption_context)</td>
+      <td>same file, second job</td>
+      <td>
+        How to read the new method profile (5 components) from BrandDNA Family A
+        and translate it into the 800–1,200-token CaptionContext brief that
+        DeepSeek consumes. The current prompt only references voice/dialect —
+        it needs to layer in cadence, diagnostic, visual idiom, and closing
+        pattern.
+      </td>
+      <td>🟡 High</td>
+    </tr>
+    <tr>
+      <td><strong>COO</strong> (Job 3: score_confidence)</td>
+      <td>same file, third job</td>
+      <td>
+        Score posts against the brand's method profile, not just dialect/tone.
+        Add criteria for "method consistency" — does this caption follow the
+        composition the brand was assigned?
+      </td>
+      <td>🟡 High</td>
+    </tr>
+    <tr>
+      <td><strong>CEO</strong></td>
+      <td><code>OGzStudios_CEO_Prompt_v1.md</code></td>
+      <td>
+        Light update only — CEO doesn't pick the method, but it needs to know
+        the new BrandDNA fields exist so it can include them in
+        <code>constraint_payload</code> when dispatching to COO/CCO/DeepSeek.
+        Also: a new memory_nomination type for archetype/lifecycle/intent
+        changes (vs the existing field_update for Lite fields).
+      </td>
+      <td>🟡 High</td>
+    </tr>
+    <tr>
+      <td><strong>CCO</strong></td>
+      <td><code>OGzStudios_CCO_Prompt_v1.md</code></td>
+      <td>
+        Add a "method adherence" QC dimension to the existing dialect / tone /
+        cultural / religious checks. Posts that violate the brand's chosen
+        method composition should be flagged — e.g. an authoritative-warm
+        voice register on a brand assigned <code>intimate_humble</code>.
+      </td>
+      <td>🟢 Medium</td>
+    </tr>
+    <tr>
+      <td><strong>DeepSeek</strong> (caption generation)</td>
+      <td><code>OGzStudios_DeepSeek_Prompt_v1.md</code></td>
+      <td>
+        Consume the new CaptionContext shape (with 5 method components) and
+        produce captions that follow each component slot. Voice register and
+        diagnostic pattern should be most visible per-caption; cadence is a
+        cross-caption concern that the prompt should reference but mostly
+        defers to ordering.
+      </td>
+      <td>🟢 Medium</td>
+    </tr>
+    <tr>
+      <td><strong>3 Admin Copilots</strong> (Management / Tech / Production)</td>
+      <td><code>OGzStudios_Copilot_*_Prompt_v1.md</code></td>
+      <td>
+        Optional but recommended: extend the Production Copilot prompt to
+        understand archetype/method when surfacing QA queue items so reviewers
+        see "this post is held because it violates the brand's <code>direct_ask</code>
+        closing-pattern" instead of just "low score".
+      </td>
+      <td>🟢 Low (Phase 1.5)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>What we'd ideally get back from you</h3>
+<ol>
+  <li>
+    A <strong>full revised COO prompt v2</strong> that replaces the current Job 1
+    section with archetype + lifecycle + intent inference + Composition Matrix +
+    5-component output schema. The framework HTML you sent has the conceptual
+    content; we need it shaped into the model-instruction style of your existing
+    prompts.
+  </li>
+  <li>
+    A <strong>signal table for archetype detection</strong> — for each of the 12
+    archetypes, what telltale signals tip COO toward that classification. Things
+    like: "Caregiver speaks in 'we' more than 'I'; uses softening particles;
+    dietary/health vocabulary common in F&amp;B sub-vertical; etc." This is what
+    we don't have the editorial authority to write ourselves.
+  </li>
+  <li>
+    The <strong>5-component pattern catalog</strong> — for each of the 5 method
+    anatomy slots, what closed list of patterns we should expose as enums. We've
+    drafted candidates above; we need your sign-off on the final values, ideally
+    with a 1-line definition each.
+  </li>
+  <li>
+    Updated <strong>CCO and DeepSeek prompts</strong> that consume the new
+    CaptionContext shape.
+  </li>
+  <li>
+    The <strong>Vulnerability Method</strong> spec, when the framework feels
+    stable — voice register choices, diagnostic pattern, visual idiom, cadence,
+    closing pattern. Even a draft is enough; we'll iterate after first live test.
+  </li>
+</ol>
+
+<div class="callout note">
+  <div class="title">How prompts reach our system (no code changes needed from you)</div>
+  <p>
+    All system prompts are environment-variable-only per <code>SEC-06</code>. You
+    send markdown files (or paste text); we put them in our
+    <code>prompts/</code> folder for dev and configure
+    <code>*_SYSTEM_PROMPT</code> env vars in production. Updating a prompt is a
+    config change, not a deploy. So you can iterate in real-time once we're
+    running live: rewrite, send, hot-reload, observe.
+  </p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  11. SUMMARY                                                  -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<h2 id="summary"><span class="section-num">11</span>What's locked, what's open, what's next</h2>
+
+<h3>Locked (we are confident in our understanding)</h3>
+<ul class="checks">
+  <li>BrandDNA Family A grows by 4 fields: archetype_primary, archetype_secondary, lifecycle_stage, intent_state — plus a new brand_method_profiles table.</li>
+  <li>Methods become 5-component composable pattern objects, sourced independently.</li>
+  <li>Composition Matrix scores 6 methods per (archetype × stage × intent) tuple.</li>
+  <li>Vulnerability is method #6 — built last, after the architecture works.</li>
+  <li>Onboarding splits into 3 sections so extraction runs in parallel with user input.</li>
+  <li>Hard Rules #1 #2 #3 #4 unchanged. CEO still routes first. Memory Controller still sole writer.</li>
+  <li>Existing 11 n8n flows preserved; A03 gets a 4-pass COO instead of 1-pass.</li>
+</ul>
+
+<h3>Open (waiting for your sign-off)</h3>
+<ul class="checks" style="--check: '?';">
+  <li>The 12 archetype names + their default method affinities (Section 3 of this doc) — please confirm cultural fit.</li>
+  <li>Sector-to-default-archetype map (Q6) — please correct any that look wrong for Saudi SME.</li>
+  <li>Dual-archetype detection thresholds (Q10).</li>
+  <li>Composition fallback floor (Q7) — 60 vs 70.</li>
+  <li>Per-calendar intent override (Q8) — Phase 1 or Phase 2.</li>
+  <li>Backfill strategy for existing brands (Q9) — cheap or accurate.</li>
+  <li>Front-end localisation of archetype labels (Q11) — Arabic-friendly names or English-only.</li>
+  <li><strong>Updated agent prompts</strong> (Section 10): COO v2, CCO update, DeepSeek update, Vulnerability Method spec — full list with priorities is in the dedicated section above.</li>
+</ul>
+
+<h3>What we'll ship after sign-off</h3>
+<ol>
+  <li>Schema migration + pattern catalog enums.</li>
+  <li>Apify config update (capture timestamps).</li>
+  <li>3-section onboarding form + Section-1-triggered background extraction.</li>
+  <li>COO prompt rewrite (Pass 2/3/4 logic + Composition Matrix + 5-component output schema).</li>
+  <li>Memory Controller whitelist additions + critical-fields constant updated to 12.</li>
+  <li>Snapshot / Profile / Admin UI updates.</li>
+  <li>CCO + DeepSeek prompt updates to consume the method profile.</li>
+  <li>Vulnerability Method as the 6th method.</li>
+</ol>
+
+<div class="callout warn" style="margin-top: 28px;">
+  <div class="title">One thing we explicitly do NOT recommend</div>
+  <p>
+    Building Vulnerability Method first or in parallel. The framework calls it the
+    highest-leverage addition, but only <em>after</em> the composable architecture
+    exists. Building it before the (archetype × stage × intent) plumbing means we
+    rewrite Vulnerability twice — once as a monolithic method, once again as a
+    pattern set. We want to ship it once.
+  </p>
+</div>
+
+<div class="callout success">
+  <div class="title">Realistic effort estimate</div>
+  <p>
+    Roughly <strong>1.5 to 2 working days</strong> end-to-end after sign-off. The
+    bottleneck is the COO prompt rewrite (4-6 hours of careful prompt engineering for
+    archetype detection signals + composition matrix encoding). Schema, code, and
+    UI are smaller. Vulnerability Method itself is another 2-3 hours after the rest
+    works.
+  </p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!--  FOOTER                                                       -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<footer class="footer">
+  <p>
+    OpenClaw — BrandDNA Understanding &amp; Verification Document v1 · Internal /
+    weiBlocks · Author: engineering · Status: awaiting client sign-off on
+    open questions before schema lift.
+  </p>
+</footer>
+
+</div>
+</body>
+</html>

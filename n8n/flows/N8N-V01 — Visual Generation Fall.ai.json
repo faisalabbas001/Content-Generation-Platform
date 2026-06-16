@@ -1,0 +1,339 @@
+{
+  "name": "N8N-V01 — Visual Generation (Testing Mode1)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "62dd27b7-4a58-43bd-9a6e-ad125fa1dfa6",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst input = $input.all()[0].json;\n\n// On-demand: the user's prompt is authoritative. Send it to the prompt-composer\n// agent (Claude Sonnet) to refine into a photographic English fal.ai prompt that\n// keeps the user's subject as the hero and layers the brand visual identity.\nconst userPrompt = (input.prompt_en || '').trim();\n\nconst payload = {\n  flow_id: 'N8N-V01',\n  brand_id: input.brand_id || 'MISSING',\n  payload: {\n    user_prompt: userPrompt || 'product lifestyle photography, clean background, natural lighting',\n    user_intent_authoritative: true,\n    expected_media_type: input.expected_media_type || input.media_type || input.format_tier || 'image',\n    chain_id: input.chain_id || undefined,\n  }\n};\n\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', 'test-webhook-secret-123').update(raw).digest('hex');\n\nreturn [{ json: {\n  url: 'https://petition-cupid-buffed.ngrok-free.dev/api/agents/prompt-composer',\n  body: raw,\n  headers: {\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': crypto.randomUUID(),\n    'x-n8n-timestamp': new Date().toISOString(),\n  }\n}}];"
+      },
+      "id": "a1b2c3d4-0001-4a00-9000-refineprep0001",
+      "name": "Prepare refine call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -820,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers[\"x-n8n-signature\"] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers[\"x-n8n-request-id\"] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers[\"x-n8n-timestamp\"] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "a1b2c3d4-0002-4a00-9000-composerhttp02",
+      "name": "POST /api/agents/prompt-composer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -620,
+        320
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst input = $('Execute Workflow Trigger').first().json;\n\n// Refined prompt from the prompt-composer agent (best-effort; falls back to the raw prompt).\nlet refinedPrompt = '';\ntry {\n  const comp = $('POST /api/agents/prompt-composer').first().json || {};\n  refinedPrompt = ((comp.result && comp.result.composed_prompt_en) || comp.composed_prompt_en || '').trim();\n  const AR = /[\\u0600-\\u06FF]/;\n  if (refinedPrompt && AR.test(refinedPrompt)) refinedPrompt = '';\n} catch (e) { refinedPrompt = ''; }\n\nif (!input.brand_id) {\n  console.warn('[V01] WARNING: brand_id is missing from input:', JSON.stringify(Object.keys(input)));\n}\n\nconst promptEn = refinedPrompt || (input.prompt_en || '').trim() || 'product lifestyle photography, clean background, natural lighting';\n\n// Map DeepSeek sharp_text_gravity → OverlayLayout.\nconst GRAVITY_TO_LAYOUT = { south: 'bottom-right', north: 'top-right', center: 'center-right' };\nconst layout = GRAVITY_TO_LAYOUT[input.sharp_text_gravity];\n\n// SMART MONTH CONVERSION - handles both \"June\" and \"2026-06\" formats\nfunction formatMonth(monthInput, yearInput) {\n  if (!monthInput) {\n    return new Date().toISOString().slice(0, 7);\n  }\n  \n  // Check if it's already in YYYY-MM format\n  if (/^\\d{4}-\\d{2}$/.test(monthInput)) {\n    return monthInput;\n  }\n  \n  // Check if it's a month name like \"June\"\n  const monthNames = {\n    'January': '01', 'February': '02', 'March': '03', 'April': '04',\n    'May': '05', 'June': '06', 'July': '07', 'August': '08',\n    'September': '09', 'October': '10', 'November': '11', 'December': '12'\n  };\n  \n  // Try to match the month name (case insensitive)\n  const monthName = Object.keys(monthNames).find(\n    name => name.toLowerCase() === monthInput.toLowerCase()\n  );\n  \n  if (monthName) {\n    // Use the provided year, or current year if not available\n    const year = yearInput || new Date().getFullYear();\n    return `${year}-${monthNames[monthName]}`;\n  }\n  \n  // If it's a number (1-12), format it\n  if (/^\\d{1,2}$/.test(monthInput)) {\n    const year = yearInput || new Date().getFullYear();\n    const monthNum = monthInput.padStart(2, '0');\n    return `${year}-${monthNum}`;\n  }\n  \n  // Fallback to current month\n  console.warn(`[V01] Unrecognized month format: ${monthInput}, using current month`);\n  return new Date().toISOString().slice(0, 7);\n}\n\n// Handle palette_hex from various sources\nlet paletteHex = input.palette_hex || [];\nif (input.primary_color_hex && input.primary_color_hex.trim() !== '') {\n  paletteHex = [input.primary_color_hex];\n}\nif (paletteHex.length === 0 && input.brand_color_palette) {\n  paletteHex = input.brand_color_palette;\n}\n\n// BUG FIX 1: Route video to the async /api/image/generate-video endpoint.\n// The sync /api/image/generate blocks up to 450 s for video — ngrok kills at 30 s → 503.\nconst expectedMediaType = input.expected_media_type || input.media_type || input.format_tier || 'image';\nconst isVideo = expectedMediaType === 'video';\nconst endpoint = isVideo\n  ? 'https://petition-cupid-buffed.ngrok-free.dev/api/image/generate-video'\n  : 'https://petition-cupid-buffed.ngrok-free.dev/api/image/generate';\n\nconst payload = {\n  flow_id:  'N8N-V01',\n  brand_id: input.brand_id  || 'MISSING',\n  post_id:  input.post_id   || crypto.randomUUID(),\n  payload: {\n    prompt_en:           promptEn,\n    brand_name_ar:       input.brand_name_ar   || input.brand_name_en || '',\n    headline_ar:         input.headline_ar     || input.caption_ar || '',\n    dialect:             input.dialect         || 'MSA_formal',\n    channel:             input.channel         || 'Instagram',\n    objective:           input.objective       || 'awareness',\n    first_ever_post:     input.first_ever_post || false,\n    confidence_flag:     input.confidence_flag || 'clean',\n    cost_constraint:     input.cost_constraint || 'standard',\n    palette_hex:         paletteHex,\n    month:               formatMonth(input.month, input.year),\n    score:               input.score || input.confidence_score || 85,\n    expected_media_type: expectedMediaType,\n    reference_image_url: input.reference_image_url || undefined,\n    chain_id:            input.chain_id        || null,\n    chain_context:       input.chain_context   || undefined,\n    layout:              layout,\n  }\n};\n\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', 'test-webhook-secret-123').update(raw).digest('hex');\n\nreturn [{ json: {\n  url:      endpoint,\n  body:     raw,\n  brand_id: input.brand_id,\n  post_id:  payload.post_id,\n  headers: {\n    'x-n8n-signature':  sig,\n    'x-n8n-request-id': crypto.randomUUID(),\n    'x-n8n-timestamp':  new Date().toISOString(),\n  }\n}}];"
+      },
+      "id": "79674297-f766-422f-a4e0-ed7cb0c146ce",
+      "name": "Prepare image/generate call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers[\"x-n8n-signature\"] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers[\"x-n8n-request-id\"] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers[\"x-n8n-timestamp\"] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "1f3b6642-0c25-4c01-b9b2-2978e6f94645",
+      "name": "POST /api/image/generate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -448,
+        112
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.result?.storage_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "id": "73f3baa1-5c65-469d-8f73-6f5012b1f180"
+            },
+            {
+              "leftValue": "={{ $json.result?.request_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "id": "async-video-request-id-check"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "b9714405-d69a-4af4-b9e0-6b682353fce6",
+      "name": "Did it succeed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $json.result || $json;\nconst storageUrl = result.storage_url;\nconst cleanStorageUrl = result.clean_storage_url || null;\nconst prepare = $('Prepare image/generate call').first().json;\nreturn [{ json: {\n  storage_url:       storageUrl,\n  clean_storage_url: cleanStorageUrl,\n  keyframe_url:      result.keyframe_url || null,\n  brand_id:          prepare.brand_id,\n  post_id:           prepare.post_id,\n  image_prompt_en:   result.image_prompt_en || null,\n  negative_prompt:   result.negative_prompt || null,\n  success:           true\n}}];\n"
+      },
+      "id": "872a7163-ee12-483e-aa63-08042a098ed6",
+      "name": "Extract storage_url",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "generation_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "chain_id",
+              "fieldValue": "fal-ai/flux-pro/v1.1-ultra"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "completed"
+            }
+          ]
+        }
+      },
+      "id": "9c815553-b04a-4d2f-8e1d-9e53637f11f6",
+      "name": "Supabase: log generation",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        528,
+        -144
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const extracted = $('Extract storage_url').first().json;\nreturn [{ json: { \n  storage_url: extracted.storage_url, \n  clean_storage_url: extracted.clean_storage_url || null, \n  keyframe_url: extracted.keyframe_url || null, \n  image_prompt_en: extracted.image_prompt_en || null, \n  negative_prompt: extracted.negative_prompt || null, \n  success: true \n} }];\n"
+      },
+      "id": "0c27a460-dc1f-4477-80b5-ce884eb7c5c4",
+      "name": "Return success to parent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { storage_url: null, success: false, error: $json.error?.message || $json.message || 'image/generate failed' } }];\n"
+      },
+      "id": "da929d97-063e-4f48-9be1-523f670b17c4",
+      "name": "Return error to parent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        368
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare refine call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare image/generate call": {
+      "main": [
+        [
+          {
+            "node": "POST /api/image/generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/image/generate": {
+      "main": [
+        [
+          {
+            "node": "Did it succeed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Did it succeed?": {
+      "main": [
+        [
+          {
+            "node": "Extract storage_url",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return error to parent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract storage_url": {
+      "main": [
+        [
+          {
+            "node": "Supabase: log generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: log generation": {
+      "main": [
+        [
+          {
+            "node": "Return success to parent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare refine call": {
+      "main": [
+        [
+          {
+            "node": "POST /api/agents/prompt-composer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/agents/prompt-composer": {
+      "main": [
+        [
+          {
+            "node": "Prepare image/generate call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6b82bfa883d8b0ed7859b6f0ce362a41be2730aad080ae279216f1911379c19c"
+  }
+}

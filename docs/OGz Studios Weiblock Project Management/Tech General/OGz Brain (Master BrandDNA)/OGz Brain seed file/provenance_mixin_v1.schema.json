@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ogz-knowledge/schemas/provenance_mixin_v1.schema.json",
+  "title": "Provenance Mixin v1",
+  "description": "Universal provenance fields embedded in every record. Non-negotiable per CONVENTIONS.md §3.",
+  "type": "object",
+  "required": ["source", "date_added", "confirmer", "confidence", "scope"],
+  "additionalProperties": false,
+  "properties": {
+    "source": {
+      "type": "string",
+      "description": "Free-text but specific. Where this record came from. Examples: 'internal_research_corpus/ogz_creative_intelligence.md#section_3', 'client_session:01HXY...; question_id:13', 'benchmark:@account_handle; post_id:...', 'inference:approval_pattern_count:23'",
+      "minLength": 5
+    },
+    "date_added": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp when this record was first created. Never updated."
+    },
+    "confirmer": {
+      "type": "string",
+      "description": "Who confirmed this record. Examples: 'Mohamed', 'Alhareth', 'Cultural Advisor', 'CD lead', 'client', 'inference_engine'",
+      "minLength": 2
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["confirmed", "inferred", "experimental"],
+      "description": "confirmed = validated by human authority OR proven through repeated production. inferred = extracted from data signal but not human-validated. experimental = initial seed, not yet validated in production."
+    },
+    "scope": {
+      "type": "string",
+      "description": "What this record applies to. Format: 'universal' OR 'sector:<slug>' OR 'brand:<ulid>' OR 'region:<slug>' OR 'occasion:<slug>'. Multiple scopes combine with '+', e.g., 'sector:f_and_b+occasion:ramadan'.",
+      "pattern": "^(universal|(sector|brand|region|occasion):[a-z0-9_]+)(\\+(sector|brand|region|occasion):[a-z0-9_]+)*$"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional. Set only when the record is updated (rare; most records are append-only)."
+    },
+    "update_reason": {
+      "type": "string",
+      "description": "Optional. Required if last_updated is set. Why the update happened."
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "predev": "node ../../scripts/sync-env.mjs",
+    "dev": "cross-env NODE_OPTIONS=\"--dns-result-order=ipv4first --no-network-family-autoselection\" next dev",
+    "prebuild": "node ../../scripts/sync-env.mjs",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@next/env": "16.2.4",
+    "@repo/ai": "workspace:*",
+    "@repo/auth": "workspace:^",
+    "@repo/compliance": "workspace:*",
+    "@repo/core": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/email": "workspace:^",
+    "@repo/i18n": "workspace:*",
+    "@repo/image": "workspace:*",
+    "@repo/memory": "workspace:*",
+    "@repo/scraping": "workspace:*",
+    "@repo/ui": "workspace:*",
+    "@repo/vectors": "workspace:*",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
+    "jszip": "^3.10.1",
+    "next": "16.2.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

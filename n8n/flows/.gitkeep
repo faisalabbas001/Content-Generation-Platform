@@ -1,0 +1,2824 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 20 * * 0,1,2,3,4"
+            }
+          ]
+        }
+      },
+      "id": "1ba234c5-aa38-4a70-8213-9dbec5066128",
+      "name": "Cron: Nightly Shard (Sun–Thu 23:00 AST)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -108304,
+        -11584
+      ]
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 20 1 * *"
+            }
+          ]
+        }
+      },
+      "id": "8f0cf8a8-db1f-4ae9-b7b4-4405977db48d",
+      "name": "Cron: 1st of Month — Orchestrator",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -108304,
+        -11760
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "openclaw-batch-calendar",
+        "options": {}
+      },
+      "id": "56ef91e6-cb40-4bdc-8b44-12b3997f67c6",
+      "name": "Webhook: openclaw-batch-calendar",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -108304,
+        -11408
+      ],
+      "webhookId": "de7cc6d0-e60c-487d-919a-1de83af8ef0c"
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst currMonth = now.getMonth();\nconst currYear  = now.getFullYear();\nconst dayOfWeek = now.getDay();\nconst monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];\nlet target_month = currMonth, target_year = currYear;\nlet target_month_key = target_year + '-' + String(target_month+1).padStart(2,'0');\nlet off_days = [0,6];\ntry { const raw = $vars.OFF_DAYS||''; if(raw) off_days=raw.split(',').map(n=>parseInt(n.trim(),10)).filter(n=>!isNaN(n)); } catch(_){}\nconst DOW_TO_SHARD = {0:0,1:1,2:2,3:3,4:4};\nlet batch_type  = now.getDate()===1?'MONTHLY':'WEEKLY';\nlet batch_shard = batch_type==='WEEKLY'?(DOW_TO_SHARD[dayOfWeek]??0):null;\nconst daysInMonth = new Date(currYear,currMonth+1,0).getDate();\nconst is_last_sunday = dayOfWeek===0 && (now.getDate()+7)>daysInMonth;\nlet batch_id = batch_type==='MONTHLY'?'monthly-'+target_month_key:'shard-'+batch_shard+'-'+target_month_key;\nlet month_offset=0, target_brand_id=null, is_partial=false, partial_start_date=null, webhook_occasion_flags=null;\ntry {\n  const body = $('Webhook: openclaw-batch-calendar').first().json.body||{};\n  if(body.brand_id) target_brand_id=body.brand_id;\n  if(body.batch_type) batch_type=body.batch_type;\n  if(typeof body.batch_shard==='number') batch_shard=body.batch_shard;\n  else if(batch_type==='WEEKLY') batch_shard=batch_shard??(DOW_TO_SHARD[dayOfWeek]??0);\n  batch_id=batch_type==='MONTHLY'?'monthly-'+target_month_key:'shard-'+batch_shard+'-'+target_month_key;\n  if(body.partial===true&&body.start_date){is_partial=true;partial_start_date=body.start_date;}\n  if(target_brand_id&&!body.batch_type){batch_type='MONTHLY';batch_shard=null;batch_id='monthly-'+target_month_key;}\n  if(typeof body.month_offset==='number'&&body.month_offset>=0&&body.month_offset<=2) month_offset=body.month_offset;\n  if(target_brand_id&&!is_partial&&now.getDate()>1){is_partial=true;const _y=now.getFullYear();const _m=String(now.getMonth()+1).padStart(2,'0');const _d=String(now.getDate()).padStart(2,'0');partial_start_date=_y+'-'+_m+'-'+_d;}\n  if(body.occasion_flags&&Array.isArray(body.occasion_flags)) webhook_occasion_flags=body.occasion_flags;\n} catch(e){}\nif(month_offset>0){\n  const od=new Date(target_year,target_month+month_offset,1);\n  target_month=od.getMonth(); target_year=od.getFullYear();\n  target_month_key=target_year+'-'+String(target_month+1).padStart(2,'0');\n  batch_id=batch_type==='MONTHLY'?'monthly-'+target_month_key+'-offset'+month_offset:'shard-'+batch_shard+'-'+target_month_key;\n  is_partial=false; partial_start_date=null;\n}\nreturn [{ json:{target_month,target_year,target_month_name:monthNames[target_month],target_month_key,batch_type,batch_shard,is_last_sunday,batch_id,generated_at:now.toISOString(),target_brand_id,off_days,is_partial,partial_start_date,expected_posts_per_brand:20,month_offset,max_brands_per_batch:batch_type==='MONTHLY'?500:60,webhook_occasion_flags} }];"
+      },
+      "id": "e6972a44-4c63-45a2-acd0-e0faecd496ab",
+      "name": "Prepare Batch Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -107856,
+        -11584
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "tableId": "usage_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-A01"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "Batch Start"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "batch_started"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify({ batch_type: $json.batch_type, batch_shard: $json.batch_shard, is_last_sunday: $json.is_last_sunday, target_month: $json.target_month_key, batch_id: $json.batch_id, generated_at: $json.generated_at }) }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "1b1ad0f3-05d2-469d-8ff4-5adafa77f0e5",
+      "name": "Supabase: Log Batch Start",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -107472,
+        -11584
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3ca1073e-32ba-4732-863d-6ee2a63d12da",
+              "leftValue": "={{ $('Prepare Batch Config').first().json.batch_type }}",
+              "rightValue": "MONTHLY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "24f370db-343c-4bff-9c2f-bd31b8bb71eb",
+      "name": "IF: Monthly or Weekly?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -107088,
+        -11584
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "brand_profiles",
+        "limit": 500
+      },
+      "id": "2568da69-af6b-4002-b561-3ab1a9198142",
+      "name": "Supabase: Fetch All Active Brands",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -104384,
+        -12272
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://redzmrlzhxkkpgcokgvl.supabase.co/rest/v1/brand_profiles?batch_shard=eq.' + $('Prepare Batch Config').first().json.batch_shard + '&or=(tier.neq.free,total_calendars_generated.eq.0)&select=*' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a1de2e28-5246-4a3c-ad07-18093e18ae31",
+      "name": "Supabase: Fetch Brands by Shard1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -103936,
+        -10688
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const batchCfg = $(\"Prepare Batch Config\").first().json;\nconst targetBrandId = batchCfg.target_brand_id||null;\nconst seen = new Set(); const result = [];\nfor (const item of $input.all()) {\n  const b = item.json;\n  if(!b.brand_id) continue;\n  if(b.tier==='free'&&(b.total_calendars_generated||0)>0) continue;\n  if(targetBrandId&&b.brand_id!==targetBrandId) continue;\n  if(!seen.has(b.brand_id)){seen.add(b.brand_id);result.push({json:b});}\n}\nreturn result;"
+      },
+      "id": "d8c6f5ef-85c7-4ffe-a7f1-709528a53cb9",
+      "name": "Merge Brand Sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -103824,
+        -12272
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "f61f869c-8068-47ca-8cf4-813e0b40eec5",
+      "name": "Loop Brands (5 Parallel)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        -102400,
+        -14912
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://redzmrlzhxkkpgcokgvl.supabase.co/rest/v1/calendars?on_conflict=brand_id,month",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ brand_id: $json.brand_id, month: $('Prepare Batch Config').first().json.target_month_key, status: 'draft' }) }}",
+        "options": {}
+      },
+      "id": "85eaa72e-b014-4f91-9eb9-cfac176e34fd",
+      "name": "Supabase: Insert Calendar Lease1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -102048,
+        -14912
+      ],
+      "retryOnFail": false,
+      "alwaysOutputData": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const brand = $input.first().json;\nconst batchConfig = $('Prepare Batch Config').first().json;\nconst offDaysRaw = ('0,6').split(',').map(s=>parseInt(s.trim(),10)).filter(n=>!isNaN(n));\nconst year=batchConfig.target_year, month=batchConfig.target_month;\nconst daysInMonth=new Date(year,month+1,0).getDate();\nconst monthName=batchConfig.target_month_name;\nconst isFirstCalendar=(brand.total_calendars_generated||0)===0;\nconst now=new Date();\nconst startDay=(batchConfig.is_partial&&batchConfig.partial_start_date)?parseInt(batchConfig.partial_start_date.split('-')[2],10):(batchConfig.start_day||now.getDate());\nlet cursor=new Date(year,month,startDay);\nconst monthEnd=new Date(year,month+1,0);\nconst scheduleDates=[];\nconst totalPosts=batchConfig.total_posts||batchConfig.expected_posts_per_brand||20;\nconst peakHours=[8,11,12,13,14,15,17,18,19,20,21,12,13,17,18,19,20,12,17,19];\nwhile(scheduleDates.length<totalPosts&&cursor<=monthEnd){\n  const dow=cursor.getDay();\n  if(!offDaysRaw.includes(dow)){\n    const yyyy=cursor.getFullYear(),mm=String(cursor.getMonth()+1).padStart(2,'0'),dd=String(cursor.getDate()).padStart(2,'0');\n    const hour=peakHours[scheduleDates.length];\n    const slotISO=`${yyyy}-${mm}-${dd}T${String(hour).padStart(2,'0')}:00:00+03:00`;\n    if(new Date(slotISO)>now) scheduleDates.push({date:`${yyyy}-${mm}-${dd}`,hour,posting_time:slotISO,is_video_slot:false});\n  }\n  cursor.setDate(cursor.getDate()+1);\n}\n\n// ── Video slot distribution ─────────────────────────────────────────────────\nconst tier = (brand.tier||'free').toLowerCase();\nlet videoCount = 0;\nif(tier==='pro'){\n  // Count full weeks remaining from startDay to monthEnd\n  const msPerWeek = 7*24*60*60*1000;\n  const startDate = new Date(year, month, startDay);\n  const remainingMs = monthEnd.getTime() - startDate.getTime();\n  videoCount = Math.max(1, Math.round(remainingMs / msPerWeek));\n  videoCount = Math.min(videoCount, scheduleDates.length);\n} else {\n  // Free: 1 video per 8 posts\n  videoCount = Math.floor(scheduleDates.length / 8);\n}\n// Evenly distribute video slots across schedule_dates\nif(videoCount > 0 && scheduleDates.length > 0){\n  const step = Math.floor(scheduleDates.length / videoCount);\n  for(let v=0;v<videoCount;v++){\n    const idx = Math.min(v * step + Math.floor(step/2), scheduleDates.length-1);\n    scheduleDates[idx].is_video_slot = true;\n  }\n}\n\nconst SAUDI_OCCASIONS={\n  'January':{occasions:['pre_ramadan_warmup'],engagement_multiplier:1.0,themes:['winter_warmth','comfort_food','family_dining','hot_beverages','qahwa'],avoid:[]},\n  'February':{occasions:['ramadan_2026','founding_day'],engagement_multiplier:2.8,ramadan:true,themes:['iftar_specials','suhoor_menu','saudi_heritage_food','founding_day_pride','family_gathering','generosity'],avoid:['daytime_food_photos','alcohol_adjacent','western_valentine_push']},\n  'March':{occasions:['ramadan_end_2026','eid_al_fitr_2026'],engagement_multiplier:2.5,ramadan:true,eid:true,themes:['eid_celebration','family_feast','sweets_gifting','eid_menu_launch','joy_togetherness'],avoid:[]},\n  'April':{occasions:['post_eid_spring','mothers_day_arab'],engagement_multiplier:1.2,themes:['outdoor_dining','spring_freshness','light_menu','mothers_day_dining','dates_culture'],avoid:[]},\n  'May':{occasions:['eid_al_adha_2026','hajj_season_2026'],engagement_multiplier:2.2,eid:true,themes:['meat_grills','mandi','kabsa','family_feast','eid_adha_special','sacrifice_generosity','bbq_grills'],avoid:['heavy_vegetarian_push','pork_adjacent']},\n  'June':{occasions:['summer_start','saudi_summer_program'],engagement_multiplier:1.0,themes:['cooling_drinks','fresh_juices','indoor_comfort','refreshing_desserts','iced_coffee','summer_specials'],avoid:['outdoor_heat_photos','heavy_meat_content']},\n  'July':{occasions:['saudi_summer_festival','school_vacation_peak'],engagement_multiplier:1.1,themes:['family_entertainment','kids_meal','ice_cream','cold_beverages','mall_dining','fun_moments'],avoid:['formal_corporate_tone']},\n  'August':{occasions:['back_to_school_prep','late_summer'],engagement_multiplier:1.0,themes:['quick_bites','student_deals','family_prep','comfort_food','affordable_options'],avoid:[]},\n  'September':{occasions:['national_day','back_to_school'],engagement_multiplier:1.9,themes:['saudi_pride','traditional_saudi_cuisine','green_gold_colors','heritage_dishes','kabsa','mandi','jareesh','harees','national_day_offer'],avoid:['non_saudi_cultural_references','western_themed_content']},\n  'October':{occasions:['world_coffee_day','world_food_day','fall_season'],engagement_multiplier:1.3,themes:['arabic_coffee','qahwa_culture','seasonal_warmth','autumn_menu','food_story','behind_scenes','artisan_quality'],avoid:[]},\n  'November':{occasions:['pre_winter_season','saudi_entertainment_season'],engagement_multiplier:1.2,themes:['warm_beverages','hearty_meals','cozy_ambiance','traditional_soups','shorbah','warm_tone'],avoid:[]},\n  'December':{occasions:['winter_peak','riyadh_season','year_end'],engagement_multiplier:1.4,themes:['year_end_gratitude','family_gatherings','winter_warmth','special_menu','gifting_sweets','premium_experience','year_review'],avoid:['christmas_themes_for_conservative_brands','new_year_party_content']}\n};\nconst monthData=SAUDI_OCCASIONS[monthName]||{occasions:[],engagement_multiplier:1.0,themes:[],avoid:[]};\nreturn [{ json:{\n  brand_id:brand.brand_id,brand_name_ar:brand.brand_name_ar,brand_name_en:brand.brand_name_en||brand.brand_name_ar,\n  sector:brand.sector,arabic_dialect:brand.arabic_dialect,city:brand.city_primary,tier:brand.tier,\n  total_calendars:brand.total_calendars_generated||0,primary_channel:brand.primary_channel||'Instagram',\n  religious_sensitivity:brand.religious_sensitivity||'High',price_position:brand.price_position||'mid_market',\n  ramadan_relevance:brand.ramadan_relevance||'High',bilingual_ratio:brand.bilingual_ratio||'arabic_primary',\n  month:monthName,month_key:year+'-'+String(month+1).padStart(2,'0'),year,days_in_month:daysInMonth,\n  posts_per_week:7-offDaysRaw.length,total_posts:scheduleDates.length,off_days:offDaysRaw,schedule_dates:scheduleDates,\n  video_count_forced:videoCount,\n  occasions:monthData.occasions,occasion_themes:monthData.themes||[],occasion_avoid:monthData.avoid||[],\n  engagement_multiplier:monthData.engagement_multiplier||1.0,ramadan_active:monthData.ramadan||false,\n  eid_active:monthData.eid||false,is_first_calendar:isFirstCalendar,batch_id:batchConfig.batch_id,\n  is_partial:batchConfig.is_partial||false,\n  primary_color_hex:brand.primary_color_hex||'',secondary_color_hex:brand.secondary_color_hex||'',\n  brand_differentiator:brand.brand_differentiator||''\n} }];"
+      },
+      "id": "063810ac-0e95-4b39-a15f-4c543b76cf26",
+      "name": "Prepare Brand Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -101504,
+        -15024
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "766c8d5f-d091-4ea5-976b-8e9266e0eada",
+              "leftValue": "={{ $json.result.decision.confidence_mode }}",
+              "rightValue": "blocked",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ee87cd82-e0b5-40be-8a16-bc8f4e55c977",
+      "name": "IF: Brand Blocked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -100800,
+        -15024
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "3d3a6cb9-3812-49b3-ab6c-ca71a921dded",
+              "leftValue": "={{ ($('Call: COO Build CaptionContext').first().json?.result?.dialect_confirmed === true) || ($('COO Fallback: Use Brand Bio').first().json?.result?.dialect_confirmed === true) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "83b56090-ddc6-4946-ae72-57658872093c",
+      "name": "IF: Dialect Confirmed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -99216,
+        -15200
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "qa_review_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $('Prepare Brand Data').first().json.brand_id }}"
+            },
+            {
+              "fieldId": "trigger_reason",
+              "fieldValue": "dialect_not_confirmed"
+            },
+            {
+              "fieldId": "flags",
+              "fieldValue": "={{ JSON.stringify({ skip_reason: 'dialect_not_confirmed', brand_name: $('Prepare Brand Data').first().json.brand_name_ar, batch_id: $('Prepare Brand Data').first().json.batch_id }) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "id": "99aec041-5d6b-424a-bc2f-607d6d1112df",
+      "name": "Supabase: Log to QA Queue",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -98304,
+        -14480
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split schedule_dates into chunks of 5 for DeepSeek batching.\nconst brandData = $('Prepare Brand Data').first().json;\nconst CHUNK_SIZE = 5;\nconst dates = brandData.schedule_dates || [];\nconst chunks = [];\nfor (let i = 0; i < Math.max(dates.length, 1); i += CHUNK_SIZE) {\n  const slice = dates.slice(i, i + CHUNK_SIZE);\n  chunks.push({ json: {\n    ...brandData,\n    schedule_dates: slice,\n    post_count_chunk: slice.length,\n    chunk_index: Math.floor(i / CHUNK_SIZE),\n    chunk_total: Math.ceil(Math.max(dates.length, 1) / CHUNK_SIZE),\n    chunk_start: i\n  }});\n}\nreturn chunks;"
+      },
+      "id": "0da61111-5cfd-4e56-8124-3ce50f19d6cc",
+      "name": "Split Into Chunks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -98752,
+        -15088
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge all DeepSeek chunk responses into one unified posts array.\n// Handles partial failures: chunks that errored produce no .result.posts,\n// so we skip those silently and merge only what succeeded.\nconst allItems = $input.all();\nconst merged   = [];\nlet failedChunks = 0;\n\nfor (const item of allItems) {\n  const r = item.json || {};\n  // Success path: result.posts array present\n  const posts = Array.isArray(r.result?.posts) ? r.result.posts\n    // Error path: some APIs return posts at top level\n    : Array.isArray(r.posts) ? r.posts\n    : [];\n  if (posts.length === 0) failedChunks++;\n  merged.push(...posts);\n}\n\nconst first = allItems[0] ? allItems[0].json : {};\n\n// If every single chunk failed, return a sentinel so downstream\n// nodes (Merge Posts Data1) can detect the failure and route to QA.\nif (merged.length === 0) {\n  return [{ json: {\n    ...first,\n    result: { posts: [] },\n    _deepseek_total_failed: true,\n    _failed_chunks: failedChunks,\n    _all_chunks: allItems.length\n  } }];\n}\n\nreturn [{ json: {\n  ...first,\n  result: { posts: merged },\n  _failed_chunks: failedChunks,\n  _total_posts_collected: merged.length\n} }];"
+      },
+      "id": "53d96849-c69b-4e5c-a520-4729fde94268",
+      "name": "Collect DeepSeek Chunks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -97776,
+        -15248
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ds-fail-check",
+              "leftValue": "={{ $json._deepseek_total_failed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "266947aa-d9a5-49d2-88fc-cf56c69474fa",
+      "name": "IF: DeepSeek Total Failure?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -97616,
+        -15056
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "qa_review_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $('Prepare Brand Data').first().json.brand_id }}"
+            },
+            {
+              "fieldId": "trigger_reason",
+              "fieldValue": "deepseek_total_failure"
+            },
+            {
+              "fieldId": "flags",
+              "fieldValue": "={{ JSON.stringify({ failed_chunks: $json._failed_chunks, total_chunks: $json._all_chunks, batch_id: $('Prepare Brand Data').first().json.batch_id }) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "id": "b161ad2d-efd3-4765-af7a-13279e91cf8e",
+      "name": "Supabase: Log DeepSeek Failure",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -97312,
+        -15200
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://redzmrlzhxkkpgcokgvl.supabase.co/rest/v1/calendars?on_conflict=brand_id,month",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ brand_id: $('Prepare Brand Data').first().json.brand_id, month: $('Prepare Brand Data').first().json.month_key, status: 'draft' }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "e0a705a6-ce43-4607-9443-4bb0fa82b670",
+      "name": "HTTP: Upsert Calendar1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -96160,
+        -15536
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');\nconst brandData=$('Prepare Brand Data').first().json;\nconst matchResult=$('Call: Match Chain').first().json||{};\nconst posts_raw=(matchResult.result?.posts)||(matchResult.posts)||($('Call: DeepSeek Generate').first().json?.result?.posts)||[];\nconst ccoResult=$('Call: CCO Quality Check').first().json.result||[];\nconst ceoResult=$('Call: CEO Confidence Gate').first().json.result||{};\nconst human_gate=(ceoResult.decision&&ceoResult.decision.human_gate_required)||false;\nconst confidence_mode=$('Call: CEO Route & Classify').first().json.result?.decision?.confidence_mode||'Standard';\nconst holdThreshold=confidence_mode==='Cautious'?65:50;\nconst isMinimal=confidence_mode==='Minimal';\nconst brand_first_calendar=brandData.is_first_calendar===true;\nconst brand_govt_hold=(brandData.sector||'').toLowerCase()==='government';\nlet planSlots=[];\ntry{ const ps=$('Call: Plan Slots').first().json||{}; planSlots=(ps.result||ps).slots||[]; } catch(_){}\nconst _calRaw=$input.first().json;\nconst calendarInput=Array.isArray(_calRaw)?_calRaw[0]:_calRaw;\nconst calendarId=calendarInput?.calendar_id||calendarInput?.id||null;\nconst scheduleDates=brandData.schedule_dates||[];\nfunction getOccasionVisualMotif(occasions){\n  if(!occasions||occasions.length===0) return 'celebratory motion';\n  const o=occasions[0];\n  if(o==='ramadan') return 'warm spiritual motif with crescent and lanterns';\n  if(o==='eid_al_fitr'||o==='eid_al_adha') return 'joyful celebratory motif with stars and lights';\n  if(o==='national_day') return 'patriotic motif with green and gold, Saudi flag elements';\n  if(o==='founding_day') return 'heritage motif with traditional architecture and maps';\n  return 'celebratory motion';\n}\nreturn posts_raw.map((caption,index)=>{\n  const slot=planSlots[index]||{};\n  const scheduled=scheduleDates[index]||{};\n  // format_tier: forced by is_video_slot from Prepare Brand Data, then plan slots, then DeepSeek format\n  const forced_video = scheduled.is_video_slot === true;\n  const format_tier = forced_video ? 'video' : (slot.format||slot.format_tier||caption.format||'image');\n  const selected_chain=slot.chain_id||caption.chain_id||null;\n  const score_obj=Array.isArray(ccoResult)?ccoResult.find(s=>s.post_id===caption.post_id)||{}:{};\n  const score_val=typeof score_obj.score==='number'?score_obj.score:75;\n  let route,brand_hold_reason=null;\n  if(brand_first_calendar){route='HOLD';brand_hold_reason='first_calendar_hold';}\n  else if(brand_govt_hold){route='HOLD';brand_hold_reason='government_sector_hold';}\n  else if(human_gate||score_obj.negpat_flag==='HARD_BLOCK') route='HOLD';\n  else if(isMinimal) route=score_val<75?'HOLD':'WATERMARK';\n  else if(score_val<holdThreshold) route='HOLD';\n  else if(score_val<75||score_obj.negpat_flag==='STRONG_WARN') route='WATERMARK';\n  else route='CLEAN';\n  const postingTime=scheduled.posting_time||caption.posting_time;\n  const post_id=crypto.randomUUID();\n  const sharp_grav=caption.sharp_text_gravity||'south';\n  const font_color=caption.font_color||'#FFFFFF';\n  const font_size=caption.font_size||48;\n  const visual_brief=caption.visual_brief_en||(brandData.brand_name_en+' product Saudi Arabia');\n  const product_descriptor=brandData.brand_differentiator||brandData.brand_name_en||'product';\n  const occasion_visual_motif=format_tier==='video'?getOccasionVisualMotif(brandData.occasions):null;\n  const brand_color_palette=format_tier==='video'?`${brandData.primary_color_hex||'#000000'} and ${brandData.secondary_color_hex||'#ffffff'}`:null;\n  const CHAIN_FAMILY_MAP={U01:'TF01',F01:'TF04'};\n  const chain_family=(selected_chain&&(CHAIN_FAMILY_MAP[selected_chain]||String(selected_chain).split(/[_-]/)[0].toUpperCase()))||'';\n  const cultural_constraints=brandData.sector==='F&B'?'no faces, avoid left hand':'modest, culturally appropriate, no faces';\n  const occasion=(brandData.occasions&&brandData.occasions[0]&&brandData.occasions[0]!=='none')?brandData.occasions[0]:'';\n  const base={\n    post_id,external_post_id:caption.post_id,calendar_id:calendarId,chain_id:selected_chain,\n    caption_ar:caption.caption_ar,posting_time:postingTime,content_type:caption.content_type||'emotional',\n    hashtags:caption.hashtags||[],visual_brief_en:visual_brief,position:index+1,confidence_score:score_val,\n    status:route==='CLEAN'?'generated':'draft',watermark:route==='WATERMARK',\n    dialect_flag:score_obj.dialect_flag||false,negpat_flag:score_obj.negpat_flag||'NONE',\n    cultural_flag:score_obj.cultural_flag||false,brave_route_flag:score_obj.brave_route_flag||false,\n    route,sharp_text_gravity:sharp_grav,brand_id:brandData.brand_id,brand_name_ar:brandData.brand_name_ar,\n    dialect:brandData.arabic_dialect,month:brandData.month,year:brandData.year,font_color,font_size,\n    gravity_rationale:caption.gravity_rationale||null,posting_time_rationale:caption.posting_time_rationale||null,\n    format_tier,selected_chain,product_descriptor,occasion_visual_motif,brand_color_palette,\n    chain_family,cultural_constraints,occasion,brand_name_en:brandData.brand_name_en||'',\n    sector:brandData.sector||'',primary_color_hex:brandData.primary_color_hex||''\n  };\n  const visualFields={\n    prompt_en:visual_brief,channel:'Instagram',\n    objective:base.content_type==='offer'?'conversion':'awareness',\n    confidence_flag:route==='WATERMARK'?'watermark_required':'clean',\n    cost_constraint:'normal',score:score_val,originalPost:{...base}\n  };\n  const qaFields={\n    cco_score:score_val,\n    flags:{route,negpat_flag:score_obj.negpat_flag||'NONE',brave_route_flag:score_obj.brave_route_flag||false,brand_hold_reason:brand_hold_reason||null},\n    trigger_reason:brand_hold_reason?brand_hold_reason:(score_val||0)<holdThreshold?'low_score':confidence_mode!=='Standard'&&route==='HOLD'?'confidence_mode_hold':'human_gate_override'\n  };\n  return {json:{...base,...visualFields,...qaFields}};\n});"
+      },
+      "id": "0ac6fa7d-6b5e-426e-a203-03b7ff259ddc",
+      "name": "Merge Posts Data1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -95232,
+        -15856
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "d5452f73-c8e8-4fc9-b5f3-bbb9f8ead874",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "CLEAN",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "7c2a32c0-1771-4609-96be-14a4affba90d",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "WATERMARK",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "279663a3-e1ba-4441-89a0-dedc011dc790",
+      "name": "IF: Route Clean or Watermark?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -94416,
+        -15872
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const post=$json;\nconst RELIGIOUS_PATTERNS=[/قرآن|القرآن|آية|حديث|النبي|الصلاة|الزكاة|الحج|الصوم|رمضان.*ديني|سورة|دعاء/u,/\\b(quran|hadith|prophet\\s+muhammad|pbuh|sallallahu|salah|zakat|islamic\\s+prayer|dua\\b|surah)\\b/i];\nconst GESTURE_HARD_BLOCKS=['left hand serv','left hand exchang','left hand offer','sole point','sole of foot','beckoning palm','palm.up beckon','cross.gender contact','cross gender contact','food consumption ramadan','eating.*ramadan.*daylight','daytime.*ramadan.*eat','quran.*mishandl','mishandl.*quran','index finger point','pointing.*index finger','western head shake','head.shake.*no','counting.*index finger','counting.*wrong'];\nconst captionText=(post.caption_ar||'');\nconst briefText=(post.visual_brief_en||post.prompt_en||'').toLowerCase();\nconst combined=captionText+' '+briefText;\nlet compliance_block=false,compliance_reason=null;\nif(post.religious_sensitivity==='High'){for(const p of RELIGIOUS_PATTERNS){if(p.test(combined)){compliance_block=true;compliance_reason='religious_content';break;}}}\nif(!compliance_block){for(const kw of GESTURE_HARD_BLOCKS){const re=new RegExp(kw,'i');if(re.test(briefText)){compliance_block=true;compliance_reason='gesture_hard_block:'+kw.replace(/\\\\./, '');break;}}}\nif(!compliance_block&&post.brave_route_flag===true){compliance_block=true;compliance_reason='brave_route_override';}\nif(!compliance_block&&post.sector==='Healthcare'){if(['educational','testimonial'].includes(post.content_type)){compliance_block=true;compliance_reason='healthcare_content_type';}}\nif(!compliance_block&&post.sector==='Finance'&&post.brave_route_flag===true){compliance_block=true;compliance_reason='finance_brave_route';}\nif(!compliance_block&&(post.sector||'').toLowerCase()==='government'){compliance_block=true;compliance_reason='government_sector';}\nif(compliance_block){\n  return [{ json:{...post,compliance_block:true,compliance_reason,\n    flags:{...(post.flags||{}),route:'HOLD',negpat_flag:compliance_reason==='brave_route_override'?'STRONG_WARN':'HARD_BLOCK',compliance_block:true,compliance_reason},\n    trigger_reason:compliance_reason==='religious_content'?'compliance_religious_content':compliance_reason==='brave_route_override'?'brave_route_flag':compliance_reason==='healthcare_content_type'?'healthcare_sector_hold':compliance_reason==='finance_brave_route'?'finance_sector_hold':compliance_reason==='government_sector'?'government_sector_hold':'compliance_visual_block',\n    route:'HOLD'\n  }}];\n}\nreturn [{ json:{...post,compliance_block:false} }];"
+      },
+      "id": "ce6b82a3-b2e9-469f-a313-ebb02f5470dc",
+      "name": "Spine: Pre-Gen Compliance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -94000,
+        -16048
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "spine-compliance-check",
+              "leftValue": "={{ $json.compliance_block }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d791046b-5af9-4bea-9649-4e7b815f790c",
+      "name": "IF: Spine Block?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -93840,
+        -16560
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "d58b7854-6241-4d70-be4e-fc44cb301431",
+              "leftValue": "={{ $json.format_tier === \"video\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7e2c2faa-80c2-44bf-9e45-3d60b02ad073",
+      "name": "IF: Video or Image?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -93568,
+        -16560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const FALLBACK = 'https://app.openclaw.com/assets/visual-placeholder.png';\n\n// Get all inputs from both branches\nconst originalPosts = $('IF: Video or Image?1').all().map(item => item.json);\nconst visualResults = $(\"Call Return success to parent'\").all().map(item => item.json);\n\n// Create a map of visual results by post_id\nconst visualMap = new Map();\nvisualResults.forEach(result => {\n  if (result.post_id) {\n    visualMap.set(result.post_id, result);\n  }\n});\n\n// Merge the data\nconst mergedResults = originalPosts.map((post) => {\n  // Get visual result by post_id\n  const visual = visualMap.get(post.post_id) || {};\n  \n  const storage_url = visual.storage_url || null;\n  const visual_failed = !storage_url;\n  const looksExternal = storage_url && !/supabase\\.co\\/storage\\/v1\\/object\\/public\\//i.test(storage_url);\n  \n  return {\n    json: {\n      // Original post data\n      post_id: post.post_id,\n      brand_id: post.brand_id,\n      calendar_id: post.calendar_id,\n      caption_ar: post.caption_ar,\n      posting_time: post.posting_time,\n      content_type: post.content_type,\n      hashtags: post.hashtags,\n      position: post.position,\n      confidence_score: post.confidence_score,\n      cco_score: post.cco_score,\n      route: post.route,\n      flags: post.flags,\n      trigger_reason: post.trigger_reason,\n      format_tier: post.format_tier,\n      brave_route_flag: post.brave_route_flag,\n      negpat_flag: post.negpat_flag,\n      \n      // Visual generation results\n      storage_url: (looksExternal || visual_failed) ? FALLBACK : storage_url,\n      clean_storage_url: visual.clean_storage_url || null,\n      visual_failed: visual_failed || looksExternal,\n      visual_generation_success: visual.success || false,\n      \n      // Updated status fields\n      status: (visual_failed || looksExternal) ? 'draft' : (post.status || 'draft'),\n      watermark: (visual_failed || looksExternal) ? true : (post.watermark || false)\n    }\n  };\n});\n\nreturn mergedResults;"
+      },
+      "id": "30ee624b-bd9d-4d66-ab7a-374a1c48152e",
+      "name": "Merge Visual Results1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -91696,
+        -15920
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const httpRequest = async ({method='GET', url, headers={}, body, timeout=60000}) => {\n  // n8n Code-node safe HTTP (fetch is not available in the sandbox).\n  // Faithful to the old fetch helper: return the parsed body for ANY HTTP status,\n  // throw only on network/timeout (so retry loops behave as before).\n  const resp = await this.helpers.httpRequest({ method, url, headers, body, timeout, json: false, returnFullResponse: true, ignoreHttpStatusErrors: true });\n  const text = resp && typeof resp === 'object' && 'body' in resp ? resp.body : resp;\n  if (typeof text !== 'string') return text;\n  try { return JSON.parse(text); } catch (_) { return text; }\n};\nconst post=$json;\nif(post.calendar_id&&post.post_id){\n  try{\n    const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo';\n    await httpRequest({\n      method:'POST',url:'https://redzmrlzhxkkpgcokgvl.supabase.co/rest/v1/calendar_posts?on_conflict=calendar_id,position',\n      headers:{apikey:SK,Authorization:'Bearer '+SK,Prefer:'resolution=merge-duplicates','Content-Type':'application/json'},\n      body:JSON.stringify({calendar_id:post.calendar_id,post_id:post.post_id,brand_id:post.brand_id,position:post.position,caption_ar:post.caption_ar,posting_time:post.posting_time,content_type:post.content_type||'emotional',hashtags:post.hashtags||[],confidence_score:post.confidence_score,status:'held',watermark:post.watermark||false,route_decision:'hold'})\n    });\n  }catch(e){console.error('Insert Hold Post1 failed:',e.message||e);}\n}\nreturn [{ json:post }];"
+      },
+      "id": "cd45c7da-9850-403d-a43f-fb7861ea3b21",
+      "name": "Insert Hold Post1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -90896,
+        -15792
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "qa_review_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "post_id",
+              "fieldValue": "={{ $json.post_id }}"
+            },
+            {
+              "fieldId": "caption_ar",
+              "fieldValue": "={{ $json.caption_ar }}"
+            },
+            {
+              "fieldId": "cco_score",
+              "fieldValue": "={{ $json.cco_score }}"
+            },
+            {
+              "fieldId": "flags",
+              "fieldValue": "={{ JSON.stringify($json.flags || {}) }}"
+            },
+            {
+              "fieldId": "trigger_reason",
+              "fieldValue": "={{ $json.trigger_reason }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "id": "945a3709-11a1-4669-a7a5-f6672a82a071",
+      "name": "Supabase: Insert QA Queue1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -91488,
+        -15504
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Email Payload — reads Prepare Brand Data + Merge Posts Data1 directly.\n// Runs when Loop Each Post1 finishes all iterations (output[1] = \"done\" port).\nconst brandData = $('Prepare Brand Data').first().json || {};\n\n// Collect post stats directly from Merge Posts Data1 (always available at this point)\nlet allPosts = [], visualPosts = [];\ntry { allPosts  = $('Merge Posts Data1').all().map(i => i.json || {}); } catch(_) {}\ntry { visualPosts = $('Merge Visual Results1').all().map(i => i.json || {}); } catch(_) {}\n\nconst postsGenerated  = allPosts.length;\nconst postsClean      = allPosts.filter(p => p.route === 'CLEAN').length;\nconst postsWatermarked= allPosts.filter(p => p.route === 'WATERMARK').length;\nconst postsHeld       = allPosts.filter(p => p.route === 'HOLD').length;\nconst visualFails     = visualPosts.filter(p => p.visual_failed).length;\nconst watermarkCount  = postsWatermarked;\nconst holdCount       = postsHeld;\nconst isFirst         = brandData.is_first_calendar === true;\nconst isPartial       = brandData.is_partial === true;\n\n// Rule 1: no posts → failure email\n// Rule 4: HOLDs → warning line\n// Rule 5: visual fails → warning\n// Rule 6: watermarks → review note\n// Rule 7: first calendar → welcome\n// Rule 8: video failures\nlet videoFailedIds = [];\ntry { videoFailedIds = allPosts.filter(p => p.format_tier === 'video' && p.visual_failed).map(p => p.post_id); } catch(_) {}\n// Rule 9: partial month\n// Rule 10: brave_route posts\nlet braveCount = 0;\ntry { braveCount = allPosts.filter(p => p.brave_route_flag === true).length; } catch(_) {}\n// Rule 11: hard blocks\nlet hardBlockCount = 0;\ntry { hardBlockCount = allPosts.filter(p => (p.negpat_flag||'') === 'HARD_BLOCK').length; } catch(_) {}\n\nconst brand_name  = brandData.brand_name_ar || '';\nconst month       = brandData.month || '';\nconst batch_id    = brandData.batch_id || '';\nconst client_email= brandData.client_email || '';\nconst client_slug = brandData.client_slug || '';\n\n// Skip email if no recipient\nif (!client_email) return [];\n\nlet subject, bodyLines = [];\n\nif (postsGenerated === 0) {\n  subject = `[خطأ] فشل إنشاء التقويم – ${brand_name} – ${month}`;\n  bodyLines.push(`<p>لم يتم إنشاء أي منشور. يرجى مراجعة سجلات النظام.</p>`);\n} else {\n  subject = `تقويم ${month} جاهز! | ${brand_name}`;\n  bodyLines.push(`<p>تم إنشاء تقويم <strong>${month}</strong> بنجاح وهو جاهز للمراجعة والنشر.</p>`);\n  bodyLines.push(`<ul>`);\n  bodyLines.push(`<li>عدد المنشورات: <strong>${postsGenerated}</strong></li>`);\n  bodyLines.push(`<li>المنشورات النظيفة: <strong>${postsClean}</strong></li>`);\n  if (watermarkCount > 0) bodyLines.push(`<li>⚠️ منشورات بعلامة مائية: <strong>${watermarkCount}</strong></li>`);\n  if (holdCount > 0)      bodyLines.push(`<li>⚠️ منشورات موقوفة (HOLD): <strong>${holdCount}</strong></li>`);\n  if (visualFails > 0)    bodyLines.push(`<li>⚠️ فشل إنشاء الصور: <strong>${visualFails}</strong></li>`);\n  if (videoFailedIds.length > 0) bodyLines.push(`<li>⚠️ فشل الفيديو: ${videoFailedIds.slice(0,5).join(', ')}</li>`);\n  if (isPartial)          bodyLines.push(`<li>ℹ️ تقويم جزئي (منتصف الشهر)</li>`);\n  if (braveCount > 0)     bodyLines.push(`<li>⚠️ تحذير امتثال: ${braveCount} منشور brave_route</li>`);\n  if (hardBlockCount > 0) bodyLines.push(`<li>🚨 مراجعة فورية: ${hardBlockCount} منشور HARD_BLOCK</li>`);\n  bodyLines.push(`</ul>`);\n  if (isFirst) bodyLines.push(`<p style='color:#0e7490;'><strong>🎉 مرحباً! هذا أول تقويم لعلامتكم مع OpenClaw.</strong></p>`);\n  bodyLines.push(`<p><a href='https://app.openclaw.com/${client_slug}/calendar' style='background:#0e7490;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;display:inline-block;'>عرض التقويم</a></p>`);\n}\n\nbodyLines.push(`<p style='color:#64748b;font-size:13px;'>المرجع: ${batch_id}</p>`);\nconst html = `<html dir='rtl' lang='ar'><body style='font-family:Noto Kufi Arabic,sans-serif;line-height:1.8;padding:24px;color:#0f172a;'><h1 style='color:#0e7490;'>${brand_name}</h1>${bodyLines.join('')}</body></html>`;\n\nreturn [{ json: { to: client_email, subject, html } }];"
+      },
+      "id": "b4b7353d-0327-4e09-a4a6-6af326927a8c",
+      "name": "Build Email Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -94224,
+        -15008
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer re_4yAMaobV_K3jdxVCfcf9jV8wZGC3U9dfk"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: \"calendars@openclaw.com\", to: $json.to, subject: $json.subject, html: $json.html }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "8acaaeb7-c64e-4c11-9b8d-cf616c0cf0a9",
+      "name": "HTTP: Send Email via Resend1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -93920,
+        -15008
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "brand_profiles",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "brand_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Brand Data').first().json.brand_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "total_calendars_generated",
+              "fieldValue": "={{ ($('Prepare Brand Data').first().json.total_calendars || 0) + 1 }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now }}"
+            }
+          ]
+        }
+      },
+      "id": "52e207d3-b51c-40f6-a0e3-2b92e4c0e267",
+      "name": "Supabase: Update Calendar Count1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -93504,
+        -14976
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "routing_decisions",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').first().json?.result?.routing_decision?.brand_id) ?? $('Prepare Brand Data').first().json.brand_id }}"
+            },
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').first().json?.result?.routing_decision?.flow_id) ?? 'N8N-A01' }}"
+            },
+            {
+              "fieldId": "request_type",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').first().json?.result?.routing_decision?.request_type) ?? 'batch_completion' }}"
+            },
+            {
+              "fieldId": "pipeline_assigned",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').first().json?.result?.routing_decision?.pipeline_assigned) ?? 'shard-0' }}"
+            },
+            {
+              "fieldId": "agents_dispatched",
+              "fieldValue": "={{ JSON.stringify(($('Call: CEO Batch Complete').first().json?.result?.routing_decision?.agents_dispatched) ?? ['CEO','COO','DeepSeek','MatchChain','CCO']) }}"
+            },
+            {
+              "fieldId": "constraints_applied",
+              "fieldValue": "={{ JSON.stringify(($('Call: CEO Batch Complete').first().json?.result?.routing_decision?.constraints_applied) ?? {}) }}"
+            },
+            {
+              "fieldId": "outcome",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').first().json?.result?.routing_decision?.outcome) ?? 'calendar_generated' }}"
+            },
+            {
+              "fieldId": "confidence_mode",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').first().json?.result?.routing_decision?.confidence_mode) ?? $('Call: CEO Route & Classify').first().json?.result?.decision?.confidence_mode ?? 'Standard' }}"
+            },
+            {
+              "fieldId": "timestamp",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').first().json?.result?.routing_decision?.timestamp) ?? $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "4b31b3ec-3255-46d6-b8ed-47eeacf01369",
+      "name": "Supabase: Insert Routing Decision1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -91968,
+        -14560
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "memory_controller_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').first().json?.result?.memory_nominations?.[0]?.brand_id) ?? $('Prepare Brand Data').first().json.brand_id }}"
+            },
+            {
+              "fieldId": "nomination_type",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').first().json?.result?.memory_nominations?.[0]?.nomination_type) ?? 'confidence_upgrade' }}"
+            },
+            {
+              "fieldId": "nomination_data",
+              "fieldValue": "={{ JSON.stringify(($('Call: CEO Batch Complete').first().json?.result?.memory_nominations?.[0]?.nomination_data) ?? {}) }}"
+            },
+            {
+              "fieldId": "nominated_by",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').first().json?.result?.memory_nominations?.[0]?.nominated_by) ?? 'CEO' }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "id": "074e7fda-6ac6-4a84-b81e-2e5d4b2b49c5",
+      "name": "Supabase: Insert Memory Nominations1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -91376,
+        -14528
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const brandData=$('Prepare Brand Data').first().json;\nlet confMode=null;\ntry{confMode=$('Call: CEO Route & Classify').first().json.result?.decision?.confidence_mode;}catch(_){}\nconst baseSummary={brand_id:brandData.brand_id,brand_name_ar:brandData.brand_name_ar,client_slug:brandData.client_slug,client_email:brandData.client_email,month:brandData.month,month_key:brandData.month_key,batch_id:brandData.batch_id,batch_shard:brandData.batch_shard,completed_at:new Date().toISOString()};\nif(confMode==='Blocked') return [{json:{...baseSummary,status:'blocked',skip_reason:'confidence_mode_blocked',posts_generated:0,posts_clean:0,posts_watermarked:0,posts_held:0,visual_fallbacks:0}}];\nif(!brandData.arabic_dialect) return [{json:{...baseSummary,status:'skipped',skip_reason:'dialect_not_confirmed',posts_generated:0,posts_clean:0,posts_watermarked:0,posts_held:0,visual_fallbacks:0}}];\nconst allPosts=$('Merge Posts Data1').all().map(i=>i.json||{});\nlet visualPosts=[];\ntry{visualPosts=$('Merge Visual Results1').all().map(i=>i.json||{});}catch(_){}\nconst visualFailures=visualPosts.filter(p=>p.visual_failed).length;\nreturn [{json:{...baseSummary,status:'complete',posts_generated:allPosts.length,posts_clean:allPosts.filter(p=>p.route==='CLEAN').length,posts_watermarked:allPosts.filter(p=>p.route==='WATERMARK').length,posts_held:allPosts.filter(p=>p.route==='HOLD').length,visual_fallbacks:visualFailures}}];"
+      },
+      "id": "b97cfc33-bfe1-48ca-9bc3-d21fd7e5d811",
+      "name": "Brand Summary1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -90256,
+        -13776
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const httpRequest = async ({method='GET', url, headers={}, body, timeout=60000}) => {\n  // n8n Code-node safe HTTP (fetch is not available in the sandbox).\n  // Faithful to the old fetch helper: return the parsed body for ANY HTTP status,\n  // throw only on network/timeout (so retry loops behave as before).\n  const resp = await this.helpers.httpRequest({ method, url, headers, body, timeout, json: false, returnFullResponse: true, ignoreHttpStatusErrors: true });\n  const text = resp && typeof resp === 'object' && 'body' in resp ? resp.body : resp;\n  if (typeof text !== 'string') return text;\n  try { return JSON.parse(text); } catch (_) { return text; }\n};\n// Collect all visual results for this brand and write them to calendar_posts in ONE call.\n// Then pass through to Loop Brands so the next brand starts.\nlet posts = [];\ntry {\n  posts = $('Merge Visual Results1').all().map(item => {\n    const p = item.json || {};\n    return {\n      calendar_id: p.calendar_id, post_id: p.post_id, brand_id: p.brand_id,\n      position: p.position, caption_ar: p.caption_ar, storage_url: p.storage_url,\n      posting_time: p.posting_time, content_type: p.content_type, hashtags: p.hashtags,\n      confidence_score: p.confidence_score, status: p.status, watermark: p.watermark,\n      route_decision: (p.route||'clean').toLowerCase()\n    };\n  }).filter(p => p.calendar_id && p.post_id);\n} catch(_) {}\n\nif (posts.length > 0) {\n  try {\n    await httpRequest({\n      method: 'POST',\n      url: 'https://redzmrlzhxkkpgcokgvl.supabase.co/rest/v1/calendar_posts?on_conflict=calendar_id,position',\n      headers: { apikey:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo', Authorization:'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo',\n                 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' },\n      body: JSON.stringify(posts), timeout: 15000\n    });\n  } catch(_) {} // non-fatal — per-post inserts in loop already ran as fallback\n}\n\n// Pass a minimal summary forward (Brand Summary1 reads from other nodes directly)\nreturn [{ json: { bulk_saved: posts.length, brand_id: posts[0]?.brand_id || null } }];"
+      },
+      "id": "38e48f5b-bafc-455f-836e-409511e10268",
+      "name": "Bulk Save & Advance Brand",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -89744,
+        -13776
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// COO timed out or errored — build a minimal caption_context from brand_profiles data.\n// This lets DeepSeek still run with a reduced (but valid) context instead of skipping the brand.\nconst brandData = $('Prepare Brand Data').first().json;\n\nconst fallbackContext = [\n  `Brand: ${brandData.brand_name_ar} (${brandData.brand_name_en || brandData.brand_name_ar})`,\n  `Sector: ${brandData.sector || 'F&B'}`,\n  `Dialect: ${brandData.arabic_dialect || 'saudi'}`,\n  `City: ${brandData.city || 'Riyadh'}`,\n  `Channel: ${brandData.primary_channel || 'Instagram'}`,\n  `Religious Sensitivity: ${brandData.religious_sensitivity || 'High'}`,\n  `Price Position: ${brandData.price_position || 'mid_market'}`,\n  `Month: ${brandData.month} ${brandData.year}`,\n  `Occasions: ${(brandData.occasions||[]).join(', ') || 'none'}`,\n  `Themes: ${(brandData.occasion_themes||[]).slice(0,5).join(', ')}`,\n  `Avoid: ${(brandData.occasion_avoid||[]).join(', ') || 'none'}`,\n  '',\n  'Tone: Warm, authentic, culturally resonant. Use appropriate Arabic dialect.',\n  'Content mix: 30% emotional, 20% lifestyle, 20% offer, 10% educational, 10% testimonial, 10% announcement.',\n  'Hashtags: Use 5-8 per post, mix Arabic and English, brand-specific + trending Saudi F&B tags.',\n  'Always: Proper Arabic grammar, no romanized Arabic, culturally appropriate imagery descriptions.',\n].join('\\n');\n\nreturn [{ json: {\n  result: {\n    caption_context: fallbackContext,\n    dialect_confirmed: true,\n    watermark_flag: false,\n    _coo_fallback: true\n  }\n} }];"
+      },
+      "id": "fbb1d9a5-145d-45fc-ae81-21e42542dc19",
+      "name": "COO Fallback: Use Brand Bio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -99456,
+        -15040
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');\nconst SECRET='c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst makeUUID=()=>'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);});\nconst isWorkflowLevel=!!($json.execution||$json.workflow);\nlet brand_id=null,brand_name_ar=null;\ntry{const bd=$('Prepare Brand Data').first().json;brand_id=bd.brand_id??null;brand_name_ar=bd.brand_name_ar??null;}catch(_){}\nlet payload,source;\nif(isWorkflowLevel){\n  source='workflow_error';const e=$json;\n  payload={anomaly_id:makeUUID(),anomaly_type:'batch_calendar_failed',severity:'error',source_flow:'N8N-A01',brand_id,message:e.execution?.error?.message||'A01 batch calendar flow failed',details:{failed_node:e.execution?.lastNodeExecuted??null,error_name:e.execution?.error?.name??null,execution_id:e.execution?.id??null},timestamp:new Date().toISOString()};\n}else{\n  source='per_brand';const errInfo=$json.error||$json;const failed=errInfo.node?.name||errInfo.nodeName||$execution.lastNodeExecuted||null;\n  payload={anomaly_id:makeUUID(),anomaly_type:'agent_call_failed',severity:'warning',source_flow:'N8N-A01',brand_id,brand_name_ar,message:errInfo.message||'AI agent HTTP call failed after retries',details:{failed_node:failed,error_name:errInfo.name||errInfo.errorName||null,http_code:errInfo.httpCode||errInfo.statusCode||null,execution_id:$execution.id},timestamp:new Date().toISOString()};\n}\nconst body=JSON.stringify(payload);\nconst sig=crypto.createHmac('sha256',SECRET).update(body).digest('hex');\nreturn [{ json:{ _body:body,_headers:{'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':`${$execution.id}-${source}-a01`,'x-n8n-timestamp':new Date().toISOString()},brand_id,failed_node:payload.details.failed_node,error_name:payload.details.error_name||null,error_message:payload.message,http_code:payload.details.http_code||null,source } }];"
+      },
+      "id": "431d84bc-1eb8-4f69-8a70-c20d0b25141f",
+      "name": "Build S03 alert1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -90624,
+        -10464
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogzstudios.app.n8n.cloud/webhook-test/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "1535ae85-18d3-4bc1-8013-ffb83a5662e9",
+      "name": "POST · S03 anomaly-alert1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -90240,
+        -10464
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "usage_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-A01"
+            },
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id || null }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "={{ $json.failed_node || 'unknown' }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "failed"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify({ error_name: $json.error_name, error_message: $json.error_message, http_code: $json.http_code, source: $json.source }) }}"
+            }
+          ]
+        }
+      },
+      "id": "6f6d7a17-e1fe-4bdb-8ed7-9955b016724e",
+      "name": "Supabase: Log Usage (failed)1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -89872,
+        -10464
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -94896,
+        -15744
+      ],
+      "id": "6dbbddd6-bc85-4dd2-aeab-e00d03dca718",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "tableId": "usage_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-A01"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "Batch Complete"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "batch_completed"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify({ batch_id: $('Prepare Batch Config').first().json.batch_id, batch_type: $('Prepare Batch Config').first().json.batch_type, batch_shard: $('Prepare Batch Config').first().json.batch_shard, target_month: $('Prepare Batch Config').first().json.target_month_key, brands_in_batch: $('Merge Brand Sources').all().length, finished_at: $now.toISO() }) }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "c8e6959c-d31f-4e4a-bc69-558806c4b461",
+      "name": "Supabase: Log Batch Complete",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -102016,
+        -15168
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto   = require('crypto');\nconst brandData = $input.first().json;\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\n\nconst bodyObj = {\n  flow_id: 'N8N-A01', brand_id: brandData.brand_id,\n  payload: {\n    request_type: 'calendar_scheduled',\n    trigger_payload: {\n      brand_id: brandData.brand_id, brand_name_ar: brandData.brand_name_ar,\n      brand_name_en: brandData.brand_name_en, sector: brandData.sector,\n      arabic_dialect: brandData.arabic_dialect, city: brandData.city, tier: brandData.tier,\n      primary_channel: brandData.primary_channel, religious_sensitivity: brandData.religious_sensitivity,\n      price_position: brandData.price_position, ramadan_relevance: brandData.ramadan_relevance,\n      bilingual_ratio: brandData.bilingual_ratio, month: brandData.month_key,\n      occasions: brandData.occasions, occasion_themes: brandData.occasion_themes||[],\n      occasion_avoid: brandData.occasion_avoid||[], engagement_multiplier: brandData.engagement_multiplier||1.0,\n      ramadan_active: brandData.ramadan_active||false, eid_active: brandData.eid_active||false,\n      is_first_calendar: brandData.is_first_calendar||false,\n      total_posts: brandData.total_posts||20, schedule_dates: brandData.schedule_dates||[]\n    },\n    occasion_flags: (brandData.occasions&&brandData.occasions.length>0&&brandData.occasions[0]!=='none') ? brandData.occasions : []\n  }\n};\nconst body      = JSON.stringify(bodyObj);\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\nconst _base = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nreturn [{ json: {\n  _url: _base + '/api/agents/ceo/classify',\n  _body: body,\n  _headers: {\n    'content-type': 'application/json', 'x-n8n-signature': signature,\n    'x-n8n-request-id': requestId, 'x-n8n-timestamp': timestamp,\n    'x-api-key': 'REDACTED_ANTHROPIC_KEY', 'anthropic-version': '2023-06-01'\n  }\n}}];"
+      },
+      "id": "82990c7c-be9d-4477-842f-8bda9d8f3953",
+      "name": "Sign · CEO Route & Classify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -101264,
+        -15040
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $json._headers['x-api-key'] }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "={{ $json._headers['anthropic-version'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 45000
+        }
+      },
+      "id": "d4d9df95-322f-4ffb-b734-73b875beb1f8",
+      "name": "Call: CEO Route & Classify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -100944,
+        -14432
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto   = require('crypto');\nconst brandData = $('Prepare Brand Data').first().json;\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\n\nconst body = JSON.stringify({\n  flow_id: 'N8N-A01', brand_id: brandData.brand_id,\n  payload: {\n    post_count:    brandData.total_posts||20,\n    schedule_dates: brandData.schedule_dates||[],\n    occasion_flags: (brandData.occasions&&brandData.occasions.length>0&&brandData.occasions[0]!=='none')\n                    ? brandData.occasions : []\n  }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\nconst _base = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nreturn [{ json: {\n  _url: _base + '/api/agents/calendar/plan-slots',\n  _body: body,\n  _headers: {\n    'content-type': 'application/json', 'x-n8n-signature': signature,\n    'x-n8n-request-id': requestId, 'x-n8n-timestamp': timestamp\n  }\n}}];"
+      },
+      "id": "49a32789-f9d1-465c-85a3-4215af2e9d4f",
+      "name": "Sign · Plan Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100640,
+        -15280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "c24a0a97-4d2f-4382-9eb7-42811396b8d8",
+      "name": "POST · Plan Slots",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -100432,
+        -15296
+      ],
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fallback to {result:{slots:[]}} when response lacks result.slots (matches original safe default).\nconst item = $input.first().json || {};\nlet resp = item;\nif (!item || typeof item !== 'object' || !item.result || !Array.isArray(item.result.slots)) {\n  resp = { result: { slots: [] } };\n}\nreturn [{ json: resp }];"
+      },
+      "id": "dc5510a5-09f5-4cb9-a697-bc89312e3cc8",
+      "name": "Call: Plan Slots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100192,
+        -15264
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto   = require('crypto');\nconst brandData = $('Prepare Brand Data').first().json;\nconst ceoResult = $('Call: CEO Route & Classify').first().json?.result || {};\nconst decision  = ceoResult.decision || {};\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\n\nconst contentMix = brandData.ramadan_active\n  ? { emotional:0.4, lifestyle:0.2, offer:0.2, educational:0.05, testimonial:0.05, announcement:0.1 }\n  : brandData.eid_active\n  ? { emotional:0.35, lifestyle:0.15, offer:0.25, educational:0.05, testimonial:0.1, announcement:0.1 }\n  : { emotional:0.3, lifestyle:0.2, offer:0.2, educational:0.1, testimonial:0.1, announcement:0.1 };\n\nconst body = JSON.stringify({\n  flow_id: 'N8N-A01', brand_id: brandData.brand_id,\n  payload: {\n    confidence_mode: decision.confidence_mode||'Standard',\n    occasion_flags:  (decision.occasion_flags&&decision.occasion_flags.length>0) ? decision.occasion_flags : ['none'],\n    platform_spec:   brandData.primary_channel||'Instagram',\n    content_mix:     contentMix,\n    post_count:      brandData.total_posts||20,\n    brand: {\n      brand_id: brandData.brand_id, brand_name_ar: brandData.brand_name_ar,\n      brand_name_en: brandData.brand_name_en, sector: brandData.sector,\n      arabic_dialect: brandData.arabic_dialect, city: brandData.city,\n      religious_sensitivity: brandData.religious_sensitivity, price_position: brandData.price_position,\n      ramadan_relevance: brandData.ramadan_relevance, bilingual_ratio: brandData.bilingual_ratio,\n      month: brandData.month_key, occasions: brandData.occasions,\n      occasion_themes: brandData.occasion_themes||[], occasion_avoid: brandData.occasion_avoid||[],\n      engagement_multiplier: brandData.engagement_multiplier||1.0,\n      ramadan_active: brandData.ramadan_active||false, eid_active: brandData.eid_active||false,\n      schedule_dates: brandData.schedule_dates\n    },\n    negative_patterns: [], cost_constraint: decision.cost_status||'normal'\n  }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\nconst _base = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nreturn [{ json: {\n  _url: _base + '/api/agents/coo/compile-caption-context',\n  _body: body,\n  _headers: {\n    'content-type': 'application/json', 'x-n8n-signature': signature,\n    'x-n8n-request-id': requestId, 'x-n8n-timestamp': timestamp,\n    'x-api-key': 'REDACTED_ANTHROPIC_KEY', 'anthropic-version': '2023-06-01'\n  }\n}}];"
+      },
+      "id": "a50c107d-84ac-45cc-9615-440c83be886d",
+      "name": "Sign · COO Build CaptionContext",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -99968,
+        -15296
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $json._headers['x-api-key'] }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "={{ $json._headers['anthropic-version'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 180000
+        }
+      },
+      "id": "9b224239-aa09-40b1-8798-1f6fca87f550",
+      "name": "Call: COO Build CaptionContext",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -99712,
+        -15184
+      ],
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Jitter: stagger parallel brand calls to avoid thundering herd on DeepSeek\nconst _chunkIdx = $json.chunk_index || 0;\nconst _brandPos = (() => { try { return $('Loop Brands (5 Parallel)').context?.currentRunIndex || 0; } catch(_){ return 0; } })();\nawait new Promise(r => setTimeout(r, (_brandPos % 5) * 300 + _chunkIdx * 80 + Math.floor(Math.random()*100)));\n\nconst crypto    = require('crypto');\nconst brandData = $json;\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\n\n// Read COO context from success path or fallback path, with inline guard\nlet cooResult = {};\ntry { cooResult = $('Call: COO Build CaptionContext').first().json?.result || {}; } catch(_) {}\nif (!cooResult.caption_context) {\n  try { cooResult = $('COO Fallback: Use Brand Bio').first().json?.result || {}; } catch(_) {}\n}\nif (!cooResult.caption_context || cooResult.caption_context.trim().length < 10) {\n  cooResult.caption_context = [\n    'Brand: '+(brandData.brand_name_ar||'')+' ('+(brandData.brand_name_en||'')+')',\n    'Sector: '+(brandData.sector||'F&B'), 'Dialect: '+(brandData.arabic_dialect||'saudi'),\n    'Month: '+(brandData.month||'')+' '+(brandData.year||''),\n    'Occasions: '+(brandData.occasions||[]).join(', '),\n    'Tone: Authentic, warm, culturally resonant. Proper Arabic grammar only.',\n    'Mix: 30% emotional, 20% lifestyle, 20% offer, 10% educational, 10% testimonial, 10% announcement.'\n  ].join('\\n');\n}\n\nconst MAX_CHARS = 4000;\nlet context = cooResult.caption_context;\nconst contextTruncated = context.length > MAX_CHARS;\nif (contextTruncated) context = context.slice(0, MAX_CHARS) + '\\n[…context truncated…]';\n\nconst occasionContext = (brandData.occasions&&brandData.occasions.length>0&&brandData.occasions[0]!=='none')\n  ? { name:brandData.occasions[0], all:brandData.occasions, themes:(brandData.occasion_themes||[]).slice(0,6),\n      avoid:(brandData.occasion_avoid||[]).slice(0,6), lead_weeks:1,\n      priority: brandData.engagement_multiplier>=2.0?'Critical':'Normal' }\n  : undefined;\n\nconst body = JSON.stringify({\n  flow_id:'N8N-A01', brand_id:brandData.brand_id,\n  payload:{\n    month: brandData.month_key, caption_context: context, context_truncated: contextTruncated,\n    post_count: brandData.post_count_chunk||brandData.total_posts||5,\n    schedule_dates: brandData.schedule_dates||[],\n    start_date: brandData.schedule_dates?.[0]?.date || brandData.month_key+'-01',\n    off_days: brandData.off_days||[5,6], platform: brandData.primary_channel||'Instagram',\n    dialect: brandData.arabic_dialect, bilingual_ratio: brandData.bilingual_ratio,\n    ...(occasionContext ? { occasion_context: occasionContext } : {}),\n    watermark_required: cooResult.watermark_flag||false,\n    system_enhancement: \"CRITICAL: Strictly follow caption_context. For each post output ALL fields: 'visual_brief_en' (detailed English image generation prompt), 'sharp_text_gravity', 'font_color', 'font_size', 'gravity_rationale', 'posting_time_rationale'.\"\n  }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\nconst _base = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nreturn [{ json: {\n  _url: _base + '/api/agents/deepseek/generate',\n  _body: body,\n  _headers: {\n    'content-type':'application/json','x-n8n-signature':signature,\n    'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp,\n    'Authorization':'Bearer sk-cdb54723c86f4667a7173d2f1e391975'\n  }\n}}];"
+      },
+      "id": "34870cbe-e246-4443-9f14-93e5b23369a1",
+      "name": "Sign · DeepSeek Generate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -98416,
+        -15088
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ $json._headers['Authorization'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 300000
+        }
+      },
+      "id": "cd846eef-26ef-46c7-a39f-0fedd2e78497",
+      "name": "POST · DeepSeek Generate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -98160,
+        -15248
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 8000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// On error (continueErrorOutput forwarded an error) emit sentinel {_chunk_error, result:{posts:[]}}.\n// On success pass the parsed body through unchanged.\nconst item = $input.first().json || {};\nif (item && typeof item === 'object' && item.error) {\n  let msg;\n  const e = item.error;\n  if (e && typeof e === 'object') { msg = e.message || JSON.stringify(e); } else { msg = String(e); }\n  return [{ json: { _chunk_error: msg, result: { posts: [] } } }];\n}\nif (!item || typeof item !== 'object') {\n  return [{ json: { _chunk_error: 'malformed response', result: { posts: [] } } }];\n}\nreturn [{ json: item }];"
+      },
+      "id": "c94274b7-1a78-4d5f-b9a3-8426d10bbf5d",
+      "name": "Call: DeepSeek Generate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -97952,
+        -15248
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto    = require('crypto');\nconst brandData  = $('Prepare Brand Data').first().json;\nconst deepseekPosts = ($input.first().json?.result?.posts || []).map(p => ({\n  post_id: p.post_id,\n  visual_brief_en: (p.visual_brief_en||p.prompt_en||'').slice(0,300),\n  content_type: p.content_type||'emotional',\n  format: p.format||'image',\n  offer_type: p.offer_type||null\n}));\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\nconst body = JSON.stringify({\n  flow_id:'N8N-A01', brand_id:brandData.brand_id,\n  payload:{ posts:deepseekPosts, sector:brandData.sector,\n            occasions:brandData.occasions||[], primary_channel:brandData.primary_channel||'Instagram',\n            month:brandData.month_key }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\nconst _deepseek_posts = $input.first().json?.result?.posts || [];\nconst _base = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nreturn [{ json: {\n  _deepseek_posts,\n  _url: _base + '/api/agents/ceo/match-chain',\n  _body: body,\n  _headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': signature,\n    'x-n8n-request-id': requestId,\n    'x-n8n-timestamp': timestamp\n  }\n}}];"
+      },
+      "id": "2706c724-2d47-48bb-9ff6-b57cf64bb72a",
+      "name": "Sign · Match Chain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -97456,
+        -14912
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "1b9fc593-0587-4aac-b6c3-c19221a67ca6",
+      "name": "POST · Match Chain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -97216,
+        -14912
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reconstruct EXACT original \"Call: Match Chain\" fallback semantics.\n// POST node has neverError:true so non-2xx bodies arrive on SUCCESS and pass through verbatim.\n// Only true network/timeout failures hit the error output and trigger the skip-fallback.\nconst item = $input.first().json || {};\nlet _deepseek_posts = [];\ntry { _deepseek_posts = item._deepseek_posts || $('Sign · Match Chain').first().json._deepseek_posts || []; } catch(_) { _deepseek_posts = item._deepseek_posts || []; }\nconst hadError = !!item.error;\nlet resp;\nif (hadError) {\n  resp = { result: { posts: _deepseek_posts }, _match_skipped: true, _deepseek_posts };\n} else {\n  const apiJson = { ...item };\n  delete apiJson._deepseek_posts;\n  delete apiJson._url; delete apiJson._body; delete apiJson._headers;\n  resp = apiJson;\n  resp._deepseek_posts = _deepseek_posts;\n}\nreturn [{ json: resp }];"
+      },
+      "id": "6f9cc955-b70a-45d7-a870-53954930ae4d",
+      "name": "Call: Match Chain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -97024,
+        -14992
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto    = require('crypto');\nconst brandData  = $('Prepare Brand Data').first().json;\nconst secret     = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId  = crypto.randomUUID();\nconst timestamp  = new Date().toISOString();\n\nlet captionCtx = '';\ntry { captionCtx = $('Call: COO Build CaptionContext').first().json?.result?.caption_context || ''; } catch(_) {}\nif (!captionCtx) { try { captionCtx = $('COO Fallback: Use Brand Bio').first().json?.result?.caption_context || ''; } catch(_) {} }\n\nconst matchResult = $('Call: Match Chain').first().json || {};\nconst posts_raw = (matchResult.result?.posts) || (matchResult.posts) || ($('Call: DeepSeek Generate').first().json?.result?.posts) || [];\nconst posts = posts_raw.map(p => ({ post_id:p.post_id, caption_ar:p.caption_ar,\n  content_type:p.content_type, hashtags:p.hashtags||[], posting_time:p.posting_time }));\n\nconst body = JSON.stringify({\n  flow_id:'N8N-A01', brand_id:brandData.brand_id,\n  payload:{ caption_context_excerpt: captionCtx.slice(0,600), posts }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\nconst _base = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nreturn [{ json: {\n  _url: _base + '/api/agents/cco/qc',\n  _body: body,\n  _headers: {\n    'content-type':'application/json','x-n8n-signature':signature,\n    'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp,\n    'Authorization':'Bearer REDACTED_OPENAI_KEY'\n  }\n}}];"
+      },
+      "id": "1ab2ded2-f1eb-4744-987a-7596183b4e68",
+      "name": "Sign · CCO Quality Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96848,
+        -14992
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ $json._headers['Authorization'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "7b3d526e-3845-49d0-ab1a-a4a4427eab92",
+      "name": "Call: CCO Quality Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -96656,
+        -14944
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto    = require('crypto');\nconst brandData  = $('Prepare Brand Data').first().json;\nconst qcResult   = $input.first().json;\nconst secret     = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId  = crypto.randomUUID();\nconst timestamp  = new Date().toISOString();\nconst ccoResults = (qcResult.result||[]).map(p => ({\n  post_id:p.post_id, score:p.score||0, brave_route_flag:p.brave_route_flag||false, negpat_flag:p.negpat_flag||'NONE'\n}));\nconst body = JSON.stringify({\n  flow_id:'N8N-A01', brand_id:brandData.brand_id,\n  payload:{ request_type:'calendar_scheduled',\n    trigger_payload:{ month:brandData.month_key, batch_id:brandData.batch_id },\n    cco_results:ccoResults,\n    occasion_flags:(brandData.occasions&&brandData.occasions.length>0)?brandData.occasions:['none'] }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\nconst _base = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nreturn [{ json: {\n  _url: _base + '/api/agents/ceo/confidence-gate',\n  _body: body,\n  _headers: {\n    'content-type':'application/json','x-n8n-signature':signature,\n    'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp\n  }\n}}];"
+      },
+      "id": "1a369c33-e9bc-4286-a2c2-14bfe3549318",
+      "name": "Sign · CEO Confidence Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96432,
+        -15040
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 45000
+        }
+      },
+      "id": "635dddfe-818e-44ae-81cc-45034cd81b22",
+      "name": "Call: CEO Confidence Gate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -96272,
+        -15040
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto      = require('crypto');\nconst calendarData = $input.first().json;\nconst calendarId   = calendarData.calendar_id || calendarData.id || (Array.isArray(calendarData) ? calendarData[0]?.id : null);\n\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\nconst body      = JSON.stringify({ calendar_id: calendarId, type: 'generated' });\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\nconst _base = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nreturn [{ json: {\n  _calendarData: calendarData,\n  _skip_notify: !calendarId,\n  _url: _base + '/api/calendar/notify',\n  _body: body,\n  _headers: {\n    'content-type':'application/json','x-n8n-signature':signature,\n    'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp\n  }\n}}];"
+      },
+      "id": "b514a264-5097-491b-8cac-bce7f7ed2a34",
+      "name": "Sign · Notify Calendar Generated",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -95968,
+        -15744
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "b757c147-677b-45db-b429-ffbac7f96a36",
+      "name": "POST · Notify Calendar Generated",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -95712,
+        -15792
+      ],
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Discard the notify HTTP response; re-emit the preserved calendarData (fire-and-forget).\nlet sign = {};\ntry { sign = $('Sign · Notify Calendar Generated').first().json || {}; } catch(_) {}\nconst calendarData = sign._calendarData !== undefined ? sign._calendarData : ($input.first().json || {});\nreturn [{ json: calendarData }];"
+      },
+      "id": "c31e9d81-6691-48ba-a114-e2979f10ceaa",
+      "name": "Call: Notify Calendar Generated",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -95504,
+        -15840
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto    = require('crypto');\nconst brandData  = $('Prepare Brand Data').first().json;\nconst ceoResult  = $('Call: CEO Route & Classify').first().json?.result || {};\nconst secret     = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId  = crypto.randomUUID();\nconst timestamp  = new Date().toISOString();\nlet postsGenerated = 0;\ntry { postsGenerated = $('Merge Posts Data1').all().length; } catch(_) {}\nconst body = JSON.stringify({\n  flow_id:'N8N-A01', brand_id:brandData.brand_id,\n  payload:{\n    batch_id:brandData.batch_id, month:brandData.month_key, outcome:'calendar_generated',\n    pipeline:ceoResult.decision?.pipeline||'A', confidence_mode:ceoResult.decision?.confidence_mode||'Standard',\n    agents_dispatched:['CEO','COO','DeepSeek','MatchChain','CCO'], posts_generated:postsGenerated,\n    cost_constraint:ceoResult.decision?.cost_status||'normal',\n    n8n_execution_id:$execution.id,\n    workflow_trigger:$('Prepare Batch Config').first().json.batch_type==='MONTHLY'?'cron_monthly':'cron_weekly'\n  }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\nconst _base = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nreturn [{ json: {\n  _url: _base + '/api/agents/ceo/batch-complete',\n  _body: body,\n  _headers: {\n    'content-type':'application/json','x-n8n-signature':signature,\n    'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp\n  }\n}}];"
+      },
+      "id": "66f2f085-9a7e-4d2c-9b7c-0059dd48b408",
+      "name": "Sign · CEO Batch Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -92992,
+        -14848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 45000
+        }
+      },
+      "id": "314bb39f-62e2-4d56-9c86-4c13140bdf0c",
+      "name": "Call: CEO Batch Complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -92320,
+        -14656
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst input = $input.all()[0].json;\n\nif (!input.brand_id) {\n  console.warn('[V01] WARNING: brand_id is missing from input:', JSON.stringify(Object.keys(input)));\n}\n\nconst promptEn = (input.prompt_en || '').trim() || 'product lifestyle photography, clean background, natural lighting';\n\n// Map DeepSeek sharp_text_gravity → OverlayLayout.\nconst GRAVITY_TO_LAYOUT = { south: 'bottom-right', north: 'top-right', center: 'center-right' };\nconst layout = GRAVITY_TO_LAYOUT[input.sharp_text_gravity];\n\n// SMART MONTH CONVERSION - handles both \"June\" and \"2026-06\" formats\nfunction formatMonth(monthInput, yearInput) {\n  if (!monthInput) {\n    return new Date().toISOString().slice(0, 7);\n  }\n  \n  // Check if it's already in YYYY-MM format\n  if (/^\\d{4}-\\d{2}$/.test(monthInput)) {\n    return monthInput;\n  }\n  \n  // Check if it's a month name like \"June\"\n  const monthNames = {\n    'January': '01', 'February': '02', 'March': '03', 'April': '04',\n    'May': '05', 'June': '06', 'July': '07', 'August': '08',\n    'September': '09', 'October': '10', 'November': '11', 'December': '12'\n  };\n  \n  // Try to match the month name (case insensitive)\n  const monthName = Object.keys(monthNames).find(\n    name => name.toLowerCase() === monthInput.toLowerCase()\n  );\n  \n  if (monthName) {\n    // Use the provided year, or current year if not available\n    const year = yearInput || new Date().getFullYear();\n    return `${year}-${monthNames[monthName]}`;\n  }\n  \n  // If it's a number (1-12), format it\n  if (/^\\d{1,2}$/.test(monthInput)) {\n    const year = yearInput || new Date().getFullYear();\n    const monthNum = monthInput.padStart(2, '0');\n    return `${year}-${monthNum}`;\n  }\n  \n  // Fallback to current month\n  console.warn(`[V01] Unrecognized month format: ${monthInput}, using current month`);\n  return new Date().toISOString().slice(0, 7);\n}\n\n// Handle palette_hex from various sources\nlet paletteHex = input.palette_hex || [];\nif (input.primary_color_hex && input.primary_color_hex.trim() !== '') {\n  paletteHex = [input.primary_color_hex];\n}\nif (paletteHex.length === 0 && input.brand_color_palette) {\n  paletteHex = input.brand_color_palette;\n}\n\nconst payload = {\n  flow_id:  'N8N-V01',\n  brand_id: input.brand_id  || 'MISSING',\n  post_id:  input.post_id   || crypto.randomUUID(),\n  payload: {\n    prompt_en:           promptEn,\n    brand_name_ar:       input.brand_name_ar   || input.brand_name_en || '',\n    headline_ar:         input.headline_ar     || input.caption_ar || '',\n    dialect:             input.dialect         || 'MSA_formal',\n    channel:             input.channel         || 'Instagram',\n    objective:           input.objective       || 'awareness',\n    first_ever_post:     input.first_ever_post || false,\n    confidence_flag:     input.confidence_flag || 'clean',\n    cost_constraint:     input.cost_constraint || 'standard',\n    palette_hex:         paletteHex,\n    month:               formatMonth(input.month, input.year),\n    score:               input.score || input.confidence_score || 85,\n    expected_media_type: input.expected_media_type || input.media_type || input.format_tier || 'image',\n    reference_image_url: input.reference_image_url || undefined,\n    chain_id:            input.chain_id        || null,\n    chain_context:       input.chain_context   || undefined,\n    layout:              layout,\n  }\n};\n\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887').update(raw).digest('hex');\n\nreturn [{ json: {\n  url:      'https://unwieldable-mavis-unbacked.ngrok-free.dev/api/image/generate',\n  body:     raw,\n  brand_id: input.brand_id,\n  post_id:  payload.post_id,\n  headers: {\n    'x-n8n-signature':  sig,\n    'x-n8n-request-id': crypto.randomUUID(),\n    'x-n8n-timestamp':  new Date().toISOString(),\n  }\n}}];"
+      },
+      "id": "9c8eb417-6c01-487d-a7cd-07c118ca3fa3",
+      "name": "Prepare image/generate call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -93328,
+        -16608
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers[\"x-n8n-signature\"] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers[\"x-n8n-request-id\"] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers[\"x-n8n-timestamp\"] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "bc713f49-c01e-4cc0-a285-764f5c7aca9b",
+      "name": "POST /api/image/generate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -93120,
+        -16608
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.result?.storage_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "id": "73f3baa1-5c65-469d-8f73-6f5012b1f180"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0bc7c958-ef61-4814-9b4d-ceb3a449c93d",
+      "name": "Did it succeed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -92800,
+        -16464
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $json.result || $json;\nconst storageUrl = result.storage_url;\nconst cleanStorageUrl = result.clean_storage_url || null;\nconst prepare = $('Prepare image/generate call').first().json;\nreturn [{ json: {\n  storage_url:       storageUrl,\n  clean_storage_url: cleanStorageUrl,\n  brand_id:          prepare.brand_id,\n  post_id:           prepare.post_id,\n  success:           true\n}}];\n"
+      },
+      "id": "4463a319-3c8f-434e-9d57-7bb8aca4e3b3",
+      "name": "Extract storage_url",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -92528,
+        -16480
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "generation_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "chain_id",
+              "fieldValue": "fal-ai/flux-pro/v1.1-ultra"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "completed"
+            }
+          ]
+        }
+      },
+      "id": "e637ece5-1179-4e98-b38a-7a1ca1b3a574",
+      "name": "Supabase: log generation",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -92304,
+        -16480
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const extracted = $('Extract storage_url').first().json;\nreturn [{ json: { \n  storage_url: extracted.storage_url, \n  clean_storage_url: extracted.clean_storage_url || null, \n  success: true \n} }];\n"
+      },
+      "id": "9bfbd5e7-f426-41ea-8846-def92ec68f02",
+      "name": "Return success to parent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -92016,
+        -16448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { storage_url: null, success: false, error: $json.error?.message || $json.message || 'image/generate failed' } }];\n"
+      },
+      "id": "281d198e-0434-4597-9c93-d3d52a89c9a1",
+      "name": "Return error to parent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -92464,
+        -12496
+      ]
+    }
+  ],
+  "connections": {
+    "Cron: Nightly Shard (Sun–Thu 23:00 AST)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batch Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron: 1st of Month — Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batch Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: openclaw-batch-calendar": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batch Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Batch Config": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Log Batch Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Log Batch Start": {
+      "main": [
+        [
+          {
+            "node": "IF: Monthly or Weekly?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Monthly or Weekly?1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Fetch All Active Brands",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: Fetch Brands by Shard1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch All Active Brands": {
+      "main": [
+        [
+          {
+            "node": "Merge Brand Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch Brands by Shard1": {
+      "main": [
+        [
+          {
+            "node": "Merge Brand Sources",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Brand Sources": {
+      "main": [
+        [
+          {
+            "node": "Loop Brands (5 Parallel)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Brands (5 Parallel)": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert Calendar Lease1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert Calendar Lease1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Brand Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Brand Data": {
+      "main": [
+        [
+          {
+            "node": "Sign · CEO Route & Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Brand Blocked?": {
+      "main": [
+        [
+          {
+            "node": "Sign · Plan Slots",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Brand Summary1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Dialect Confirmed?": {
+      "main": [
+        [
+          {
+            "node": "Split Into Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: Log to QA Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Log to QA Queue": {
+      "main": [
+        [
+          {
+            "node": "Brand Summary1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Chunks": {
+      "main": [
+        [
+          {
+            "node": "Sign · DeepSeek Generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect DeepSeek Chunks": {
+      "main": [
+        [
+          {
+            "node": "IF: DeepSeek Total Failure?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: DeepSeek Total Failure?": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Log DeepSeek Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sign · Match Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Log DeepSeek Failure": {
+      "main": [
+        [
+          {
+            "node": "Brand Summary1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Upsert Calendar1": {
+      "main": [
+        [
+          {
+            "node": "Sign · Notify Calendar Generated",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Posts Data1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Route Clean or Watermark?1": {
+      "main": [
+        [
+          {
+            "node": "Spine: Pre-Gen Compliance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Spine: Pre-Gen Compliance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Spine: Pre-Gen Compliance": {
+      "main": [
+        [
+          {
+            "node": "IF: Spine Block?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Spine Block?": {
+      "main": [
+        [
+          {
+            "node": "IF: Video or Image?1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: Video or Image?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Video or Image?1": {
+      "main": [
+        [
+          {
+            "node": "Prepare image/generate call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare image/generate call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Visual Results1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert QA Queue1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Hold Post1": {
+      "main": [
+        []
+      ]
+    },
+    "Supabase: Insert QA Queue1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email Payload": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Email via Resend1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Send Email via Resend1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Update Calendar Count1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Update Calendar Count1": {
+      "main": [
+        [
+          {
+            "node": "Sign · CEO Batch Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert Routing Decision1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert Memory Nominations1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert Memory Nominations1": {
+      "main": [
+        [
+          {
+            "node": "Brand Summary1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brand Summary1": {
+      "main": [
+        [
+          {
+            "node": "Bulk Save & Advance Brand",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bulk Save & Advance Brand": {
+      "main": [
+        [
+          {
+            "node": "Loop Brands (5 Parallel)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "COO Fallback: Use Brand Bio": {
+      "main": [
+        [
+          {
+            "node": "IF: Dialect Confirmed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build S03 alert1": {
+      "main": [
+        [
+          {
+            "node": "POST · S03 anomaly-alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · S03 anomaly-alert1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Log Usage (failed)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Build Email Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: Route Clean or Watermark?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · CEO Route & Classify": {
+      "main": [
+        [
+          {
+            "node": "Call: CEO Route & Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: CEO Route & Classify": {
+      "main": [
+        [
+          {
+            "node": "IF: Brand Blocked?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · Plan Slots": {
+      "main": [
+        [
+          {
+            "node": "POST · Plan Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · Plan Slots": {
+      "main": [
+        [
+          {
+            "node": "Call: Plan Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: Plan Slots": {
+      "main": [
+        [
+          {
+            "node": "Sign · COO Build CaptionContext",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · COO Build CaptionContext": {
+      "main": [
+        [
+          {
+            "node": "Call: COO Build CaptionContext",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: COO Build CaptionContext": {
+      "main": [
+        [
+          {
+            "node": "IF: Dialect Confirmed?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "COO Fallback: Use Brand Bio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · DeepSeek Generate": {
+      "main": [
+        [
+          {
+            "node": "POST · DeepSeek Generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · DeepSeek Generate": {
+      "main": [
+        [
+          {
+            "node": "Call: DeepSeek Generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: DeepSeek Generate": {
+      "main": [
+        [
+          {
+            "node": "Collect DeepSeek Chunks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · Match Chain": {
+      "main": [
+        [
+          {
+            "node": "POST · Match Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · Match Chain": {
+      "main": [
+        [
+          {
+            "node": "Call: Match Chain",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: Match Chain": {
+      "main": [
+        [
+          {
+            "node": "Sign · CCO Quality Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · CCO Quality Check": {
+      "main": [
+        [
+          {
+            "node": "Call: CCO Quality Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: CCO Quality Check": {
+      "main": [
+        [
+          {
+            "node": "Sign · CEO Confidence Gate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · CEO Confidence Gate": {
+      "main": [
+        [
+          {
+            "node": "Call: CEO Confidence Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: CEO Confidence Gate": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Upsert Calendar1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · Notify Calendar Generated": {
+      "main": [
+        [
+          {
+            "node": "POST · Notify Calendar Generated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · Notify Calendar Generated": {
+      "main": [
+        [
+          {
+            "node": "Call: Notify Calendar Generated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: Notify Calendar Generated": {
+      "main": [
+        [
+          {
+            "node": "Merge Posts Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · CEO Batch Complete": {
+      "main": [
+        [
+          {
+            "node": "Call: CEO Batch Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: CEO Batch Complete": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert Routing Decision1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare image/generate call": {
+      "main": [
+        [
+          {
+            "node": "POST /api/image/generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/image/generate": {
+      "main": [
+        [
+          {
+            "node": "Did it succeed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Did it succeed?": {
+      "main": [
+        [
+          {
+            "node": "Extract storage_url",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return error to parent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract storage_url": {
+      "main": [
+        [
+          {
+            "node": "Supabase: log generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: log generation": {
+      "main": [
+        [
+          {
+            "node": "Return success to parent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return success to parent": {
+      "main": [
+        [
+          {
+            "node": "Merge Visual Results1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return error to parent": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6b82bfa883d8b0ed7859b6f0ce362a41be2730aad080ae279216f1911379c19c"
+  }
+}

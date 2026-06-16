@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Full Report · Hungry House · OGz AI</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg: #0A0908;
+  --bg-2: #0F0D0B;
+  --card: #141312;
+  --card-hi: #1C1A17;
+  --border: #252320;
+  --border-hi: #383530;
+  --text: #F0EDE8;
+  --text-dim: #A09B92;
+  --muted: #6B6860;
+  --subtle: #3A3733;
+
+  --score-amber: #E5A04C;
+  --score-amber-2: #C9853A;
+  --score-amber-bg: #1A0F05;
+  --score-gold: #C9A84C;
+  --score-emerald: #3DB88A;
+  --score-coral: #E5667A;
+  --score-purple: #9883FF;
+
+  --green: #22c55e;
+  --red: #EF4444;
+
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  --font-ar: 'Tajawal', 'DM Sans', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  font-size: 15px;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 800px 600px at 50% -200px, rgba(229,160,76,0.06), transparent 70%),
+    radial-gradient(ellipse 600px 1200px at 100% 30%, rgba(61,184,138,0.04), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+html[data-lang="ar"] body { font-family: var(--font-ar); direction: rtl; }
+.ar-only { display: none; }
+.en-only { display: inline-block; }
+html[data-lang="ar"] .ar-only { display: inline-block; }
+html[data-lang="ar"] .en-only { display: none; }
+html[data-lang="en"] [data-ar] { display: none !important; }
+html[data-lang="ar"] [data-en] { display: none !important; }
+html[data-lang="ar"] .ltr-fixed { direction: ltr; display: inline-block; }
+
+.container { max-width: 560px; margin: 0 auto; padding: 0 20px 80px; position: relative; }
+
+/* ─── UNLOCKED BANNER ──────────────────────────────────── */
+.unlocked-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  margin: 16px -20px 0;
+  background: linear-gradient(90deg, rgba(61,184,138,0.12), rgba(61,184,138,0.04));
+  border-top: 1px solid rgba(61,184,138,0.25);
+  border-bottom: 1px solid rgba(61,184,138,0.25);
+}
+.unlocked-left {
+  display: flex; align-items: center; gap: 10px;
+}
+.unlocked-icon {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  background: rgba(61,184,138,0.2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--score-emerald);
+  font-size: 13px;
+  font-weight: 700;
+}
+.unlocked-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--score-emerald);
+  font-weight: 600;
+}
+.unlocked-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+.lang-toggle {
+  display: flex; gap: 4px;
+  padding: 3px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 40px;
+}
+.lang-btn {
+  padding: 4px 11px;
+  border: none; border-radius: 30px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lang-btn.active { background: var(--score-amber); color: #000; }
+.lang-btn.ar { font-family: var(--font-ar); font-size: 12px; letter-spacing: 0; }
+
+/* ─── HEADER ────────────────────────────────────────── */
+.report-header {
+  text-align: center;
+  padding: 40px 0 32px;
+}
+.report-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: var(--score-emerald);
+  background: rgba(61,184,138,0.1);
+  padding: 5px 13px;
+  border-radius: 40px;
+  border: 1px solid rgba(61,184,138,0.25);
+  margin-bottom: 22px;
+}
+.brand-name {
+  font-family: var(--font-serif);
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin-bottom: 4px;
+}
+.brand-name-ar {
+  font-family: var(--font-ar);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-dim);
+  direction: rtl;
+  margin-bottom: 16px;
+}
+.brand-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.brand-meta-dot {
+  display: inline-block;
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin: 0 8px;
+  vertical-align: middle;
+}
+
+/* ─── HEADLINE SCORE SUMMARY ──────────────────────────── */
+.score-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 32px 0;
+}
+.summary-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  text-align: center;
+}
+.summary-card.you {
+  background: var(--score-amber-bg);
+  border-color: rgba(229,160,76,0.4);
+}
+.summary-card.gap {
+  background: rgba(229,102,122,0.05);
+  border-color: rgba(229,102,122,0.3);
+}
+.summary-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.summary-num {
+  font-family: var(--font-serif);
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.summary-num.you-num { color: var(--score-amber); }
+.summary-num.gap-num { color: var(--score-coral); }
+.summary-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 6px;
+  letter-spacing: 0.04em;
+}
+
+/* ─── SECTIONS ─────────────────────────────────────── */
+.section-header {
+  display: flex; align-items: center; gap: 14px;
+  margin: 56px 0 6px;
+}
+.section-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--score-emerald);
+  letter-spacing: 0.15em;
+  font-weight: 600;
+}
+.section-title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.018em;
+}
+.section-line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--border), transparent); }
+.section-intro {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 24px;
+  line-height: 1.6;
+  max-width: 480px;
+}
+
+/* ─── COMPETITOR DEEP DIVE ────────────────────────── */
+.competitor-deep {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.competitor-deep:hover { border-color: var(--border-hi); }
+.competitor-deep.you {
+  background: var(--score-amber-bg);
+  border-color: rgba(229,160,76,0.3);
+}
+.cd-head {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 18px;
+  cursor: pointer;
+  user-select: none;
+}
+.cd-rank {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.cd-name-block {
+  min-width: 0;
+}
+.cd-name {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cd-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  margin-top: 3px;
+}
+.cd-score-block {
+  display: flex; align-items: center; gap: 12px;
+  flex-shrink: 0;
+}
+.cd-score {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cd-chev {
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+.competitor-deep[open] .cd-chev { transform: rotate(180deg); }
+
+/* Dimension breakdown grid */
+.cd-body {
+  padding: 0 18px 18px;
+  border-top: 1px solid var(--border);
+  margin-top: -1px;
+}
+.cd-dims {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding-top: 16px;
+  margin-bottom: 16px;
+}
+.cd-dim {
+  text-align: center;
+  padding: 10px 6px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.cd-dim-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+.cd-dim-score {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* What they do better */
+.cd-insight {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px;
+  background: rgba(229,160,76,0.06);
+  border: 1px solid rgba(229,160,76,0.2);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.cd-insight.you-win {
+  background: rgba(61,184,138,0.06);
+  border-color: rgba(61,184,138,0.2);
+}
+.cd-insight-icon {
+  font-size: 11px;
+  width: 20px; height: 20px;
+  border-radius: 5px;
+  background: rgba(229,160,76,0.15);
+  color: var(--score-amber);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+.cd-insight.you-win .cd-insight-icon {
+  background: rgba(61,184,138,0.15);
+  color: var(--score-emerald);
+}
+.cd-insight-text {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  flex: 1;
+}
+.cd-insight-text strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ─── 90-DAY PLAN ────────────────────────────────── */
+.plan-summary {
+  background: linear-gradient(180deg, var(--card), var(--card-hi));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.plan-summary::before {
+  content: '';
+  position: absolute;
+  top: -50px; right: -50px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(61,184,138,0.1), transparent 60%);
+  pointer-events: none;
+}
+.plan-target-row {
+  display: flex; align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+  position: relative;
+  flex-wrap: wrap;
+}
+.plan-from {
+  font-family: var(--font-serif);
+  font-size: 40px;
+  font-weight: 800;
+  color: var(--score-amber);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.plan-arrow {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  color: var(--muted);
+}
+.plan-to {
+  font-family: var(--font-serif);
+  font-size: 56px;
+  font-weight: 800;
+  color: var(--score-emerald);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+  text-shadow: 0 0 30px rgba(61,184,138,0.3);
+}
+.plan-target-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+.plan-tagline {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  color: var(--text-dim);
+  font-style: italic;
+  line-height: 1.5;
+  position: relative;
+}
+
+/* Phases */
+.phase {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.phase-marker {
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 2px;
+}
+.phase-num {
+  font-family: var(--font-serif);
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--score-emerald);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.phase-num-sub {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+.phase-content { min-width: 0; }
+.phase-weeks {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--score-emerald);
+  letter-spacing: 0.1em;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.phase-title {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+.phase-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+.phase-actions {
+  display: flex; flex-direction: column; gap: 5px;
+  margin-bottom: 12px;
+}
+.phase-action {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+  padding: 6px 0;
+}
+.phase-action-num {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  width: 16px;
+  flex-shrink: 0;
+}
+.phase-action-name { flex: 1; }
+.phase-action-name strong {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--score-emerald);
+  background: rgba(61,184,138,0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 6px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+html[data-lang="ar"] .phase-action-name strong { margin-right: 0; margin-left: 6px; }
+.phase-result {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(61,184,138,0.06);
+  border: 1px solid rgba(61,184,138,0.2);
+  border-radius: 8px;
+}
+.phase-result-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.phase-result-num {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--score-emerald);
+  letter-spacing: 0.04em;
+}
+
+/* ─── METHODOLOGY DISCLOSURE ─────────────────────── */
+.method-block {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 10px;
+}
+.method-block-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.method-block h4 {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  letter-spacing: -0.012em;
+}
+.method-block p {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.65;
+  margin-bottom: 10px;
+}
+.method-block p:last-child { margin-bottom: 0; }
+.method-block code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(229,160,76,0.08);
+  color: var(--score-amber);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.method-formula {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  padding: 14px;
+  border-radius: 10px;
+  color: var(--text);
+  margin: 12px 0;
+  letter-spacing: 0.02em;
+  text-align: center;
+  line-height: 1.8;
+  direction: ltr;
+}
+.method-formula .var { color: var(--score-amber); font-weight: 600; }
+.method-formula .num { color: var(--score-emerald); }
+
+.weights-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 12px;
+}
+.weight-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 12px;
+  background: var(--bg-2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.weight-name { font-family: var(--font-sans); font-size: 12px; color: var(--text-dim); }
+.weight-pct {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--score-amber);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dataset disclosure */
+.dataset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+.dataset-cell {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+}
+.dataset-cell-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.dataset-cell-num {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.dataset-cell-note {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 6px;
+  letter-spacing: 0.04em;
+}
+
+/* ─── CTAs ───────────────────────────────────────── */
+.cta-stack {
+  display: flex; flex-direction: column;
+  gap: 10px;
+  margin: 40px 0 20px;
+}
+.cta {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px;
+  padding: 17px 24px;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.12s;
+}
+html[data-lang="ar"] .cta { font-family: var(--font-ar); letter-spacing: 0; text-transform: none; font-size: 14px; }
+.cta-primary {
+  background: var(--score-emerald);
+  color: #000;
+  box-shadow: 0 0 24px rgba(61,184,138,0.3);
+}
+.cta-primary:hover { transform: translateY(-1px); }
+.cta-secondary {
+  background: #25D366;
+  color: #000;
+  box-shadow: 0 0 24px rgba(37,211,102,0.25);
+}
+.cta-tertiary {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
+/* ─── FOOTER ────────────────────────────────────── */
+footer {
+  text-align: center;
+  padding: 40px 20px 20px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  line-height: 1.7;
+}
+footer a { color: var(--score-amber); text-decoration: none; }
+footer .footer-divider { width: 40px; height: 1px; background: var(--border); margin: 12px auto; }
+.receipt-stamp {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1px dashed rgba(61,184,138,0.4);
+  border-radius: 20px;
+  color: var(--score-emerald);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.competitor-deep, .phase, .method-block, .summary-card {
+  animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+.summary-card:nth-child(1) { animation-delay: 0.05s; }
+.summary-card:nth-child(2) { animation-delay: 0.1s; }
+.summary-card:nth-child(3) { animation-delay: 0.15s; }
+.summary-card:nth-child(4) { animation-delay: 0.2s; }
+
+@media (max-width: 420px) {
+  .summary-num { font-size: 42px; }
+  .plan-to { font-size: 48px; }
+  .plan-from { font-size: 34px; }
+  .cd-dims { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .cd-dim { padding: 8px 3px; }
+  .cd-dim-score { font-size: 14px; }
+  .cd-dim-label { font-size: 7px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ════ UNLOCKED BAR ════ -->
+  <div class="unlocked-bar">
+    <div class="unlocked-left">
+      <div class="unlocked-icon">✓</div>
+      <div>
+        <div class="unlocked-text">
+          <span data-en>FULL REPORT UNLOCKED</span>
+          <span data-ar>التقرير الكامل مفعّل</span>
+        </div>
+        <div class="unlocked-meta">
+          <span data-en>SAR 85 · 12 MAY 2026 · #HH-4477</span>
+          <span data-ar>٨٥ ريال · ١٢ مايو ٢٠٢٦ · #HH-4477</span>
+        </div>
+      </div>
+    </div>
+    <div class="lang-toggle" role="tablist">
+      <button class="lang-btn active" data-set-lang="en">EN</button>
+      <button class="lang-btn ar" data-set-lang="ar">عربي</button>
+    </div>
+  </div>
+
+  <!-- ════ HEADER ════ -->
+  <header class="report-header">
+    <div class="report-tag">
+      <span data-en>FULL BRAND DNA REPORT · 90-DAY PLAN</span>
+      <span data-ar>التقرير الكامل · خطة ٩٠ يوم</span>
+    </div>
+    <h1 class="brand-name">Hungry House</h1>
+    <div class="brand-name-ar">هنغري هاوس</div>
+    <div class="brand-meta">
+      <span data-en>Fast Casual</span><span data-ar>وجبات سريعة</span>
+      <span class="brand-meta-dot"></span>
+      <span data-en>Riyadh · Al Wurud</span><span data-ar>الرياض · الورود</span>
+      <span class="brand-meta-dot"></span>
+      <span class="ltr-fixed">3,200 followers</span>
+    </div>
+  </header>
+
+  <!-- ════ HEADLINE SUMMARY ════ -->
+  <section class="score-summary">
+    <div class="summary-card you">
+      <div class="summary-label">
+        <span data-en>Your score</span><span data-ar>نتيجتك</span>
+      </div>
+      <div class="summary-num you-num">34</div>
+      <div class="summary-sub">
+        <span data-en>RANKED 5 OF 6 NEARBY</span>
+        <span data-ar>المرتبة ٥ من ٦ في منطقتك</span>
+      </div>
+    </div>
+    <div class="summary-card gap">
+      <div class="summary-label">
+        <span data-en>Local leader gap</span><span data-ar>الفجوة مع الأول</span>
+      </div>
+      <div class="summary-num gap-num">−37</div>
+      <div class="summary-sub">
+        <span data-en>VS ALBAIK (71) · GRANADA</span>
+        <span data-ar>مقابل البيك (٧١) · غرناطة</span>
+      </div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">
+        <span data-en>90-day target</span><span data-ar>هدف ٩٠ يوم</span>
+      </div>
+      <div class="summary-num" style="color: var(--score-emerald)">73</div>
+      <div class="summary-sub">
+        <span data-en>+39 POINTS · LEADER TIER</span>
+        <span data-ar>+٣٩ نقطة · فئة المتصدرين</span>
+      </div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-label">
+        <span data-en>Total recommended actions</span><span data-ar>الإجراءات المقترحة</span>
+      </div>
+      <div class="summary-num" style="color: var(--text)">11</div>
+      <div class="summary-sub">
+        <span data-en>ACROSS 3 PHASES</span>
+        <span data-ar>عبر ٣ مراحل</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ SECTION 01 — COMPETITOR DEEP DIVE ════ -->
+  <div class="section-header">
+    <span class="section-num">01</span>
+    <h2 class="section-title">
+      <span data-en>Why they beat you</span>
+      <span data-ar>ليش هم يتفوقون عليك</span>
+    </h2>
+    <span class="section-line"></span>
+  </div>
+  <p class="section-intro">
+    <span data-en>Tap any competitor to see their five-dimension breakdown and the specific things they do better than you. The same scoring engine. The same posts analyzed. No mystery.</span>
+    <span data-ar>اضغط على أي منافس لتشوف تقسيم النقاط لكل من الأبعاد الخمسة، وش يسوّونه أحسن منك بالضبط. نفس النظام، نفس المنشورات المُحلّلة. بدون غموض.</span>
+  </p>
+
+  <!-- ALBAIK -->
+  <details class="competitor-deep" open>
+    <summary class="cd-head">
+      <span class="cd-rank">#1</span>
+      <div class="cd-name-block">
+        <div class="cd-name">Albaik</div>
+        <div class="cd-meta">
+          <span data-en>GRANADA MALL · 1.4 KM · 312K FOLLOWERS</span>
+          <span data-ar>مول غرناطة · ١.٤ كم · ٣١٢ ألف متابع</span>
+        </div>
+      </div>
+      <div class="cd-score-block">
+        <div class="cd-score" style="color: var(--score-emerald)">71</div>
+        <span class="cd-chev">▾</span>
+      </div>
+    </summary>
+    <div class="cd-body">
+      <div class="cd-dims">
+        <div class="cd-dim"><div class="cd-dim-label">VQ</div><div class="cd-dim-score" style="color: var(--score-emerald)">78</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">CF</div><div class="cd-dim-score" style="color: var(--score-emerald)">82</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">PC</div><div class="cd-dim-score" style="color: var(--score-gold)">64</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">BC</div><div class="cd-dim-score" style="color: var(--score-emerald)">75</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">EH</div><div class="cd-dim-score" style="color: var(--score-gold)">52</div></div>
+      </div>
+      <div class="cd-insight">
+        <div class="cd-insight-icon">↑</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Cultural Fit: 82 vs your 41.</strong> They hit every Saudi cultural moment for 11 months running. <strong>+28 dialect captions vs your 11.</strong> Their Najdi-leaning copy gets 3.8× more saves than their MSA posts.
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>الملاءمة الثقافية: ٨٢ مقابل ٤١.</strong> ضربوا كل مناسبة سعودية على مدى ١١ شهر. <strong>+٢٨ كابشن بلهجة مقابل ١١ عندك.</strong> كتاباتهم النجدية تجيب حفظ ٣.٨× مقارنة بالفصحى.
+        </div>
+      </div>
+      <div class="cd-insight">
+        <div class="cd-insight-icon">↑</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Brand Coherence: 75.</strong> One logo, one color palette across 30 posts. Their visual identity is locked. <strong>Yours uses 7 fonts and 3 logo variants.</strong>
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>تماسك الهوية: ٧٥.</strong> شعار واحد، لون واحد عبر ٣٠ منشور. هويتهم البصرية مثبّتة. <strong>أنت تستخدم ٧ خطوط و٣ شعارات.</strong>
+        </div>
+      </div>
+      <div class="cd-insight you-win">
+        <div class="cd-insight-icon">=</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Engagement Health: their 52 vs your 44.</strong> Closer than you think. They're a chain — they don't reply to DMs fast. <strong>Your DM speed could close this gap in weeks.</strong>
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>صحة التفاعل: ٥٢ عندهم مقابل ٤٤ عندك.</strong> الفرق أقرب مما تتوقع. هم سلسلة كبيرة، ما يردون بسرعة. <strong>سرعة ردك تقدر تقفل الفجوة خلال أسابيع.</strong>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- HARDEE'S -->
+  <details class="competitor-deep">
+    <summary class="cd-head">
+      <span class="cd-rank">#2</span>
+      <div class="cd-name-block">
+        <div class="cd-name">Hardee's</div>
+        <div class="cd-meta">
+          <span data-en>AL TAHLIYAH · 2.2 KM · 1.2M FOLLOWERS</span>
+          <span data-ar>التحلية · ٢.٢ كم · ١.٢ مليون</span>
+        </div>
+      </div>
+      <div class="cd-score-block">
+        <div class="cd-score" style="color: var(--score-gold)">58</div>
+        <span class="cd-chev">▾</span>
+      </div>
+    </summary>
+    <div class="cd-body">
+      <div class="cd-dims">
+        <div class="cd-dim"><div class="cd-dim-label">VQ</div><div class="cd-dim-score" style="color: var(--score-emerald)">81</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">CF</div><div class="cd-dim-score" style="color: var(--score-amber)">38</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">PC</div><div class="cd-dim-score" style="color: var(--score-gold)">62</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">BC</div><div class="cd-dim-score" style="color: var(--score-emerald)">88</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">EH</div><div class="cd-dim-score" style="color: var(--score-amber)">29</div></div>
+      </div>
+      <div class="cd-insight">
+        <div class="cd-insight-icon">↑</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Visual Quality: 81.</strong> Global brand budget. Every post professionally lit, color-graded, retouched. <strong>0 phone shots.</strong> You can't outspend them — but you can match their lighting using Workflow 3.
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>جودة الصور: ٨١.</strong> ميزانية علامة عالمية. كل منشور إضاءة احترافية وتعديل ألوان. <strong>صفر صور بالجوال.</strong> ما تقدر تنافسهم بالميزانية، لكن تقدر تطابق إضاءتهم بسير العمل ٣.
+        </div>
+      </div>
+      <div class="cd-insight you-win">
+        <div class="cd-insight-icon">↓</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Cultural Fit: 38 — lower than yours.</strong> Imported global creative. <strong>Their Ramadan campaign was generic English copy.</strong> A locally-rooted Najdi brand can take share here.
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>الملاءمة الثقافية: ٣٨ — أقل منك.</strong> محتوى عالمي مستورد. <strong>حملتهم في رمضان كانت إنجليزي عام.</strong> علامة محلية بلهجة نجدية تقدر تكسب هنا.
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- KEBAB EXPRESS -->
+  <details class="competitor-deep">
+    <summary class="cd-head">
+      <span class="cd-rank">#3</span>
+      <div class="cd-name-block">
+        <div class="cd-name">Kebab Express</div>
+        <div class="cd-meta">
+          <span data-en>OLAYA · 800 M · 8,400 FOLLOWERS</span>
+          <span data-ar>العليا · ٨٠٠ م · ٨٬٤٠٠ متابع</span>
+        </div>
+      </div>
+      <div class="cd-score-block">
+        <div class="cd-score" style="color: var(--score-gold)">51</div>
+        <span class="cd-chev">▾</span>
+      </div>
+    </summary>
+    <div class="cd-body">
+      <div class="cd-dims">
+        <div class="cd-dim"><div class="cd-dim-label">VQ</div><div class="cd-dim-score" style="color: var(--score-amber)">42</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">CF</div><div class="cd-dim-score" style="color: var(--score-emerald)">71</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">PC</div><div class="cd-dim-score" style="color: var(--score-gold)">58</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">BC</div><div class="cd-dim-score" style="color: var(--score-gold)">44</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">EH</div><div class="cd-dim-score" style="color: var(--score-emerald)">61</div></div>
+      </div>
+      <div class="cd-insight">
+        <div class="cd-insight-icon">↑</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Cultural Fit: 71 with mediocre photography.</strong> Pure Najdi voice. They post 9× per week — your 4.2 lets them dominate your audience's feed.
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>الملاءمة الثقافية: ٧١ بصور متوسطة.</strong> صوت نجدي خالص. ينشرون ٩ مرات بالأسبوع — انتظامك ٤.٢ يخلّيهم يسيطرون على فيد جمهورك.
+        </div>
+      </div>
+      <div class="cd-insight you-win">
+        <div class="cd-insight-icon">↓</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Visual Quality: 42 — only 14 points ahead of you.</strong> Closest catchable score. <strong>Workflow 3 alone puts you past them in 4–6 weeks.</strong>
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>جودة الصور: ٤٢ — ١٤ نقطة بس عنك.</strong> أقرب نتيجة تتجاوزها. <strong>سير العمل ٣ لحاله يخليك تتجاوزهم بـ٤-٦ أسابيع.</strong>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- BUKHARA EXPRESS -->
+  <details class="competitor-deep">
+    <summary class="cd-head">
+      <span class="cd-rank">#4</span>
+      <div class="cd-name-block">
+        <div class="cd-name">Bukhara Express</div>
+        <div class="cd-meta">
+          <span data-en>KING ABDULAZIZ · 2 STREETS · 4,100 FOLLOWERS</span>
+          <span data-ar>الملك عبدالعزيز · شارعين · ٤٬١٠٠ متابع</span>
+        </div>
+      </div>
+      <div class="cd-score-block">
+        <div class="cd-score" style="color: var(--score-gold)">46</div>
+        <span class="cd-chev">▾</span>
+      </div>
+    </summary>
+    <div class="cd-body">
+      <div class="cd-dims">
+        <div class="cd-dim"><div class="cd-dim-label">VQ</div><div class="cd-dim-score" style="color: var(--score-amber)">35</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">CF</div><div class="cd-dim-score" style="color: var(--score-gold)">52</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">PC</div><div class="cd-dim-score" style="color: var(--score-gold)">61</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">BC</div><div class="cd-dim-score" style="color: var(--score-gold)">47</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">EH</div><div class="cd-dim-score" style="color: var(--score-gold)">39</div></div>
+      </div>
+      <div class="cd-insight">
+        <div class="cd-insight-icon">↑</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Your direct competitor — 2 streets away.</strong> They post 7.8× per week. You post 4.2×. Same neighborhood, same customers, half the volume. <strong>They show up in feeds when you don't.</strong>
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>المنافس المباشر — شارعين عنك.</strong> ينشرون ٧.٨ مرة بالأسبوع. أنت ٤.٢. نفس الحي، نفس العملاء، نص الكمية. <strong>يظهرون في الفيد لما ما تظهر.</strong>
+        </div>
+      </div>
+      <div class="cd-insight you-win">
+        <div class="cd-insight-icon">→</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Beatable in 30 days.</strong> Their lead is consistency, not quality. AI Calendar alone closes 12 points by Day 30.
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>تقدر تتجاوزهم في ٣٠ يوم.</strong> تفوقهم في الانتظام مش الجودة. تقويم الذكاء الاصطناعي لحاله يقفل ١٢ نقطة في ٣٠ يوم.
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- HUNGRY HOUSE (YOU) -->
+  <details class="competitor-deep you">
+    <summary class="cd-head">
+      <span class="cd-rank">#5</span>
+      <div class="cd-name-block">
+        <div class="cd-name">
+          <span data-en>Hungry House (you)</span>
+          <span data-ar>هنغري هاوس (أنت)</span>
+        </div>
+        <div class="cd-meta">
+          <span data-en>AL WURUD · 3,200 FOLLOWERS</span>
+          <span data-ar>الورود · ٣٬٢٠٠ متابع</span>
+        </div>
+      </div>
+      <div class="cd-score-block">
+        <div class="cd-score" style="color: var(--score-amber)">34</div>
+        <span class="cd-chev">▾</span>
+      </div>
+    </summary>
+    <div class="cd-body">
+      <div class="cd-dims">
+        <div class="cd-dim"><div class="cd-dim-label">VQ</div><div class="cd-dim-score" style="color: var(--score-amber)">28</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">CF</div><div class="cd-dim-score" style="color: var(--score-amber)">41</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">PC</div><div class="cd-dim-score" style="color: var(--score-amber)">22</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">BC</div><div class="cd-dim-score" style="color: var(--score-amber)">35</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">EH</div><div class="cd-dim-score" style="color: var(--score-gold)">44</div></div>
+      </div>
+      <div class="cd-insight">
+        <div class="cd-insight-icon">!</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Three of your five dimensions are below 40.</strong> The pattern isn't bad luck — it's lack of system. Five different brands in 24 posts. <strong>One BrandDNA lock fixes most of this.</strong>
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>ثلاثة من أبعادك الخمسة تحت ٤٠.</strong> النمط مش حظ سيء — نقص في النظام. خمس علامات مختلفة في ٢٤ منشور. <strong>تثبيت هوية واحد يحل أغلب هذا.</strong>
+        </div>
+      </div>
+      <div class="cd-insight you-win">
+        <div class="cd-insight-icon">↑</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Engagement Health: 44 — your best score, beating Bukhara.</strong> Your audience cares. They're loyal. <strong>You're not invisible — you're inconsistent.</strong>
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>صحة التفاعل: ٤٤ — أفضل بُعد عندك، تتجاوز بخارى.</strong> جمهورك مهتم. مخلصين. <strong>مش غير مرئي — متذبذب.</strong>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- RIYADH BITES -->
+  <details class="competitor-deep">
+    <summary class="cd-head">
+      <span class="cd-rank">#6</span>
+      <div class="cd-name-block">
+        <div class="cd-name">Riyadh Bites</div>
+        <div class="cd-meta">
+          <span data-en>KING FAHD RD · 1.8 KM · 1,800 FOLLOWERS</span>
+          <span data-ar>طريق الملك فهد · ١.٨ كم · ١٬٨٠٠ متابع</span>
+        </div>
+      </div>
+      <div class="cd-score-block">
+        <div class="cd-score" style="color: var(--score-amber)">31</div>
+        <span class="cd-chev">▾</span>
+      </div>
+    </summary>
+    <div class="cd-body">
+      <div class="cd-dims">
+        <div class="cd-dim"><div class="cd-dim-label">VQ</div><div class="cd-dim-score" style="color: var(--score-amber)">31</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">CF</div><div class="cd-dim-score" style="color: var(--score-amber)">28</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">PC</div><div class="cd-dim-score" style="color: var(--score-amber)">18</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">BC</div><div class="cd-dim-score" style="color: var(--score-amber)">29</div></div>
+        <div class="cd-dim"><div class="cd-dim-label">EH</div><div class="cd-dim-score" style="color: var(--score-gold)">52</div></div>
+      </div>
+      <div class="cd-insight you-win">
+        <div class="cd-insight-icon">↓</div>
+        <div class="cd-insight-text" data-en>
+          <strong>Below you on 4 of 5 dimensions.</strong> If they activate before you, this gap closes. Speed matters here. The good news: they have no platform discipline either.
+        </div>
+        <div class="cd-insight-text" data-ar>
+          <strong>تحتك في ٤ من ٥ أبعاد.</strong> لو فعّلوا قبلك، هذي الفجوة تقفل. السرعة مهمة. الخبر الزين: ما عندهم انضباط في المنصة.
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- ════ SECTION 02 — 90-DAY PLAN ════ -->
+  <div class="section-header">
+    <span class="section-num">02</span>
+    <h2 class="section-title">
+      <span data-en>Your 90-day plan</span>
+      <span data-ar>خطتك لـ٩٠ يوم</span>
+    </h2>
+    <span class="section-line"></span>
+  </div>
+  <p class="section-intro">
+    <span data-en>Three sequenced phases. Eleven specific actions. Each phase compounds on the last. Stop following advice — start running a system.</span>
+    <span data-ar>ثلاث مراحل متتابعة. ١١ إجراء محدد. كل مرحلة تبني على اللي قبلها. كفى نصايح — ابدأ تشغّل نظام.</span>
+  </p>
+
+  <div class="plan-summary">
+    <div class="plan-target-label">
+      <span data-en>Where you go from where you are</span>
+      <span data-ar>من وين أنت إلى وين رايح</span>
+    </div>
+    <div class="plan-target-row">
+      <span class="plan-from">34</span>
+      <span class="plan-arrow">→</span>
+      <span class="plan-to">73</span>
+    </div>
+    <div class="plan-tagline">
+      <span data-en>From "ranked 5 of 6" to "above Albaik in your neighborhood." 90 days. 11 moves. Not faster — sequenced.</span>
+      <span data-ar>من "المرتبة ٥ من ٦" إلى "فوق البيك في حيك". ٩٠ يوم. ١١ خطوة. مش أسرع — مرتّبة.</span>
+    </div>
+  </div>
+
+  <!-- PHASE 1 -->
+  <div class="phase">
+    <div class="phase-marker">
+      <div class="phase-num">01</div>
+      <div class="phase-num-sub">PHASE</div>
+    </div>
+    <div class="phase-content">
+      <div class="phase-weeks">
+        <span data-en>Weeks 1–4 · Foundation</span>
+        <span data-ar>الأسابيع ١–٤ · الأساس</span>
+      </div>
+      <h3 class="phase-title">
+        <span data-en>Lock the brand. Stop the bleeding.</span>
+        <span data-ar>ثبّت الهوية. أوقف النزيف.</span>
+      </h3>
+      <p class="phase-desc" data-en>
+        Three of your low scores are inconsistency problems, not quality problems. Before adding anything, lock what you already have. One brand. One voice. One schedule.
+      </p>
+      <p class="phase-desc" data-ar>
+        ثلاث من نتائجك المنخفضة مشكلة تذبذب، مش جودة. قبل ما تضيف شي، ثبّت اللي عندك. علامة واحدة. صوت واحد. جدول واحد.
+      </p>
+      <div class="phase-actions">
+        <div class="phase-action">
+          <span class="phase-action-num">01</span>
+          <span class="phase-action-name">
+            <strong>BrandDNA</strong>
+            <span data-en>Complete the 8-min onboarding. Locks fonts, palette, voice, restrictions.</span>
+            <span data-ar>أكمل إعداد هوية العلامة (٨ دقايق). يثبّت الخطوط والألوان والصوت والقواعد.</span>
+          </span>
+        </div>
+        <div class="phase-action">
+          <span class="phase-action-num">02</span>
+          <span class="phase-action-name">
+            <strong>AI Calendar</strong>
+            <span data-en>Activate auto-scheduling at audience prime-time (6pm–9pm).</span>
+            <span data-ar>فعّل الجدولة التلقائية في أوقات ذروة جمهورك (٦م–٩م).</span>
+          </span>
+        </div>
+        <div class="phase-action">
+          <span class="phase-action-num">03</span>
+          <span class="phase-action-name">
+            <strong>Workflow 3</strong>
+            <span data-en>Real Photo Enhancement on your 8 best-selling dishes.</span>
+            <span data-ar>تحسين صور حقيقي لأفضل ٨ أطباق مبيعاً.</span>
+          </span>
+        </div>
+        <div class="phase-action">
+          <span class="phase-action-num">04</span>
+          <span class="phase-action-name">
+            <strong>Captions Chain</strong>
+            <span data-en>Switch all captions to Najdi-tuned voice (your 3.2× multiplier).</span>
+            <span data-ar>حوّل كل الكابشن إلى صوت نجدي (مضاعف ٣.٢×).</span>
+          </span>
+        </div>
+      </div>
+      <div class="phase-result">
+        <span class="phase-result-label">
+          <span data-en>EST. SCORE END OF PHASE 1</span>
+          <span data-ar>النتيجة المتوقعة آخر المرحلة ١</span>
+        </span>
+        <span class="phase-result-num">34 → 52</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div class="phase">
+    <div class="phase-marker">
+      <div class="phase-num">02</div>
+      <div class="phase-num-sub">PHASE</div>
+    </div>
+    <div class="phase-content">
+      <div class="phase-weeks">
+        <span data-en>Weeks 5–8 · Acceleration</span>
+        <span data-ar>الأسابيع ٥–٨ · التسارع</span>
+      </div>
+      <h3 class="phase-title">
+        <span data-en>Take Bukhara's neighborhood.</span>
+        <span data-ar>اكسب حيّ بخارى.</span>
+      </h3>
+      <p class="phase-desc" data-en>
+        Foundation locked. Now add volume and cultural depth. Bukhara's lead is consistency — match it, then exceed it on Cultural Fit where they're weakest.
+      </p>
+      <p class="phase-desc" data-ar>
+        الأساس مثبّت. الحين زيد الكمية والعمق الثقافي. تفوق بخارى في الانتظام — طابقه، ثم تجاوزه بالملاءمة الثقافية حيث هم أضعف.
+      </p>
+      <div class="phase-actions">
+        <div class="phase-action">
+          <span class="phase-action-num">05</span>
+          <span class="phase-action-name">
+            <strong>Chain C2</strong>
+            <span data-en>Eid Al-Fitr content series (8 posts across the 3-day window).</span>
+            <span data-ar>سلسلة عيد الفطر (٨ منشورات عبر ٣ أيام).</span>
+          </span>
+        </div>
+        <div class="phase-action">
+          <span class="phase-action-num">06</span>
+          <span class="phase-action-name">
+            <strong>Workflow 5</strong>
+            <span data-en>Behind-the-scenes video — 2 per week. Restaurant feel + chef hands.</span>
+            <span data-ar>كواليس فيديو — ٢ بالأسبوع. إحساس المطعم + يدين الشيف.</span>
+          </span>
+        </div>
+        <div class="phase-action">
+          <span class="phase-action-num">07</span>
+          <span class="phase-action-name">
+            <strong>UGC Repost</strong>
+            <span data-en>Activate Workflow 4. Customer photos with your DNA-tuned captions.</span>
+            <span data-ar>فعّل سير العمل ٤. صور عملاء بكابشن من هويتك.</span>
+          </span>
+        </div>
+        <div class="phase-action">
+          <span class="phase-action-num">08</span>
+          <span class="phase-action-name">
+            <strong>DM Response</strong>
+            <span data-en>Reply within 1 hour. Use AI templates for the first 30 minutes of activity.</span>
+            <span data-ar>رد خلال ساعة. استخدم قوالب AI لأول ٣٠ دقيقة من النشاط.</span>
+          </span>
+        </div>
+      </div>
+      <div class="phase-result">
+        <span class="phase-result-label">
+          <span data-en>EST. SCORE END OF PHASE 2</span>
+          <span data-ar>النتيجة المتوقعة آخر المرحلة ٢</span>
+        </span>
+        <span class="phase-result-num">52 → 65</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div class="phase">
+    <div class="phase-marker">
+      <div class="phase-num">03</div>
+      <div class="phase-num-sub">PHASE</div>
+    </div>
+    <div class="phase-content">
+      <div class="phase-weeks">
+        <span data-en>Weeks 9–12 · Leader tier</span>
+        <span data-ar>الأسابيع ٩–١٢ · فئة المتصدرين</span>
+      </div>
+      <h3 class="phase-title">
+        <span data-en>Catch Albaik. Build your moat.</span>
+        <span data-ar>الحق البيك. ابنِ حصنك.</span>
+      </h3>
+      <p class="phase-desc" data-en>
+        You won't fully out-budget Albaik on photography. But you can out-Saudi them on Cultural Fit and out-respond them on Engagement. This is where Cultural Fit's 30% weight pays you back.
+      </p>
+      <p class="phase-desc" data-ar>
+        ما راح تتفوق على البيك بالميزانية في التصوير. لكن تقدر تتفوق عليهم بالملاءمة الثقافية والتفاعل. هنا وزن الـ٣٠٪ للملاءمة الثقافية يردّ لك الجميل.
+      </p>
+      <div class="phase-actions">
+        <div class="phase-action">
+          <span class="phase-action-num">09</span>
+          <span class="phase-action-name">
+            <strong>Chain C4</strong>
+            <span data-en>National Day campaign — 3-week build, peaks September 23.</span>
+            <span data-ar>حملة اليوم الوطني — ٣ أسابيع، الذروة ٢٣ سبتمبر.</span>
+          </span>
+        </div>
+        <div class="phase-action">
+          <span class="phase-action-num">10</span>
+          <span class="phase-action-name">
+            <strong>Score Card</strong>
+            <span data-en>Re-scan. Share publicly. Compete openly with your block.</span>
+            <span data-ar>إعادة المسح. شارك علناً. نافس بشفافية في حيك.</span>
+          </span>
+        </div>
+        <div class="phase-action">
+          <span class="phase-action-num">11</span>
+          <span class="phase-action-name">
+            <strong>Local SEO</strong>
+            <span data-en>Sync Instagram bio + Google Maps + Talabat. Same voice everywhere.</span>
+            <span data-ar>زامن بايو انستقرام + خرائط جوجل + طلبات. نفس الصوت في كل مكان.</span>
+          </span>
+        </div>
+      </div>
+      <div class="phase-result">
+        <span class="phase-result-label">
+          <span data-en>EST. SCORE END OF PHASE 3</span>
+          <span data-ar>النتيجة المتوقعة آخر المرحلة ٣</span>
+        </span>
+        <span class="phase-result-num">65 → 73</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ SECTION 03 — METHODOLOGY ════ -->
+  <div class="section-header">
+    <span class="section-num">03</span>
+    <h2 class="section-title">
+      <span data-en>How we calculated this</span>
+      <span data-ar>كيف حسبنا هذا</span>
+    </h2>
+    <span class="section-line"></span>
+  </div>
+  <p class="section-intro">
+    <span data-en>Every score on this page is auditable. Here's the math, the dataset, and the model stack. No black box.</span>
+    <span data-ar>كل نقطة في هذي الصفحة قابلة للتدقيق. هذي المعادلة، والبيانات، والنماذج. ما فيه صندوق أسود.</span>
+  </p>
+
+  <!-- The formula -->
+  <div class="method-block">
+    <div class="method-block-label">
+      <span data-en>The formula</span>
+      <span data-ar>المعادلة</span>
+    </div>
+    <h4>
+      <span data-en>One weighted sum. That's it.</span>
+      <span data-ar>مجموع مرجّح واحد. هذا كل شي.</span>
+    </h4>
+    <p data-en>
+      Your overall score is a transparent linear combination of five dimensions, each independently scored 0–100. There are no hidden adjustments, AI smoothing, or bias terms. Anyone with access to the same posts can reproduce your number.
+    </p>
+    <p data-ar>
+      نتيجتك الإجمالية مجموع خطي شفاف لخمسة أبعاد، كل واحد محسوب من ٠–١٠٠ مستقل. ما فيه تعديلات مخفية ولا تجميل AI ولا أوزان متحيزة. أي شخص عنده نفس المنشورات يقدر يعيد حساب رقمك.
+    </p>
+    <div class="method-formula">
+      <span class="num">34</span> = <span class="var">28</span>×0.20 + <span class="var">41</span>×0.30 + <span class="var">22</span>×0.15 + <span class="var">35</span>×0.20 + <span class="var">44</span>×0.15
+    </div>
+    <p style="font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-align: center; letter-spacing: 0.04em;" data-en>
+      = 5.6 + 12.3 + 3.3 + 7.0 + 6.6 = 34.8 → rounded to 34
+    </p>
+    <p style="font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-align: center; letter-spacing: 0.04em;" data-ar>
+      = ٥.٦ + ١٢.٣ + ٣.٣ + ٧.٠ + ٦.٦ = ٣٤.٨ → بالتقريب ٣٤
+    </p>
+  </div>
+
+  <!-- The weights -->
+  <div class="method-block">
+    <div class="method-block-label">
+      <span data-en>The weights · why each dimension matters this much</span>
+      <span data-ar>الأوزان · ليش كل بُعد يستاهل هذي النسبة</span>
+    </div>
+    <p data-en>
+      Weights were calibrated against 1,247 Saudi F&B brands. Cultural Fit carries the most weight because it's the strongest predictor of save rate and follow-rate in Saudi market data — and it's the dimension global tools can't measure for you.
+    </p>
+    <p data-ar>
+      الأوزان مُعيّرة على ١٬٢٤٧ علامة سعودية في قطاع المطاعم. الملاءمة الثقافية تأخذ أعلى وزن لأنها أقوى مؤشر لمعدل الحفظ ونمو المتابعين في السوق السعودي — وهي البُعد اللي الأدوات العالمية ما تقيسه.
+    </p>
+    <div class="weights-grid">
+      <div class="weight-row"><span class="weight-name"><span data-en>Cultural Fit</span><span data-ar>الملاءمة الثقافية</span></span><span class="weight-pct">30%</span></div>
+      <div class="weight-row"><span class="weight-name"><span data-en>Visual Quality</span><span data-ar>جودة الصور</span></span><span class="weight-pct">20%</span></div>
+      <div class="weight-row"><span class="weight-name"><span data-en>Brand Coherence</span><span data-ar>تماسك الهوية</span></span><span class="weight-pct">20%</span></div>
+      <div class="weight-row"><span class="weight-name"><span data-en>Posting Consistency</span><span data-ar>انتظام النشر</span></span><span class="weight-pct">15%</span></div>
+      <div class="weight-row"><span class="weight-name"><span data-en>Engagement Health</span><span data-ar>صحة التفاعل</span></span><span class="weight-pct">15%</span></div>
+    </div>
+  </div>
+
+  <!-- Dataset -->
+  <div class="method-block">
+    <div class="method-block-label">
+      <span data-en>The dataset · what we benchmark you against</span>
+      <span data-ar>قاعدة البيانات · مقابل ماذا نقيسك</span>
+    </div>
+    <p data-en>
+      "Sector benchmarks" aren't theoretical numbers. They're percentiles computed from real Saudi brands in your category, refreshed monthly. You can request the percentile distribution your scores fall in via support.
+    </p>
+    <p data-ar>
+      "معايير القطاع" مش أرقام نظرية. هي نسب مئوية محسوبة من علامات سعودية حقيقية في فئتك، تتحدث شهرياً. تقدر تطلب توزيع النسب اللي نتائجك واقعة فيه عبر الدعم.
+    </p>
+    <div class="dataset-grid">
+      <div class="dataset-cell">
+        <div class="dataset-cell-label">
+          <span data-en>F&B brands</span><span data-ar>علامات مطاعم</span>
+        </div>
+        <div class="dataset-cell-num">1,247</div>
+        <div class="dataset-cell-note">
+          <span data-en>SAUDI · ALL TIERS</span>
+          <span data-ar>سعودية · كل الفئات</span>
+        </div>
+      </div>
+      <div class="dataset-cell">
+        <div class="dataset-cell-label">
+          <span data-en>Posts analyzed</span><span data-ar>المنشورات المُحلّلة</span>
+        </div>
+        <div class="dataset-cell-num">37,410</div>
+        <div class="dataset-cell-note">
+          <span data-en>30 PER BRAND</span>
+          <span data-ar>٣٠ لكل علامة</span>
+        </div>
+      </div>
+      <div class="dataset-cell">
+        <div class="dataset-cell-label">
+          <span data-en>Refresh cadence</span><span data-ar>دورة التحديث</span>
+        </div>
+        <div class="dataset-cell-num">30d</div>
+        <div class="dataset-cell-note">
+          <span data-en>BENCHMARK ROLL</span>
+          <span data-ar>تدوير المعيار</span>
+        </div>
+      </div>
+      <div class="dataset-cell">
+        <div class="dataset-cell-label">
+          <span data-en>Yours, last scan</span><span data-ar>الخاص بك، آخر مسح</span>
+        </div>
+        <div class="dataset-cell-num">14:22</div>
+        <div class="dataset-cell-note">
+          <span data-en>12 MAY 2026 AST</span>
+          <span data-ar>١٢ مايو ٢٠٢٦</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Models stack -->
+  <div class="method-block">
+    <div class="method-block-label">
+      <span data-en>The stack · what scores each dimension</span>
+      <span data-ar>الأدوات · من يحسب كل بُعد</span>
+    </div>
+    <p data-en>
+      Visual Quality is OpenCV (Laplacian variance for sharpness) plus <code>Claude Vision</code> via fal.ai for lighting and composition classification. Cultural Fit uses <code>DeepSeek V3</code> for caption language and dialect classification, plus a custom Saudi cultural calendar matcher. Brand Coherence uses <code>scikit-learn</code> k-means for color palette extraction and perceptual hashing for logo consistency. Posting Consistency and Engagement Health are pure math — no AI involved.
+    </p>
+    <p data-ar>
+      جودة الصور تستخدم OpenCV (Laplacian variance للحدة) مع <code>Claude Vision</code> عبر fal.ai لتصنيف الإضاءة والتكوين. الملاءمة الثقافية تستخدم <code>DeepSeek V3</code> لتصنيف اللغة واللهجة، مع مطابق تقويم ثقافي سعودي مخصص. تماسك الهوية يستخدم <code>scikit-learn</code> k-means لاستخراج الألوان والـ pHash لتطابق الشعار. انتظام النشر وصحة التفاعل حسابات رياضية بحتة — بدون AI.
+    </p>
+  </div>
+
+  <!-- ════ CTAs ════ -->
+  <div class="cta-stack">
+    <button class="cta cta-primary" onclick="startTrial()">
+      <span data-en>Start your 90-day plan · Free for 7 days</span>
+      <span data-ar>ابدأ خطة ٩٠ يوم · ٧ أيام مجاناً</span>
+    </button>
+    <button class="cta cta-secondary" onclick="downloadPDF()">
+      <span data-en>📄 Download report PDF</span>
+      <span data-ar>📄 تحميل التقرير PDF</span>
+    </button>
+    <button class="cta cta-tertiary" onclick="talkToUs()">
+      <span data-en>Talk to OGz AI on WhatsApp</span>
+      <span data-ar>كلّمنا على واتساب</span>
+    </button>
+  </div>
+
+  <!-- ════ FOOTER ════ -->
+  <footer>
+    <div data-en>
+      Full report · Generated 12 May 2026 · Based on 30 most recent public posts
+    </div>
+    <div data-ar>
+      التقرير الكامل · ١٢ مايو ٢٠٢٦ · بناء على آخر ٣٠ منشور عام
+    </div>
+    <div class="receipt-stamp">
+      <span>✓</span>
+      <span data-en>PAID · SAR 85 · ORDER #HH-4477</span>
+      <span data-ar>مدفوع · ٨٥ ريال · طلب #HH-4477</span>
+    </div>
+    <div class="footer-divider"></div>
+    <div>© 2026 OGz AI · <a href="#">Methodology</a> · <a href="#">Privacy</a> · <a href="#">Support</a></div>
+  </footer>
+
+</div>
+
+<script>
+document.querySelectorAll('[data-set-lang]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const lang = btn.dataset.setLang;
+    document.documentElement.setAttribute('data-lang', lang);
+    document.documentElement.setAttribute('lang', lang);
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.setLang === lang));
+  });
+});
+
+function startTrial() { alert('Free 7-day trial — would open subscription flow'); }
+function downloadPDF() { alert('Would generate and download PDF report'); }
+function talkToUs() {
+  const msg = document.documentElement.getAttribute('data-lang') === 'ar'
+    ? 'سلام، عندي تقرير هنغري هاوس وأبي أبدأ خطة ٩٠ يوم'
+    : 'Hi, I have my Hungry House report and want to start the 90-day plan';
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+}
+</script>
+
+</body>
+</html>

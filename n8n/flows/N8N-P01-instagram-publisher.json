@@ -1,0 +1,837 @@
+{
+  "name": "N8N-P01: Instagram Publisher (Postiz)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "openclaw-instagram-publisher",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "node-1-webhook",
+      "name": "Webhook: openclaw-instagram-publisher",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.body || $input.first().json;\n\nif (!payload.post_id || !payload.brand_id) {\n  throw new Error('post_id and brand_id are required');\n}\n\nreturn {\n  post_id:     payload.post_id.trim(),\n  brand_id:    payload.brand_id.trim(),\n  slug:        payload.slug || null,\n  flow_id:     'N8N-P01',\n  received_at: new Date().toISOString()\n};"
+      },
+      "id": "node-2-validate",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "table": "calendar_posts",
+        "filters": {
+          "conditions": [
+            {
+              "field": "post_id",
+              "operator": "eq",
+              "value": "={{ $json.post_id }}"
+            },
+            {
+              "field": "brand_id",
+              "operator": "eq",
+              "value": "={{ $json.brand_id }}"
+            }
+          ]
+        },
+        "options": {
+          "limit": 1
+        }
+      },
+      "id": "node-3-fetch-post",
+      "name": "Supabase: Fetch Post",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        640,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "table": "channel_profiles",
+        "filters": {
+          "conditions": [
+            {
+              "field": "brand_id",
+              "operator": "eq",
+              "value": "={{ $('Supabase: Fetch Post').item.json.brand_id }}"
+            },
+            {
+              "field": "channel",
+              "operator": "eq",
+              "value": "Instagram"
+            }
+          ]
+        },
+        "options": {
+          "limit": 1
+        }
+      },
+      "id": "node-4-fetch-channel",
+      "name": "Supabase: Fetch Channel",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        840,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const post    = $('Supabase: Fetch Post').first().json;\nconst channel = $input.first().json;\nconst input   = $('Validate Input').first().json;\n\n// Guard: Postiz channel must be connected\nif (!channel || !channel.postiz_channel_id) {\n  throw new Error(\n    'POSTIZ_NOT_CONNECTED: No Postiz channel ID for brand ' + input.brand_id +\n    '. Visit /{slug}/settings to connect Instagram via Postiz.'\n  );\n}\n\n// Guard: image must exist\nif (!post.storage_url) {\n  throw new Error('NO_IMAGE: calendar_posts row has no storage_url.');\n}\n\n// Guard: posting_time must be a valid future datetime\nconst postingTime = new Date(post.posting_time);\nif (isNaN(postingTime.getTime())) {\n  throw new Error('INVALID_POSTING_TIME: ' + post.posting_time);\n}\nif (postingTime <= new Date()) {\n  throw new Error(\n    'POSTING_TIME_PAST: ' + post.posting_time +\n    ' is in the past. Mark post as manual_required instead.'\n  );\n}\n\n// Build caption: Arabic text + hashtags separated by a blank line\nconst hashtagStr = Array.isArray(post.hashtags)\n  ? post.hashtags.join(' ')\n  : (post.hashtags || '');\nconst caption = [post.caption_ar, hashtagStr].filter(Boolean).join('\\n\\n');\n\n// Extract storage path for Supabase signed URL.\n// URL format: https://<project>.supabase.co/storage/v1/object/public/post-images/<path>\nconst storagePath = post.storage_url.match(/\\/post-images\\/(.+)/)?.[1];\nif (!storagePath) {\n  throw new Error('INVALID_STORAGE_URL: cannot extract path from: ' + post.storage_url);\n}\n\nreturn {\n  post_id:           input.post_id,\n  brand_id:          input.brand_id,\n  postiz_channel_id: channel.postiz_channel_id,\n  caption,\n  posting_time_iso:  postingTime.toISOString(),\n  storage_path:      decodeURIComponent(storagePath),\n};"
+      },
+      "id": "node-5-validate-prepare",
+      "name": "Code: Validate & Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SUPABASE_URL }}/storage/v1/object/sign/post-images/{{ $json.storage_path }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"expiresIn\": 3600 }"
+      },
+      "id": "node-6-signed-url",
+      "name": "HTTP: Get Signed URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1240,
+        300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const upload = $input.first().json;            // Postiz /upload response: {id, path, ...}\nconst prev   = $('Code: Validate & Prepare').first().json;\n\nif (!upload || !upload.id || !upload.path) {\n  throw new Error('POSTIZ_UPLOAD_FAILED: ' + JSON.stringify(upload));\n}\n\n// Shape validated against the live Postiz public API (2026-06):\n//   - media must be uploaded to Postiz first (POST /upload) and referenced\n//     via posts[0].value[0].image as [{id, path}] — raw URLs are rejected\n//   - top-level `tags` is required (array)\n//   - posts[0].settings.post_type is required: 'post' | 'story'\nconst postizPayload = {\n  type:      'schedule',\n  date:      prev.posting_time_iso,\n  shortLink: false,\n  tags:      [],\n  posts: [{\n    integration: { id: prev.postiz_channel_id },\n    value: [{ content: prev.caption, image: [{ id: upload.id, path: upload.path }] }],\n    settings: { post_type: 'post' },\n  }],\n};\n\nreturn {\n  ...prev,\n  postiz_media:   { id: upload.id, path: upload.path },\n  postiz_payload: postizPayload,\n};\n"
+      },
+      "id": "node-7-build-payload",
+      "name": "Code: Build Postiz Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.postiz.com/public/v1/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $vars.POSTIZ_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.postiz_payload }}"
+      },
+      "id": "node-8-postiz-post",
+      "name": "HTTP: Create Postiz Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1640,
+        300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst prev     = $('Code: Build Postiz Payload').first().json;\n\nconsole.log('[P01] Postiz response:', JSON.stringify(response));\n\n// Live API returns an ARRAY: [{ postId, integration }]. Older builds returned\n// an object with `id` — accept both.\nconst first = Array.isArray(response) ? response[0] : response;\nconst postizPostId = first && (first.postId || first.id);\nif (!postizPostId) {\n  throw new Error(\n    'POSTIZ_POST_FAILED: no post id returned. Response: ' + JSON.stringify(response)\n  );\n}\n\nreturn {\n  post_id:        prev.post_id,\n  brand_id:       prev.brand_id,\n  postiz_post_id: String(postizPostId),\n};\n"
+      },
+      "id": "node-9-extract-id",
+      "name": "Code: Extract Postiz Post ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "calendar_posts",
+        "filters": {
+          "conditions": [
+            {
+              "field": "post_id",
+              "operator": "eq",
+              "value": "={{ $json.post_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "postiz_post_id",
+              "fieldValue": "={{ $json.postiz_post_id }}"
+            },
+            {
+              "fieldId": "publish_status",
+              "fieldValue": "scheduled"
+            }
+          ]
+        }
+      },
+      "id": "node-10-update-scheduled",
+      "name": "Supabase: Update Post (scheduled)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2040,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const error        = $input.first().json.error || $input.first().json;\nconst errorMessage = typeof error === 'string' ? error : (error.message || JSON.stringify(error));\n\nlet post_id  = null;\nlet brand_id = null;\ntry {\n  post_id  = $('Validate Input').first().json.post_id;\n  brand_id = $('Validate Input').first().json.brand_id;\n} catch (_) {}\n\nconsole.error('[P01] Error — post_id=' + post_id + ':', errorMessage);\n\n// POSTING_TIME_PAST means the content is ready but automation missed the window.\n// Flag for manual publishing rather than marking as a failure.\nconst isManualRequired = errorMessage.startsWith('POSTING_TIME_PAST');\n\nreturn {\n  post_id,\n  brand_id,\n  publish_status: isManualRequired ? 'manual_required' : 'failed',\n  error_message:  errorMessage,\n};"
+      },
+      "id": "node-11-error-handler",
+      "name": "Code: Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "calendar_posts",
+        "filters": {
+          "conditions": [
+            {
+              "field": "post_id",
+              "operator": "eq",
+              "value": "={{ $json.post_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "publish_status",
+              "fieldValue": "={{ $json.publish_status }}"
+            }
+          ]
+        }
+      },
+      "id": "node-12-update-failed",
+      "name": "Supabase: Update Post (failed)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1640,
+        520
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "usage_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-P01"
+            },
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $('Validate Input').first().json.brand_id }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "p01_publish"
+            },
+            {
+              "fieldId": "provider",
+              "fieldValue": "postiz"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "success"
+            },
+            {
+              "fieldId": "duration_ms",
+              "fieldValue": "={{ Date.now() - new Date($('Validate Input').first().json.received_at).getTime() }}"
+            },
+            {
+              "fieldId": "cost_usd",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify({ post_id: $json.post_id, postiz_post_id: $json.postiz_post_id }) }}"
+            }
+          ]
+        }
+      },
+      "name": "Supabase: Log Usage (success)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        180
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "usage_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-P01"
+            },
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "p01_publish"
+            },
+            {
+              "fieldId": "provider",
+              "fieldValue": "postiz"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.publish_status }}"
+            },
+            {
+              "fieldId": "duration_ms",
+              "fieldValue": "={{ Date.now() - new Date($('Validate Input').first().json.received_at).getTime() }}"
+            },
+            {
+              "fieldId": "cost_usd",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify({ post_id: $json.post_id, error: $json.error_message }) }}"
+            }
+          ]
+        }
+      },
+      "name": "Supabase: Log Usage (failed)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        500
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "id": "p01-err-trigger",
+      "name": "On Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build HMAC-signed S03 alert — fires on any unhandled P01 error.\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst e = $json;\n\nlet brand_id = null;\ntry { brand_id = $('Validate Input').first().json.brand_id ?? null; } catch (_) {}\n\nconst makeUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n  const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\n\nconst body = JSON.stringify({\n  anomaly_id:   makeUUID(),\n  anomaly_type: 'publishing_failed',\n  severity:     'error',\n  source_flow:  'N8N-P01',\n  brand_id,\n  message:      e.execution?.error?.message || 'P01 Instagram publisher flow failed',\n  details: {\n    failed_node:  e.execution?.lastNodeExecuted ?? null,\n    error_name:   e.execution?.error?.name      ?? null,\n    execution_id: e.execution?.id               ?? null,\n  },\n  timestamp: new Date().toISOString(),\n});\n\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  _body: body,\n  _headers: {\n    'content-type':     'application/json',\n    'x-n8n-signature':  sig,\n    'x-n8n-request-id': `${$execution.id}-err-p01`,\n    'x-n8n-timestamp':  new Date().toISOString(),\n  },\n};"
+      },
+      "id": "p01-err-build-alert",
+      "name": "Build S03 alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogzstudios.app.n8n.cloud/webhook-test/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "timeout": 10000,
+          "onError": "continueRegularOutput"
+        }
+      },
+      "id": "p01-err-post-s03",
+      "name": "POST · S03 anomaly-alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        640,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $vars.SUPABASE_URL }}{{ $json.signedURL }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "node-6b-download-media",
+      "name": "HTTP: Download Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        140
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.postiz.com/public/v1/upload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $vars.POSTIZ_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        }
+      },
+      "id": "node-6c-postiz-upload",
+      "name": "HTTP: Upload to Postiz",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        140
+      ],
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "connections": {
+    "Webhook: openclaw-instagram-publisher": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Fetch Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch Post": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Fetch Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch Channel": {
+      "main": [
+        [
+          {
+            "node": "Code: Validate & Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Validate & Prepare": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Get Signed URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Get Signed URL": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Download Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Postiz Payload": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Create Postiz Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Create Postiz Post": {
+      "main": [
+        [
+          {
+            "node": "Code: Extract Postiz Post ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Extract Postiz Post ID": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Update Post (scheduled)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Update Post (failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Update Post (scheduled)": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Log Usage (success)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Update Post (failed)": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Log Usage (failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Log Usage (success)": {
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Log Usage (failed)": {
+      "error": [
+        [
+          {
+            "node": "Code: Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On Error": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build S03 alert": {
+      "main": [
+        [
+          {
+            "node": "POST · S03 anomaly-alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Download Media": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Upload to Postiz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Upload to Postiz": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Postiz Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "N8N-P01"
+  },
+  "tags": [
+    {
+      "name": "openclaw"
+    },
+    {
+      "name": "publishing"
+    }
+  ]
+}

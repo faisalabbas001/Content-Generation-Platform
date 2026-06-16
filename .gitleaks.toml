@@ -1,0 +1,9 @@
+# gitleaks configuration — SEC-02
+title = "OpenClaw secret scan"
+
+[allowlist]
+paths = [
+  '''\.env\.example$''',
+  '''docs/.*\.md$''',
+]
+

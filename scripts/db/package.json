@@ -1,0 +1,5 @@
+{
+  "name": "@openclaw/db-scripts",
+  "private": true,
+  "type": "module"
+}

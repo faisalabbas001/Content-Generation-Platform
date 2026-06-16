@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Brand DNA Score · Hungry House · OGz AI</title>
+<meta name="description" content="Hungry House scored 34/100. See the full breakdown.">
+<meta property="og:title" content="Hungry House · Brand DNA Score · 34/100">
+<meta property="og:description" content="Quantified visual quality, cultural fit, posting consistency, brand coherence, and engagement.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800;9..144,900&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  /* Base */
+  --bg: #0A0908;
+  --bg-2: #0F0D0B;
+  --card: #141312;
+  --card-hi: #1C1A17;
+  --border: #252320;
+  --border-hi: #383530;
+  --text: #F0EDE8;
+  --text-dim: #A09B92;
+  --muted: #6B6860;
+  --subtle: #3A3733;
+
+  /* Earned palette — score 34 = amber dominant */
+  --score-amber: #E5A04C;
+  --score-amber-2: #C9853A;
+  --score-amber-bg: #1A0F05;
+  --score-gold: #C9A84C;
+  --score-emerald: #3DB88A;
+  --score-coral: #E5667A;
+
+  /* Status */
+  --green: #22c55e;
+  --red: #EF4444;
+
+  --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  --font-ar: 'Tajawal', 'DM Sans', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  font-size: 15px;
+  min-height: 100vh;
+  /* Subtle background gradient tinted by the earned score color */
+  background:
+    radial-gradient(ellipse 800px 600px at 50% -200px, rgba(229,160,76,0.08), transparent 70%),
+    radial-gradient(ellipse 600px 800px at 100% 50%, rgba(229,160,76,0.04), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+/* Arabic mode */
+html[data-lang="ar"] body { font-family: var(--font-ar); direction: rtl; }
+html[data-lang="ar"] .ar-only { display: inline-block; }
+html[data-lang="ar"] .en-only { display: none; }
+.ar-only { display: none; }
+.en-only { display: inline-block; }
+html[data-lang="ar"] .ltr-fixed { direction: ltr; display: inline-block; }
+
+.container {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 0 20px 80px;
+  position: relative;
+}
+
+/* ─── TOP NAV ─────────────────────────────────────────── */
+.topnav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 0 14px;
+  position: sticky; top: 0; z-index: 10;
+  background: linear-gradient(180deg, var(--bg) 80%, transparent);
+  margin: 0 -20px;
+  padding-left: 20px; padding-right: 20px;
+}
+.topnav-brand {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.topnav-brand span { color: var(--score-amber); }
+.lang-toggle {
+  display: flex; gap: 4px;
+  padding: 3px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 40px;
+}
+.lang-btn {
+  padding: 5px 13px;
+  border: none;
+  border-radius: 30px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lang-btn.active {
+  background: var(--score-amber);
+  color: #000;
+}
+.lang-btn.ar { font-family: var(--font-ar); font-size: 12px; letter-spacing: 0; }
+
+/* ─── HERO ────────────────────────────────────────────── */
+.hero {
+  padding: 48px 0 32px;
+  text-align: center;
+  position: relative;
+}
+.hero-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--score-amber);
+  background: rgba(229,160,76,0.1);
+  padding: 5px 13px;
+  border-radius: 40px;
+  border: 1px solid rgba(229,160,76,0.25);
+  margin-bottom: 24px;
+}
+.brand-name {
+  font-family: var(--font-serif);
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin-bottom: 4px;
+}
+.brand-name-ar {
+  font-family: var(--font-ar);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-dim);
+  direction: rtl;
+  margin-bottom: 18px;
+}
+.brand-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 48px;
+}
+.brand-meta-dot {
+  display: inline-block;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin: 0 8px;
+  vertical-align: middle;
+}
+
+/* ─── THE BIG NUMBER ──────────────────────────────────── */
+.score-stack {
+  position: relative;
+  padding: 16px 0 24px;
+}
+.score-stack::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, rgba(229,160,76,0.18) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+.score-label {
+  position: relative; z-index: 1;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  color: var(--muted);
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+.score-number {
+  position: relative; z-index: 1;
+  font-family: var(--font-serif);
+  font-size: 168px;
+  font-weight: 800;
+  color: var(--score-amber);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 60px rgba(229,160,76,0.4);
+}
+.score-denom {
+  position: relative; z-index: 1;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 0.15em;
+  margin-bottom: 28px;
+}
+
+/* Competitor anchor */
+.competitor-anchor {
+  position: relative; z-index: 1;
+  display: inline-flex; align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background: rgba(229,102,122,0.08);
+  border: 1px solid rgba(229,102,122,0.3);
+  border-radius: 12px;
+  margin-top: 8px;
+}
+.competitor-arrow {
+  font-size: 14px;
+  color: var(--score-coral);
+  font-weight: 700;
+}
+.competitor-text {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: left;
+}
+html[data-lang="ar"] .competitor-text { text-align: right; }
+.competitor-text strong { color: var(--text); font-weight: 600; }
+.competitor-distance {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+
+/* ─── COMPETITOR STRIP ─────────────────────────────────── */
+.section-header {
+  display: flex; align-items: center; gap: 14px;
+  margin: 56px 0 20px;
+}
+.section-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--score-amber);
+  letter-spacing: 0.15em;
+  font-weight: 600;
+}
+.section-title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.015em;
+}
+.section-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border), transparent);
+}
+
+.competitor-row {
+  display: flex; flex-direction: column;
+  gap: 6px;
+  margin-bottom: 36px;
+}
+.competitor-bar {
+  display: grid;
+  grid-template-columns: 1fr 80px 36px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+.competitor-bar.you {
+  background: var(--score-amber-bg);
+  border-color: var(--score-amber-2);
+  border-left-width: 3px;
+}
+html[data-lang="ar"] .competitor-bar.you { border-left-width: 1px; border-right-width: 3px; }
+.competitor-bar-name {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.competitor-bar-name .small {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  display: block;
+  margin-top: 2px;
+  letter-spacing: 0.04em;
+}
+.competitor-bar-track {
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.competitor-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+.competitor-bar-score {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── DIMENSION CARDS ────────────────────────────────── */
+.dim-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 14px;
+  transition: border-color 0.2s;
+}
+.dim-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.dim-name {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.dim-name-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 4px;
+  font-weight: 500;
+}
+.dim-score-block { text-align: right; flex-shrink: 0; }
+html[data-lang="ar"] .dim-score-block { text-align: left; }
+.dim-score {
+  font-family: var(--font-serif);
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.dim-score-denom {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+}
+
+/* Sparkline */
+.dim-spark {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.dim-spark svg { flex-shrink: 0; }
+.dim-spark-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.dim-bench {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-left: auto;
+  letter-spacing: 0.03em;
+}
+html[data-lang="ar"] .dim-bench { margin-left: 0; margin-right: auto; }
+
+/* Finding */
+.dim-finding {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+.dim-finding strong {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Action */
+.dim-action {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px;
+  background: rgba(61,184,138,0.06);
+  border: 1px solid rgba(61,184,138,0.2);
+  border-radius: 10px;
+}
+.dim-action-icon {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  background: rgba(61,184,138,0.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.dim-action-text {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.dim-action-text strong {
+  color: var(--score-emerald);
+  font-weight: 600;
+}
+.dim-action-lift {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--score-emerald);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+/* Color tint per score range */
+.score-low { color: var(--score-amber); }
+.score-low .competitor-bar-fill { background: linear-gradient(90deg, var(--score-amber), var(--score-amber-2)); }
+.score-mid { color: var(--score-gold); }
+.score-mid .competitor-bar-fill { background: linear-gradient(90deg, var(--score-gold), #B5942F); }
+.score-high { color: var(--score-emerald); }
+.score-high .competitor-bar-fill { background: linear-gradient(90deg, var(--score-emerald), #2A9B6F); }
+
+/* ─── CULTURAL FIT DEEP DIVE ─────────────────────────── */
+.deepdive {
+  background: linear-gradient(180deg, var(--card), var(--card-hi));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 24px;
+  margin: 24px 0;
+  position: relative;
+  overflow: hidden;
+}
+.deepdive::before {
+  content: '';
+  position: absolute;
+  top: -100px; right: -100px;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(124,106,245,0.12), transparent 60%);
+  pointer-events: none;
+}
+.deepdive-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: #9883FF;
+  background: rgba(124,106,245,0.12);
+  border: 1px solid rgba(124,106,245,0.3);
+  padding: 4px 11px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+}
+.deepdive h3 {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  margin-bottom: 22px;
+  line-height: 1.2;
+}
+.deepdive-block {
+  margin-bottom: 22px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+.deepdive-block:last-of-type { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+.deepdive-block-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* Language breakdown bar */
+.lang-bar {
+  display: flex;
+  height: 36px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.lang-bar-seg {
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: #000;
+  transition: all 0.2s;
+}
+.lang-bar-msa { background: #7C6AF5; }
+.lang-bar-dialect { background: #3DB88A; }
+.lang-bar-english { background: #6B6860; color: var(--text); }
+.lang-bar-legend {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  margin-top: 8px;
+}
+.lang-bar-leg-item {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.lang-bar-leg-swatch {
+  width: 8px; height: 8px; border-radius: 2px;
+}
+
+/* Occasion calendar */
+.occ-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.occ-cell {
+  padding: 10px 8px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  text-align: center;
+  position: relative;
+}
+.occ-cell.hit {
+  border-color: rgba(61,184,138,0.4);
+  background: rgba(61,184,138,0.08);
+}
+.occ-cell.miss {
+  border-color: rgba(229,102,122,0.3);
+  background: rgba(229,102,122,0.06);
+}
+.occ-icon {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+.occ-name {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.occ-status {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+}
+.occ-cell.hit .occ-status { color: var(--green); }
+.occ-cell.miss .occ-status { color: var(--red); }
+
+/* Dialect engagement */
+.dialect-stat {
+  display: flex; align-items: baseline; gap: 14px;
+  padding: 14px 16px;
+  background: rgba(61,184,138,0.06);
+  border: 1px solid rgba(61,184,138,0.2);
+  border-radius: 10px;
+}
+.dialect-stat-num {
+  font-family: var(--font-serif);
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--score-emerald);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.dialect-stat-x {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  color: var(--score-emerald);
+  font-weight: 600;
+}
+.dialect-stat-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ─── METHODOLOGY ────────────────────────────────────── */
+.method {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin: 32px 0 20px;
+  overflow: hidden;
+}
+.method-head {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+}
+html[data-lang="ar"] .method-head { text-align: right; }
+.method-head-left {
+  display: flex; align-items: center; gap: 10px;
+}
+.method-head-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.method-chevron {
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+.method[open] .method-chevron { transform: rotate(180deg); }
+.method-body {
+  padding: 0 20px 20px;
+  display: none;
+}
+.method[open] .method-body { display: block; }
+.method-row {
+  display: flex; justify-content: space-between;
+  padding: 8px 0;
+  font-size: 12px;
+  border-bottom: 1px dashed var(--border);
+}
+.method-row:last-child { border-bottom: none; }
+.method-row-label {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+.method-row-val {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── CTA STACK ──────────────────────────────────────── */
+.cta-stack {
+  display: flex; flex-direction: column;
+  gap: 10px;
+  margin-top: 32px;
+}
+.cta {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px;
+  padding: 17px 24px;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.12s, box-shadow 0.2s;
+}
+html[data-lang="ar"] .cta { font-family: var(--font-ar); letter-spacing: 0; text-transform: none; font-size: 14px; }
+.cta-primary {
+  background: #25D366;
+  color: #000;
+  box-shadow: 0 0 24px rgba(37,211,102,0.3);
+}
+.cta-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 32px rgba(37,211,102,0.45); }
+.cta-secondary {
+  background: var(--score-amber);
+  color: #000;
+  box-shadow: 0 0 24px rgba(229,160,76,0.3);
+}
+.cta-secondary:hover { transform: translateY(-1px); box-shadow: 0 4px 32px rgba(229,160,76,0.45); }
+.cta-tertiary {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.cta-tertiary:hover { border-color: var(--border-hi); color: var(--text); }
+.cta-price {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.8;
+  padding-left: 8px;
+  border-left: 1px solid rgba(0,0,0,0.2);
+  margin-left: 4px;
+}
+html[data-lang="ar"] .cta-price { border-left: none; border-right: 1px solid rgba(0,0,0,0.2); padding-left: 0; padding-right: 8px; margin-left: 0; margin-right: 4px; }
+
+/* ─── FOOTER ─────────────────────────────────────────── */
+footer {
+  text-align: center;
+  padding: 40px 20px 20px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  line-height: 1.7;
+}
+footer a { color: var(--score-amber); text-decoration: none; }
+footer .footer-divider {
+  width: 40px; height: 1px;
+  background: var(--border);
+  margin: 12px auto;
+}
+
+/* ─── SCROLLBAR ─────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ─── RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 380px) {
+  .score-number { font-size: 130px; }
+  .brand-name { font-size: 32px; }
+  .container { padding: 0 16px 60px; }
+  .dim-card { padding: 18px; }
+  .occ-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Smooth scroll-in animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.dim-card, .deepdive, .competitor-bar, .method, .cta-stack {
+  animation: fadeUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+.dim-card:nth-of-type(1) { animation-delay: 0.05s; }
+.dim-card:nth-of-type(2) { animation-delay: 0.1s; }
+.dim-card:nth-of-type(3) { animation-delay: 0.15s; }
+.dim-card:nth-of-type(4) { animation-delay: 0.2s; }
+.dim-card:nth-of-type(5) { animation-delay: 0.25s; }
+
+/* Hide / show by language */
+[data-en], [data-ar] {}
+html[data-lang="en"] [data-ar] { display: none !important; }
+html[data-lang="ar"] [data-en] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ════ NAV ════ -->
+  <nav class="topnav">
+    <div class="topnav-brand">
+      score.<span>ogzai</span>.com / hungry-house
+    </div>
+    <div class="lang-toggle" role="tablist">
+      <button class="lang-btn active" data-set-lang="en" role="tab">EN</button>
+      <button class="lang-btn ar" data-set-lang="ar" role="tab">عربي</button>
+    </div>
+  </nav>
+
+  <!-- ════ HERO ════ -->
+  <section class="hero">
+    <div class="hero-tag">
+      <span data-en>BRAND DNA SCORE · MAY 2026</span>
+      <span data-ar>هوية العلامة · مايو ٢٠٢٦</span>
+    </div>
+
+    <h1 class="brand-name">Hungry House</h1>
+    <div class="brand-name-ar">هنغري هاوس</div>
+
+    <div class="brand-meta">
+      <span data-en>Fast Casual</span><span data-ar>وجبات سريعة</span>
+      <span class="brand-meta-dot"></span>
+      <span data-en>Riyadh · Al Wurud</span><span data-ar>الرياض · الورود</span>
+      <span class="brand-meta-dot"></span>
+      <span class="ltr-fixed">3,200 followers</span>
+    </div>
+
+    <div class="score-stack score-low">
+      <div class="score-label">
+        <span data-en>YOUR SCORE</span>
+        <span data-ar>نتيجتك</span>
+      </div>
+      <div class="score-number">34</div>
+      <div class="score-denom">/ 100</div>
+
+      <div class="competitor-anchor">
+        <div class="competitor-arrow">▼</div>
+        <div>
+          <div class="competitor-text" data-en>
+            <strong>12 points behind Bukhara Express</strong> (46)
+          </div>
+          <div class="competitor-text" data-ar>
+            <strong>١٢ نقطة وراء بخارى إكسبريس</strong> (٤٦)
+          </div>
+          <div class="competitor-distance">
+            <span data-en>2 STREETS AWAY · KING ABDULAZIZ RD</span>
+            <span data-ar>شارعين عنك · طريق الملك عبدالعزيز</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ COMPETITOR STRIP ════ -->
+  <section>
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <h2 class="section-title">
+        <span data-en>Your neighborhood</span>
+        <span data-ar>منطقتك</span>
+      </h2>
+      <span class="section-line"></span>
+    </div>
+
+    <div class="competitor-row">
+      <div class="competitor-bar score-high">
+        <div class="competitor-bar-name">
+          Albaik
+          <span class="small" data-en>Granada Mall · 1.4 km</span>
+          <span class="small" data-ar>مول غرناطة · ١.٤ كم</span>
+        </div>
+        <div class="competitor-bar-track"><div class="competitor-bar-fill" style="width:71%"></div></div>
+        <div class="competitor-bar-score" style="color:var(--score-emerald)">71</div>
+      </div>
+
+      <div class="competitor-bar score-mid">
+        <div class="competitor-bar-name">
+          Hardee's
+          <span class="small" data-en>Al Tahliyah · 2.2 km</span>
+          <span class="small" data-ar>التحلية · ٢.٢ كم</span>
+        </div>
+        <div class="competitor-bar-track"><div class="competitor-bar-fill" style="width:58%"></div></div>
+        <div class="competitor-bar-score" style="color:var(--score-gold)">58</div>
+      </div>
+
+      <div class="competitor-bar score-mid">
+        <div class="competitor-bar-name">
+          Kebab Express
+          <span class="small" data-en>Olaya · 800 m</span>
+          <span class="small" data-ar>العليا · ٨٠٠ م</span>
+        </div>
+        <div class="competitor-bar-track"><div class="competitor-bar-fill" style="width:51%"></div></div>
+        <div class="competitor-bar-score" style="color:var(--score-gold)">51</div>
+      </div>
+
+      <div class="competitor-bar score-mid">
+        <div class="competitor-bar-name">
+          Bukhara Express
+          <span class="small" data-en>King Abdulaziz · 2 streets</span>
+          <span class="small" data-ar>الملك عبدالعزيز · شارعين</span>
+        </div>
+        <div class="competitor-bar-track"><div class="competitor-bar-fill" style="width:46%"></div></div>
+        <div class="competitor-bar-score" style="color:var(--score-gold)">46</div>
+      </div>
+
+      <div class="competitor-bar you score-low">
+        <div class="competitor-bar-name">
+          <span data-en>Hungry House (you)</span>
+          <span data-ar>هنغري هاوس (أنت)</span>
+          <span class="small" data-en>Al Wurud</span>
+          <span class="small" data-ar>الورود</span>
+        </div>
+        <div class="competitor-bar-track"><div class="competitor-bar-fill" style="width:34%"></div></div>
+        <div class="competitor-bar-score" style="color:var(--score-amber)">34</div>
+      </div>
+
+      <div class="competitor-bar score-low">
+        <div class="competitor-bar-name">
+          Riyadh Bites
+          <span class="small" data-en>King Fahd Rd · 1.8 km</span>
+          <span class="small" data-ar>طريق الملك فهد · ١.٨ كم</span>
+        </div>
+        <div class="competitor-bar-track"><div class="competitor-bar-fill" style="width:31%"></div></div>
+        <div class="competitor-bar-score" style="color:var(--score-amber)">31</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ DIMENSIONS ════ -->
+  <section>
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <h2 class="section-title">
+        <span data-en>Where the number comes from</span>
+        <span data-ar>من وين جا هالرقم</span>
+      </h2>
+      <span class="section-line"></span>
+    </div>
+
+    <!-- DIM 1: VISUAL QUALITY -->
+    <div class="dim-card">
+      <div class="dim-head">
+        <div>
+          <div class="dim-name" data-en>Visual Quality</div>
+          <div class="dim-name" data-ar>جودة الصور</div>
+          <div class="dim-name-meta">
+            <span data-en>20% weight · photography & composition</span>
+            <span data-ar>وزن ٢٠٪ · تصوير وتكوين</span>
+          </div>
+        </div>
+        <div class="dim-score-block">
+          <div class="dim-score" style="color:var(--score-amber)">28</div>
+          <div class="dim-score-denom">/ 100</div>
+        </div>
+      </div>
+
+      <div class="dim-spark">
+        <svg width="80" height="24" viewBox="0 0 80 24">
+          <polyline points="2,18 12,20 22,16 32,21 42,17 52,19 62,22 72,18 78,15" fill="none" stroke="#E5A04C" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="78" cy="15" r="2.5" fill="#E5A04C"/>
+        </svg>
+        <span class="dim-spark-label" data-en>30 posts analyzed</span>
+        <span class="dim-spark-label" data-ar>٣٠ منشور</span>
+        <span class="dim-bench">
+          <span data-en>Sector benchmark: 62</span>
+          <span data-ar>المعيار: ٦٢</span>
+        </span>
+      </div>
+
+      <div class="dim-finding" data-en>
+        Your last 30 posts: <strong>8 with steam visible</strong> in hot food shots. Sector benchmark: 21/30. <strong>19 of 30 shot under fluorescent ceiling light</strong> — creates flat shadows, kills appetite appeal. <strong>0 of 30 use plate composition with negative space.</strong>
+      </div>
+      <div class="dim-finding" data-ar>
+        آخر ٣٠ منشور: <strong>٨ بس فيها بخار</strong> في صور الأكل الحار. المعيار: ٢١ من ٣٠. <strong>١٩ من ٣٠ مصورة تحت إنارة سقف فلورسنت</strong> — تطلع الظلال مسطحة وتقتل شهية الأكل. <strong>صفر من ٣٠ فيها تكوين بمساحة فارغة في الصحن.</strong>
+      </div>
+
+      <div class="dim-action">
+        <div class="dim-action-icon">📸</div>
+        <div class="dim-action-text">
+          <span data-en><strong>Workflow 3 · Real Photo Enhancement</strong> rebuilds the scene from your phone shots. Estimated lift in 6 weeks.</span>
+          <span data-ar><strong>سير العمل ٣ · تحسين الصور الحقيقية</strong> يعيد بناء المشهد من صور جوالك. التحسن المتوقع بعد ٦ أسابيع.</span>
+        </div>
+        <div class="dim-action-lift">+18</div>
+      </div>
+    </div>
+
+    <!-- DIM 2: CULTURAL FIT -->
+    <div class="dim-card">
+      <div class="dim-head">
+        <div>
+          <div class="dim-name" data-en>Cultural Fit</div>
+          <div class="dim-name" data-ar>الملاءمة الثقافية</div>
+          <div class="dim-name-meta">
+            <span data-en>30% weight · the dimension global tools can't measure</span>
+            <span data-ar>وزن ٣٠٪ · البُعد اللي الأدوات العالمية ما تقيسه</span>
+          </div>
+        </div>
+        <div class="dim-score-block">
+          <div class="dim-score" style="color:var(--score-amber)">41</div>
+          <div class="dim-score-denom">/ 100</div>
+        </div>
+      </div>
+
+      <div class="dim-spark">
+        <svg width="80" height="24" viewBox="0 0 80 24">
+          <polyline points="2,15 12,17 22,14 32,18 42,13 52,16 62,12 72,15 78,11" fill="none" stroke="#E5A04C" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="78" cy="11" r="2.5" fill="#E5A04C"/>
+        </svg>
+        <span class="dim-spark-label" data-en>14 captions in MSA / 11 dialect / 5 EN</span>
+        <span class="dim-spark-label" data-ar>١٤ فصحى / ١١ لهجة / ٥ إنجليزي</span>
+        <span class="dim-bench">
+          <span data-en>Benchmark: 73</span>
+          <span data-ar>المعيار: ٧٣</span>
+        </span>
+      </div>
+
+      <div class="dim-finding" data-en>
+        Your audience engages <strong>3.2× more with dialect Najdi captions</strong> than with MSA. <strong>0 Ramadan posts</strong> during March 11 – April 10. <strong>0 Founding Day posts.</strong> Saudi National Day 2025: 1 generic post 4 days late.
+      </div>
+      <div class="dim-finding" data-ar>
+        جمهورك يتفاعل <strong>٣.٢× مع كابشن باللهجة النجدية</strong> أكثر من الفصحى. <strong>صفر منشورات في رمضان</strong> بين ١١ مارس و١٠ أبريل. <strong>صفر منشورات يوم التأسيس.</strong> اليوم الوطني ٢٠٢٥: منشور واحد عام، متأخر ٤ أيام.
+      </div>
+
+      <div class="dim-action">
+        <div class="dim-action-icon">🌙</div>
+        <div class="dim-action-text">
+          <span data-en><strong>Chains C1 (Ramadan) + C4 (National Day)</strong> activated. Plus Najdi-tuned captions chain.</span>
+          <span data-ar><strong>سلاسل C1 (رمضان) + C4 (اليوم الوطني)</strong> تتفعّل. وسلسلة كابشن باللهجة النجدية.</span>
+        </div>
+        <div class="dim-action-lift">+24</div>
+      </div>
+    </div>
+
+    <!-- ════ CULTURAL FIT DEEP DIVE ════ -->
+    <div class="deepdive">
+      <span class="deepdive-tag">
+        <span data-en>↓ Cultural Fit · deep dive</span>
+        <span data-ar>↓ الملاءمة الثقافية · تفصيل</span>
+      </span>
+      <h3 data-en>This is what no global tool can measure for you.</h3>
+      <h3 data-ar>هذا الشي ما تقدر أي أداة عالمية تقيسه لك.</h3>
+
+      <!-- Caption language breakdown -->
+      <div class="deepdive-block">
+        <div class="deepdive-block-label">
+          <span data-en>Caption language · last 30 posts</span>
+          <span data-ar>لغة الكابشن · آخر ٣٠ منشور</span>
+        </div>
+        <div class="lang-bar">
+          <div class="lang-bar-seg lang-bar-msa" style="width:47%">14</div>
+          <div class="lang-bar-seg lang-bar-dialect" style="width:37%">11</div>
+          <div class="lang-bar-seg lang-bar-english" style="width:16%">5</div>
+        </div>
+        <div class="lang-bar-legend">
+          <div class="lang-bar-leg-item">
+            <span class="lang-bar-leg-swatch" style="background:#7C6AF5"></span>
+            <span data-en>MSA (formal)</span><span data-ar>فصحى</span>
+          </div>
+          <div class="lang-bar-leg-item">
+            <span class="lang-bar-leg-swatch" style="background:#3DB88A"></span>
+            <span data-en>Najdi dialect</span><span data-ar>نجدي</span>
+          </div>
+          <div class="lang-bar-leg-item">
+            <span class="lang-bar-leg-swatch" style="background:#6B6860"></span>
+            <span data-en>English only</span><span data-ar>إنجليزي</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Occasion calendar -->
+      <div class="deepdive-block">
+        <div class="deepdive-block-label">
+          <span data-en>Saudi cultural moments · past 12 months</span>
+          <span data-ar>المناسبات السعودية · آخر ١٢ شهر</span>
+        </div>
+        <div class="occ-grid">
+          <div class="occ-cell miss">
+            <div class="occ-icon">🌙</div>
+            <div class="occ-name">Ramadan</div>
+            <div class="occ-status">MISS</div>
+          </div>
+          <div class="occ-cell miss">
+            <div class="occ-icon">🕌</div>
+            <div class="occ-name" data-en>Eid Fitr</div>
+            <div class="occ-name" data-ar>عيد الفطر</div>
+            <div class="occ-status">MISS</div>
+          </div>
+          <div class="occ-cell hit">
+            <div class="occ-icon">🐑</div>
+            <div class="occ-name" data-en>Eid Adha</div>
+            <div class="occ-name" data-ar>عيد الأضحى</div>
+            <div class="occ-status">HIT</div>
+          </div>
+          <div class="occ-cell miss">
+            <div class="occ-icon">🇸🇦</div>
+            <div class="occ-name" data-en>Nat'l Day</div>
+            <div class="occ-name" data-ar>وطني</div>
+            <div class="occ-status">LATE</div>
+          </div>
+          <div class="occ-cell miss">
+            <div class="occ-icon">⚔️</div>
+            <div class="occ-name" data-en>Founding</div>
+            <div class="occ-name" data-ar>تأسيس</div>
+            <div class="occ-status">MISS</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dialect engagement stat -->
+      <div class="deepdive-block">
+        <div class="deepdive-block-label">
+          <span data-en>Dialect engagement multiplier</span>
+          <span data-ar>أثر استخدام اللهجة على التفاعل</span>
+        </div>
+        <div class="dialect-stat">
+          <div>
+            <span class="dialect-stat-num">3.2</span><span class="dialect-stat-x">×</span>
+          </div>
+          <div class="dialect-stat-text">
+            <span data-en>more engagement on your dialect posts vs your MSA posts. The system writes everything in Najdi by default for your account.</span>
+            <span data-ar>تفاعل أعلى على منشوراتك باللهجة مقارنة بالفصحى. النظام يكتب كل شي باللهجة النجدية تلقائياً لحسابك.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIM 3: POSTING CONSISTENCY -->
+    <div class="dim-card">
+      <div class="dim-head">
+        <div>
+          <div class="dim-name" data-en>Posting Consistency</div>
+          <div class="dim-name" data-ar>انتظام النشر</div>
+          <div class="dim-name-meta">
+            <span data-en>15% weight · cadence & prime-time hit rate</span>
+            <span data-ar>وزن ١٥٪ · إيقاع وأوقات الذروة</span>
+          </div>
+        </div>
+        <div class="dim-score-block">
+          <div class="dim-score" style="color:var(--score-amber)">22</div>
+          <div class="dim-score-denom">/ 100</div>
+        </div>
+      </div>
+
+      <div class="dim-spark">
+        <svg width="80" height="24" viewBox="0 0 80 24">
+          <polyline points="2,16 12,15 22,21 32,15 42,17 52,21 62,16 72,22 78,19" fill="none" stroke="#E5A04C" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="78" cy="19" r="2.5" fill="#E5A04C"/>
+        </svg>
+        <span class="dim-spark-label" data-en>4.2 posts/week avg</span>
+        <span class="dim-spark-label" data-ar>٤.٢ منشور/أسبوع</span>
+        <span class="dim-bench">
+          <span data-en>Benchmark: 8.5/week</span>
+          <span data-ar>المعيار: ٨.٥</span>
+        </span>
+      </div>
+
+      <div class="dim-finding" data-en>
+        <strong>17-day gap</strong> between Feb 14 and Mar 3 — your longest silence. <strong>73% of posts published between 11pm and 2am.</strong> Your audience is most active <strong>6pm – 9pm.</strong> You're posting when they're asleep.
+      </div>
+      <div class="dim-finding" data-ar>
+        <strong>فجوة ١٧ يوم</strong> بين ١٤ فبراير و٣ مارس — أطول صمت لك. <strong>٧٣٪ من المنشورات بين ١١م و٢ص.</strong> جمهورك أنشط <strong>٦م – ٩م.</strong> تنشر وهم نايمين.
+      </div>
+
+      <div class="dim-action">
+        <div class="dim-action-icon">📅</div>
+        <div class="dim-action-text">
+          <span data-en><strong>AI Content Calendar</strong> auto-schedules into your audience prime-time. Biggest single lift available.</span>
+          <span data-ar><strong>تقويم المحتوى الذكي</strong> يجدول تلقائياً بأوقات الذروة لجمهورك. أكبر تحسن ممكن.</span>
+        </div>
+        <div class="dim-action-lift">+35</div>
+      </div>
+    </div>
+
+    <!-- DIM 4: BRAND COHERENCE -->
+    <div class="dim-card">
+      <div class="dim-head">
+        <div>
+          <div class="dim-name" data-en>Brand Coherence</div>
+          <div class="dim-name" data-ar>تماسك الهوية</div>
+          <div class="dim-name-meta">
+            <span data-en>20% weight · visual & voice consistency</span>
+            <span data-ar>وزن ٢٠٪ · تناسق بصري وصوتي</span>
+          </div>
+        </div>
+        <div class="dim-score-block">
+          <div class="dim-score" style="color:var(--score-amber)">35</div>
+          <div class="dim-score-denom">/ 100</div>
+        </div>
+      </div>
+
+      <div class="dim-spark">
+        <svg width="80" height="24" viewBox="0 0 80 24">
+          <polyline points="2,14 12,18 22,15 32,20 42,16 52,19 62,17 72,21 78,18" fill="none" stroke="#E5A04C" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="78" cy="18" r="2.5" fill="#E5A04C"/>
+        </svg>
+        <span class="dim-spark-label" data-en>7 fonts · 4 palettes · 3 logos</span>
+        <span class="dim-spark-label" data-ar>٧ خطوط · ٤ ألوان · ٣ شعارات</span>
+        <span class="dim-bench">
+          <span data-en>Benchmark: 1 / 1 / 1</span>
+          <span data-ar>المعيار: ١ / ١ / ١</span>
+        </span>
+      </div>
+
+      <div class="dim-finding" data-en>
+        Across 24 posts we detected <strong>7 different fonts, 4 color palettes, 3 logo variations.</strong> Caption tone splits: <strong>8 formal, 12 casual, 4 promotional</strong> — three different brands talking. Every new follower sees a different brand.
+      </div>
+      <div class="dim-finding" data-ar>
+        في ٢٤ منشور رصدنا <strong>٧ خطوط مختلفة، ٤ ألوان، ٣ شعارات.</strong> أسلوب الكتابة: <strong>٨ رسمي، ١٢ عفوي، ٤ ترويجي</strong> — ثلاث علامات يتكلمون. كل متابع جديد يشوف علامة مختلفة.
+      </div>
+
+      <div class="dim-action">
+        <div class="dim-action-icon">🧬</div>
+        <div class="dim-action-text">
+          <span data-en><strong>BrandDNA onboarding (8 min)</strong> locks fonts, palette, logo, voice across every chain. One-time setup.</span>
+          <span data-ar><strong>إعداد هوية العلامة (٨ دقايق)</strong> يثبّت الخطوط والألوان والشعار والصوت لكل سلسلة. إعداد لمرة واحدة.</span>
+        </div>
+        <div class="dim-action-lift">+28</div>
+      </div>
+    </div>
+
+    <!-- DIM 5: ENGAGEMENT HEALTH -->
+    <div class="dim-card">
+      <div class="dim-head">
+        <div>
+          <div class="dim-name" data-en>Engagement Health</div>
+          <div class="dim-name" data-ar>صحة التفاعل</div>
+          <div class="dim-name-meta">
+            <span data-en>15% weight · signal, not vanity</span>
+            <span data-ar>وزن ١٥٪ · إشارة حقيقية، مش أرقام شكلية</span>
+          </div>
+        </div>
+        <div class="dim-score-block">
+          <div class="dim-score" style="color:var(--score-gold)">44</div>
+          <div class="dim-score-denom">/ 100</div>
+        </div>
+      </div>
+
+      <div class="dim-spark">
+        <svg width="80" height="24" viewBox="0 0 80 24">
+          <polyline points="2,17 12,15 22,18 32,14 42,16 52,13 62,15 72,12 78,14" fill="none" stroke="#C9A84C" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="78" cy="14" r="2.5" fill="#C9A84C"/>
+        </svg>
+        <span class="dim-spark-label" data-en>+2.4%/mo growth</span>
+        <span class="dim-spark-label" data-ar>+٢.٤٪ نمو شهري</span>
+        <span class="dim-bench">
+          <span data-en>Benchmark: 67</span>
+          <span data-ar>المعيار: ٦٧</span>
+        </span>
+      </div>
+
+      <div class="dim-finding" data-en>
+        Save rate <strong>0.4%</strong> (sector median: 1.2%). DM response time <strong>11.4 hours</strong> (sector median: 47 minutes). Comments-to-followers <strong>0.3%</strong> — decent. Followers growing, but no one's saving your posts.
+      </div>
+      <div class="dim-finding" data-ar>
+        نسبة الحفظ <strong>٠.٤٪</strong> (المتوسط: ١.٢٪). الرد على الرسائل <strong>١١.٤ ساعة</strong> (المتوسط: ٤٧ دقيقة). تعليقات لكل متابع <strong>٠.٣٪</strong> — معقول. المتابعين يزيدون، بس محد يحفظ منشوراتك.
+      </div>
+
+      <div class="dim-action">
+        <div class="dim-action-icon">💬</div>
+        <div class="dim-action-text">
+          <span data-en><strong>Workflow 4 (UGC Repost) + Captions Chain</strong> increases save rate and DM-worthy hooks.</span>
+          <span data-ar><strong>سير العمل ٤ (إعادة نشر محتوى المستخدمين) + سلسلة الكابشن</strong> يزيد الحفظ والرسائل.</span>
+        </div>
+        <div class="dim-action-lift">+15</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ════ METHODOLOGY ════ -->
+  <details class="method">
+    <summary class="method-head">
+      <div class="method-head-left">
+        <span class="method-head-label">
+          <span data-en>How we calculated this</span>
+          <span data-ar>كيف حسبنا هذا</span>
+        </span>
+      </div>
+      <span class="method-chevron">▾</span>
+    </summary>
+    <div class="method-body">
+      <div class="method-row">
+        <span class="method-row-label" data-en>Posts analyzed</span>
+        <span class="method-row-label" data-ar>المنشورات المُحلّلة</span>
+        <span class="method-row-val">30 most recent · public · Instagram</span>
+      </div>
+      <div class="method-row">
+        <span class="method-row-label" data-en>Visual analysis</span>
+        <span class="method-row-label" data-ar>التحليل البصري</span>
+        <span class="method-row-val">fal.ai vision pipeline · FLUX.1 Dev classifier</span>
+      </div>
+      <div class="method-row">
+        <span class="method-row-label" data-en>Arabic NLP</span>
+        <span class="method-row-label" data-ar>تحليل اللغة العربية</span>
+        <span class="method-row-val">DeepSeek V3 + OGz dialect model</span>
+      </div>
+      <div class="method-row">
+        <span class="method-row-label" data-en>Sector benchmark</span>
+        <span class="method-row-label" data-ar>المعيار القطاعي</span>
+        <span class="method-row-val">1,247 Saudi F&B brands</span>
+      </div>
+      <div class="method-row">
+        <span class="method-row-label" data-en>Weighting</span>
+        <span class="method-row-label" data-ar>الأوزان</span>
+        <span class="method-row-val">VQ 20 · CF 30 · PC 15 · BC 20 · EH 15</span>
+      </div>
+      <div class="method-row">
+        <span class="method-row-label" data-en>Last refresh</span>
+        <span class="method-row-label" data-ar>آخر تحديث</span>
+        <span class="method-row-val">12 May 2026 · 14:22 AST</span>
+      </div>
+      <div class="method-row">
+        <span class="method-row-label" data-en>Score formula</span>
+        <span class="method-row-label" data-ar>معادلة النتيجة</span>
+        <span class="method-row-val">Σ(dim × weight) / 100</span>
+      </div>
+    </div>
+  </details>
+
+  <!-- ════ CTAs ════ -->
+  <div class="cta-stack">
+    <button class="cta cta-primary" onclick="shareWhatsApp()">
+      <span data-en>📲 Share via WhatsApp</span>
+      <span data-ar>📲 شارك عبر واتساب</span>
+    </button>
+
+    <button class="cta cta-secondary">
+      <span data-en>Unlock full report</span>
+      <span data-ar>افتح التقرير الكامل</span>
+      <span class="cta-price">SAR 99</span>
+    </button>
+
+    <button class="cta cta-tertiary">
+      <span data-en>Talk to OGz AI on WhatsApp</span>
+      <span data-ar>كلّمنا على واتساب</span>
+    </button>
+  </div>
+
+  <!-- ════ FOOTER ════ -->
+  <footer>
+    <div data-en>
+      Updated 12 May 2026 · Based on 30 most recent public posts
+    </div>
+    <div data-ar>
+      تحديث ١٢ مايو ٢٠٢٦ · بناء على آخر ٣٠ منشور عام
+    </div>
+    <div class="footer-divider"></div>
+    <div>© 2026 OGz AI · <a href="#">Methodology</a> · <a href="#">Privacy</a></div>
+  </footer>
+
+</div>
+
+<script>
+// Language toggle
+document.querySelectorAll('[data-set-lang]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const lang = btn.dataset.setLang;
+    document.documentElement.setAttribute('data-lang', lang);
+    document.documentElement.setAttribute('lang', lang);
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.setLang === lang));
+  });
+});
+
+// WhatsApp share
+function shareWhatsApp() {
+  const lang = document.documentElement.getAttribute('data-lang');
+  const url = 'score.ogzai.com/hungry-house';
+  const msg = lang === 'ar'
+    ? `شفت نتيجة محل Hungry House؟ ٣٤ من ١٠٠. وفي محل قريب بـ٤٦. شوف بنفسك: ${url}`
+    : `Hungry House scored 34/100 on Brand DNA. The restaurant 2 streets away scored 46. See it: ${url}`;
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(whatsappUrl, '_blank');
+}
+</script>
+
+</body>
+</html>

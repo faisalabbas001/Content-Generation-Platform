@@ -1,0 +1,94 @@
+{
+  "$schema": "../../12_data_shapes/chain_v1.schema.json",
+  "chain_ulid": "01HXZQQR5N2PVQ4VZG9YT3WQCC",
+  "chain_id_short": "tf23_01",
+  "family": "TF23",
+  "schema_version": 1,
+  "name_en": "Saudi UGC Phone POV Unboxing",
+  "name_ar": "محتوى المستخدم - فتح المنتج بزاوية الهاتف",
+  "purpose": "Generate a phone-POV unboxing video that looks like authentic Saudi user-generated content. Native vertical format, handheld feel, natural lighting, Najdi-colloquial Arabic voiceover register. Used to seed TikTok/Reels content and to produce native-feeling brand activations.",
+  "models_used": [
+    {
+      "provider": "fal",
+      "model_id": "fal-ai/kling-video/v2.1-standard",
+      "role": "primary_video_generation"
+    },
+    {
+      "provider": "fal",
+      "model_id": "fal-ai/flux-pro/v1.1",
+      "role": "primary_image_generation"
+    }
+  ],
+  "input_schema": {
+    "product_description": {
+      "type": "string",
+      "description": "What is being unboxed; details of the product",
+      "required": true
+    },
+    "talent_demographic": {
+      "type": "string",
+      "description": "Age range, gender, regional look (e.g., 'young-adult-male-najdi')",
+      "required": true
+    },
+    "setting_environment": {
+      "type": "string",
+      "description": "Where unboxing happens (home interior, car, office)",
+      "required": true,
+      "default": "modern-saudi-home-interior"
+    },
+    "voiceover_text_ar": {
+      "type": "string",
+      "description": "Najdi-colloquial Arabic voiceover text",
+      "required": false
+    },
+    "duration_seconds": {
+      "type": "integer",
+      "description": "Target video duration in seconds",
+      "default": 9,
+      "required": true
+    }
+  },
+  "prompt_template": "Phone POV vertical video, 9:16 aspect ratio. Handheld feel — natural micro-jitter, not stable gimbal. Talent: {talent_demographic}, hands and lower forearms visible in frame, unboxing {product_description}. Setting: {setting_environment}, natural daylight or warm interior light. Camera: looking down at product from phone POV (selfie-stick-not-used angle). Sound: natural ambient — no music. Subtle phone microphone audio quality. Aesthetic: authentic UGC, NOT cinematic. Avoid: pro-cinematography, studio lighting, gimbal-smooth movement, color-graded look. Wardrobe: {wardrobe_constraints}. Gesture compliance: right-hand handling product (never left-hand for primary action). {cultural_constraints_injection}.",
+  "output_type": "video",
+  "target_dimensions": {
+    "width": 1080,
+    "height": 1920,
+    "aspect_ratio_label": "9:16",
+    "duration_seconds": 9
+  },
+  "eligibility_filters": {
+    "sectors_allowed": ["retail", "f_and_b", "beauty"],
+    "sectors_excluded": ["healthcare_clinical", "real_estate_luxury"],
+    "occasions_allowed": ["*"],
+    "occasions_excluded": ["ramadan_solemn_phase"],
+    "quality_tiers_allowed": ["starter", "growth", "enterprise"],
+    "min_brand_maturity_days": 0
+  },
+  "cultural_constraints": {
+    "requires_wardrobe_check": true,
+    "requires_gesture_check": true,
+    "requires_cultural_coherence_check": true,
+    "requires_arabic_text_validation": false,
+    "high_religious_sensitivity": false,
+    "high_gender_sensitivity": true,
+    "human_review_recommended_above_quality_tier": "never"
+  },
+  "cost_estimate_usd": 1.2,
+  "latency_estimate_seconds": 60,
+  "best_for_cd_brains": ["cd_03", "cd_05"],
+  "anti_patterns": [
+    "Never make this look 'produced' — defeats the entire UGC pretense",
+    "Do not use studio lighting prompts",
+    "Avoid stabilized camera grammar (handheld jitter is the point)",
+    "Do not pair with classical-Arabic voiceover register (use colloquial)",
+    "Never have talent show left hand as primary product-handling hand"
+  ],
+  "notes": "TF23 family represents the Saudi-UGC native authenticity layer — chains in this family must feel like real users, not produced content. Gesture-check gate is critical: left-hand serving violations are common AI failure mode and read as deeply foreign to Saudi audiences.",
+  "provenance": {
+    "source": "internal_research_corpus/OGz_2_0_ChainLibrary_v2_Complete.docx#TF23",
+    "date_added": "2026-05-13T14:30:00Z",
+    "confirmer": "Mohamed",
+    "confidence": "experimental",
+    "scope": "universal"
+  }
+}

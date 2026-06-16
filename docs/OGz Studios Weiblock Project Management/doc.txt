@@ -1,0 +1,2200 @@
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+                  OpenClaw
+
+                       AI Content Platform
+
+                 Complete Technical Architecture & Developer Documentation
+
+Version         v1.0 -- Phase 1 Baseline
+Project
+Built By        OpenClaw -- OGz Studios, Riyadh
+Date
+Phases Covered  weiBlocks
+
+Audience        April 2026
+
+                Phase 1 (complete) + Phase 2�6 (architecture
+                notes)
+
+                Lead Architect, Frontend Dev, Backend Dev, OGz
+                Studios Tech Team
+
+                CONFIDENTIAL -- NDA Protected -- OGz Studios + weiBlocks Only
+
+                OpenClaw Technical Docs v1.0 � weiBlocks � Page 1 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+1. Project Overview
+
+1.1 What OpenClaw Is
+
+OpenClaw is a governed AI content operating system for Saudi SME brands. It is not a simple
+form-to-GPT-to-display pipeline. It is a multi-agent intelligence platform where four AI models
+collaborate in a defined sequence with quality gates, audit trails, and a self-improving memory system.
+A Saudi SME business owner fills a 15-question Arabic onboarding form. Within 24 hours the platform
+generates a 20-post monthly Arabic social media content calendar with visual assets. The client
+downloads the calendar and posts manually. Phase 1 is download-only -- no auto-publishing.
+
+1.2 The Three Systems Inside One Product
+
+System             Name                   What It Does
+
+System 1           Intelligence Pipeline  n8n orchestrates 4 AI models in sequence.
+                                          CEO routes, COO briefs, DeepSeek
+                                          generates, CCO quality-gates. Every
+                                          decision logged.
+
+System 2           Memory System          BrandDNA -- governed intelligence schema.
+                                          Nothing writes directly. Memory Controller is
+                                          the only write gateway. Full evidence
+                                          tracking.
+
+System 3           Learning Layer         Three-layer BrandDNA: private brand data +
+                                          sector intelligence + global anonymous
+                                          patterns. Gets smarter with every brand
+                                          interaction.
+
+1.3 Phase Roadmap
+
+Phas    Status    Key Features                                    New Agents
+e                                                                 CEO, COO, CCO,
+                                                                  DeepSeek
+Phas BUILD        Onboarding, calendar generation, download       CIO (Gemini 2.5 Pro)
+                  delivery, admin panel, 3 Copilots, Arabic QC
+e1      NOW                                                       CARO
+                                                                  CPO
+Phas    ARCHITEC  Postiz auto-publishing, Meta Insights API, CIO  Agency layer
+e2      TURE      pattern analysis, client OAuth
+        READY
+
+Phas PLANNED      CARO Arabic QC (Jais/DeepSeek), video/motion
+e3                chains, advanced competitor analysis
+
+Phas PLANNED      CPO (Claude Code) autonomous content
+e4                strategy, multi-platform expansion
+
+Phas PLANNED      White-label API for agencies, multi-tenant
+e5                enterprise, custom brand models
+
+                                          OpenClaw Technical Docs v1.0 � weiBlocks � Page 2 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+Phas PLANNED  Predictive content scoring, real-time performance  Full CIO suite
+e6            optimization, Arabic market data product
+
+1.4 Hard Architectural Rules -- Never Violate These
+
+   HARD RULE: n8n NEVER calls COO or CCO directly. Every request goes through CEO first.
+  CEO instructs n8n which agent to call next.
+
+   HARD RULE: No AI agent writes to BrandDNA tables directly. All writes are nominated by CEO,
+  queued in memory_controller_queue, validated by Memory Controller, then written.
+
+   HARD RULE: Arabic text NEVER enters any image generation model. Arabic text is applied
+  POST-GENERATION as a Sharp/Canvas overlay in N8N-V01.
+
+   HARD RULE: Weavy CDN URLs are NEVER stored in the database. All Weavy outputs are
+  downloaded and re-uploaded to Supabase Storage. Only Supabase Storage URLs are stored.
+
+   HARD RULE: n8n NEVER makes creative or strategic decisions. It routes payloads between
+  agents only. Business logic lives inside the AI agents.
+
+              OpenClaw Technical Docs v1.0 � weiBlocks � Page 3 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+2. Technology Stack
+
+2.1 Complete Stack -- Phase 1
+
+Layer           Technology             Plan/Tier         Purpose
+Frontend        Next.js 14 App Router  Vercel Pro        Client platform + Admin panel
+
+Hosting         Vercel                 Pro               Deployment, preview envs, edge
+
+                                                         network
+
+Database        Supabase               Pro               All data, RLS, Auth, Storage,
+                PostgreSQL             Included          Realtime
+Auth -- Client                         Included          /[slug] routes -- client users only
+                Supabase Auth
+Auth --         (instance 1)                             /admin routes -- OGz team only
+Admin
+                Supabase Auth
+                (instance 2)
+
+Vector DB       Qdrant Cloud           Free tier  Scale  CaptionContext + onboarding vectors
+                                       PRO ($50/mo)      per brand
+Orchestration n8n Cloud                OGz API key
+                                                         All 11 workflows -- routing only, never
+Visual Gen      Weavy.ai REST API                        logic
+
+                                                         Image generation chain with model
+                                                         routing
+
+Image           Sharp (Node.js)        npm package       Arabic text overlay, watermark, safe
+Processing                                               zone mask
+
+AI -- CEO       Claude Sonnet 4.6      Anthropic API     All routing, gating, governance
+AI -- COO       Claude Haiku 4.5       Anthropic API     decisions
+
+                                                         BrandDNA build, CaptionContext,
+                                                         scoring
+
+AI -- CCO       GPT-5                  OpenAI API (Tier 4) Arabic QC, dialect validation,
+                                                                      NegativePattern check
+
+AI --           DeepSeek V3            DeepSeek API      20 Arabic caption generation per
+Calendar        Gemini 2.5 Pro         Google AI API     client
+
+AI -- CIO                                                Stored for Phase 2 -- not active in
+                                                         Phase 1
+
+Image Model     Nano Banana            Weavy node        Bulk post generation (default model)
+1
+
+Image Model     Flux 1.1 Ultra         Weavy node        First-ever post per client + high-score
+2               Resend                 OGz account       brand_awareness
+
+Email                                                    All transactional emails -- Arabic
+                                                         templates
+
+Payments        Stripe Checkout        OGz account       Subscription management, SAR
+                                                         pricing
+
+                                                         OpenClaw Technical Docs v1.0 � weiBlocks � Page 4 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+Analytics  PostHog              Free tier     Funnel tracking, upgrade triggers
+           GitHub               OGz org       Weekly commits from Day 1
+Source
+Control    Apify (third-party)  OGz pays      Instagram scraper -- $30-80/month
+
+Scraping
+
+ WARNING: n8n Starter plan ($20/mo) is INSUFFICIENT for production. It allows ~2,500
+executions/month. A single Sunday batch for 300 clients exceeds this. n8n Pro ($50/mo) is required
+from Day 1.
+
+2.2 Environment Variables -- Complete List
+
+All stored as Vercel environment variables. Never in source code. Never in n8n workflow node text.
+Never in GitHub.
+
+Variable           Service                    Used In
+ANTHROPIC_API_KEY  Claude Sonnet + Haiku      CEO routing (n8n flows + Admin Copilots) +
+                                              COO operations
+OPENAI_API_KEY     GPT-5 (CCO)                Arabic QC in N8N-A01, A02 + CCO
+                                              reasoning
+GOOGLE_AI_API_KEY  Gemini 2.5 Pro (CIO)       Stored for Phase 2. DO NOT call in Phase 1.
+                   DeepSeek V3                Calendar generation in N8N-A01, A02
+DEEPSEEK_API_KEY   Weavy.ai                   N8N-V01 REST API calls
+                   Nano Banana                N8N-V01 bulk generation node
+WEAVY_API_KEY
+                   Flux 1.1 Ultra             N8N-V01 first-ever post node
+NANO_BANANA_API_
+KEY                Supabase                   All database operations
+                   Supabase                   Client-facing queries (RLS enforced)
+FLUX_ULTRA_API_KE
+Y                  Supabase                   Server-side writes, Memory Controller, admin
+                                              operations
+SUPABASE_URL       Supabase (admin instance)  Admin panel auth -- separate instance
+
+SUPABASE_ANON_K    Supabase (admin instance)  Admin server operations
+EY
+                   Qdrant Cloud               Vector read/write operations
+SUPABASE_SERVICE   Qdrant Cloud               Authenticated Qdrant access
+_ROLE_KEY          Resend                     All transactional email delivery
+
+SUPABASE_ADMIN_U                                     OpenClaw Technical Docs v1.0 � weiBlocks � Page 5 of 43
+RL
+
+SUPABASE_ADMIN_S
+ERVICE_KEY
+
+QDRANT_URL
+
+QDRANT_API_KEY
+
+RESEND_API_KEY
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+STRIPE_SECRET_KEY Stripe   Checkout session creation, webhook
+                           validation
+STRIPE_WEBHOOK_S  Stripe   Webhook signature verification
+ECRET
+                  PostHog  Analytics event tracking
+POSTHOG_KEY       Apify    Instagram scraper calls in N8N-A03
+                  n8n      Validates incoming n8n webhook calls to
+APIFY_API_KEY              Next.js
+
+N8N_WEBHOOK_SEC
+RET
+
+                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 6 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+3. System Architecture
+
+3.1 Seven-Layer Architecture
+
+Layer       Technology        Role                              Scalability Pattern
+
+L1 --       Supabase          All persistent data, RLS          Read replicas in Phase 3,
+Storage     PostgreSQL        enforcement, event logs           connection pooling via
+                                                                pgBouncer
+
+L2 --       Supabase Storage  Generated images, client logos, ZIP CDN-backed, move to
+Files
+                              downloads                         dedicated S3 in Phase 4
+
+L3 --       Qdrant Cloud      CaptionContext cache, onboarding  Per-client namespaces, add
+Vectors     n8n Cloud         gap vectors                       nodes as brand count grows
+
+L4 --       AI C-Suite (4     Routes payloads between agents.   Parallel batch processing,
+Orchestr    models)           Never decides.                    shard model by brand_id
+ation
+                              CEO routes, COO briefs, CCO       Stateless HTTP calls, token
+L5 --                         validates, DS generates           budget enforcement per
+Intelligen                                                      model
+ce
+
+L6 --       Next.js 14 on     Client platform + Admin panel,    Edge functions, ISR for
+                              Arabic RTL                        public pages, SSR for
+Frontend Vercel                                                 dashboards
+
+L7 --       BrandDNA 3-layer  Private + Sector + Global         CIO adds Phase 2, patterns
+Learning    schema            intelligence                      compound with brand count
+
+3.2 Request Flow -- Every Generation Event
+
+This flow applies to both N8N-A01 (batch) and N8N-A02 (on-demand). The steps are identical -- only
+the trigger and priority differ.
+
+   TRIGGER (Cron Sunday 23:00 AST or Webhook from client click)
+      
+      
+
+   n8n receives event
+      
+       Fetches active clients from Supabase
+       Writes to usage_logs: flow_id, timestamp
+      
+      
+
+   HTTP POST  CEO (Claude Sonnet 4.6)
+      Input: client_list + EvidenceBundle states + current_date + monthly_spend
+      Output: confidence_mode per client + occasion_flags + cost_constraints + ordered
+
+   manifest
+      Writes: RoutingDecision record (append-only)
+      
+       [For each client -- parallel batches of 5-6]
+
+   HTTP POST  COO (Claude Haiku 4.5)
+
+                                                                                                             OpenClaw Technical Docs v1.0 � weiBlocks � Page 7 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+      Input: brand_id + confidence_mode
+      Output: CaptionContext (800-1200 tokens) + dialect_confirmed bool
+      Reads: brand_profiles + all BrandDNA tables + Sector Intelligence + Global
+   Intelligence
+      Writes: CaptionContext to Qdrant cache
+      
+       [IF dialect_confirmed = false]  Skip client  Log to admin QA  Continue
+      
+      
+   HTTP POST  DeepSeek V3
+      Input: CaptionContext + month + posts_per_week + occasion_context
+      Output: 20 Arabic captions with metadata (posting_time, content_type, hashtags)
+      Note: Prompt caching applied -- brief cached, only generation tokens variable
+      
+      
+   HTTP POST  CCO (GPT-5)
+      Input: captions[] + CaptionContext (for QC reference)
+      Output: per post: { score: 0-100, dialect_flag, negpat_flag, cultural_flag,
+   brave_route_flag }
+      
+      
+   HTTP POST  CEO (Claude Sonnet 4.6) -- Confidence Gate
+      Input: CCO results per post
+      Output: per post routing: clean | watermark_required | hold
+      Checks: All 11 human override trigger conditions
+      Writes: RoutingDecision update
+      
+       [score >= 75 AND no override]  CLEAN  Proceed to N8N-V01
+       [score 50-74 AND no override]  WATERMARK  Proceed to N8N-V01 with flag
+       [score < 50 OR any override]  HOLD  Write to qa_review_queue  Skip N8N-V01
+      
+       [For non-held posts]
+   CALL N8N-V01 (Weavy Visual Chain sub-workflow)
+      Input: WeavyVisualContext per post
+      Output: supabase_storage_url per post
+      
+      
+   Assemble final calendar in Supabase
+      { post_id, caption_ar, storage_url, posting_time, confidence_score, watermark:
+   bool }
+      
+      
+   Resend email  "Your [Month] calendar is ready"
+      
+      
+   HTTP POST  CEO -- Batch completion
+      CEO logs RoutingDecision batch summary
+      CEO nominates BrandDNA updates to memory_controller_queue
+      
+      
+
+                                                                                                             OpenClaw Technical Docs v1.0 � weiBlocks � Page 8 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+   Memory Controller processes nominations
+      Validates  Writes to brand tables  Logs to branddna_event_log
+      Updates Sector Intelligence (Box 2) with anonymized outcome signals
+      Updates Global Intelligence (Box 3) with anonymized outcome signals
+
+3.3 N8N-V01 -- Weavy Visual Chain Detail
+
+Node     Type          Function                           Critical Rule
+
+1--      Trigger       Receive WeavyVisualContext from    Validate all required variables
+Input                  calling flow                       present before proceeding
+
+2--      Switch        Route by objective:                Each chain has different prompt
+Router                 awareness/engagement/conversion/   structure and model preference
+                       cultural/trust
+
+3--      IF            first_ever_post=true  Flux Ultra.  Override: brand_awareness +
+                       cost_constraint=high  Nano         score>80  Flux Ultra
+Model                  Banana. default  Nano Banana
+
+Select
+
+4--      HTTP Request  Call selected image model with     NEVER pass Arabic text,
+Genera    Weavy        English-only descriptors           brand_name_ar, or caption text to
+te                                                        image model
+
+5--      HTTP Request  Apply brand hex colors via Flux    Only if COLOR_PALETTE has 2+
+Palette   Weavy        Canny Pro node                     confirmed hex values
+Lock
+
+6--      Code Node     Render brand_name_ar in            Font: Najdi/HejaziNoto Naskh
+Arabic   (Sharp)       dialect-appropriate Arabic font    Arabic, GulfCairo. Applied at safe
+Overla                                                    zone.
+y
+
+7--      Code Node     Apply platform-specific mask       Instagram: bottom-third safe zone.
+Safe     (Sharp)                                          Snapchat: top+bottom bars.
+Zone
+
+8--      IF + Code     Apply "Beta AI draft" overlay if   Position: top-right, opacity: 30%
+Water    Node          CONFIDENCE_FLAG=watermark_r
+mark                   equired
+
+9--      HTTP Request Download from Weavy URL, upload     Path:
+Downl                                                     /clients/{brand_id}/calendars/{YYYY
+oad      + Supabase    to Supabase Storage                -MM}/{post_id}.jpg. NEVER store
+                                                          Weavy CDN URL.
+
+10 --    Return        Return supabase_storage_url to     Calling flow writes URL to post
+                       calling flow                       record in Supabase
+Output
+
+                                                          OpenClaw Technical Docs v1.0 � weiBlocks � Page 9 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+4. BrandDNA -- Three-Layer Intelligence Schema
+
+4.1 Architecture Overview
+
+BrandDNA is not a database table with brand fields. It is a governed intelligence schema with evidence
+tracking, conflict detection, confidence states, an append-only event log, and a three-layer learning
+architecture. Every field has a confidence state. Every write is logged. Nothing can be written without
+going through the Memory Controller.
+
+Layer                     Tables                         Access
+Layer 1 -- Private                                       RLS: brand_id = auth.uid(). Zero cross-brand
+Brand                     brand_profiles,                access. Deleted on account deletion.
+                          audience_profiles,
+Layer 2 -- Sector         visual_style_profiles,         Readable by all agents. Writable by Memory
+Intelligence              channel_profiles,              Controller only. Updated monthly by CIO
+Layer 3 -- Global         evidence_bundles,              (Phase 2).
+Intelligence              source_records,                Readable by all authenticated users. Writable
+                          negative_patterns,             by service_role only. Zero foreign keys to
+                          override_rules,                brand_profiles.
+                          onboarding_responses,
+                          brand_performance_log
+
+                          sector_baselines,
+                          sector_question_weights,
+                          sector_trends
+
+                          content_performance_patter
+                          ns, negative_pattern_library,
+                          onboarding_intelligence,
+                          visual_performance_global,
+                          occasion_intelligence
+
+4.2 Complete Table Specifications -- Layer 1
+
+brand_profiles            UUID PRIMARY KEY DEFAULT gen_random_uuid()
+                          TEXT NOT NULL
+   brand_id               TEXT
+   brand_name_ar          ENUM (F&B, Retail, Beauty_Wellness)
+   brand_name_en          TEXT
+   sector                 ENUM (Najdi, Hejazi, Gulf, MSA_formal, MSA_accessible,
+   city_primary
+   arabic_dialect         ENUM (budget, mid_market, premium, luxury)
+   Mixed)                 TEXT
+   price_position         ENUM (casual, semi_formal, formal)
+   brand_differentiator   ENUM (none, light, moderate)
+   formality_level        ENUM (Low, Medium, High)
+   humor_tolerance        ENUM (arabic_only, arabic_primary, balanced,
+   religious_sensitivity
+   bilingual_ratio        ENUM (Critical, High, Medium, Low, Not_relevant)
+   english_primary)       ENUM (Critical, High, Medium, Low, Not_relevant)
+   ramadan_relevance      ENUM (Critical, High, Medium, Low, Not_relevant)
+   eid_fitr_relevance
+   eid_adha_relevance
+
+                                                         OpenClaw Technical Docs v1.0 � weiBlocks � Page 10 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+national_day_relevance ENUM (Critical, High, Medium, Low, Not_relevant)
+
+founding_day_relevance ENUM (Critical, High, Medium, Low, Not_relevant)
+
+primary_channel      ENUM (Instagram, Snapchat, TikTok, Twitter)
+
+tier                 ENUM (free, paid_starter, paid_pro)
+
+completeness_score   FLOAT DEFAULT 0
+
+pipeline_tier        ENUM (Starter, Pro)
+
+batch_shard          INT (0-6, assigned on signup, determines generation night)
+
+sector_baseline_id   UUID FK  sector_baselines
+
+client_slug          TEXT UNIQUE NOT NULL
+
+logo_url             TEXT (Supabase Storage URL)
+
+primary_color_hex    CHAR(7)
+
+total_calendars_generated INT DEFAULT 0
+
+created_at           TIMESTAMPTZ DEFAULT now()
+
+updated_at           TIMESTAMPTZ DEFAULT now()
+
+WRITE AUTHORITY: Memory Controller queue ONLY
+RLS: brand_id = auth.uid() for SELECT/UPDATE/DELETE
+
+evidence_bundles -- 10 Generation-Critical Fields
+
+bundle_id            UUID PRIMARY KEY
+
+brand_id             UUID FK  brand_profiles ON DELETE CASCADE
+
+field_name           TEXT NOT NULL
+
+supporting_source_ids UUID[] (array of source_record IDs that support this value)
+
+contradicting_source_ids UUID[] (array of source_record IDs that contradict)
+
+agreement_ratio      FLOAT (0-1: 1 = all sources agree)
+
+recency_score        FLOAT (0-1: 1 = very recent sources)
+
+conflict_score       FLOAT (0-1: 0 = no conflict)
+
+field_confidence     ENUM (explicitly_confirmed, inferred_high, inferred_medium,
+
+                     inferred_low, rejected, deprecated)
+
+last_evaluated       TIMESTAMPTZ
+
+-- field_confidence is AUTO-DERIVED from bundle states -- NEVER set manually
+-- explicitly_confirmed: client confirmed this value directly
+-- inferred_high: 3+ corroborating sources, agreement_ratio > 0.8
+-- inferred_medium: 2+ sources, agreement_ratio > 0.6
+-- inferred_low: 1 source or agreement_ratio < 0.6
+-- rejected: client explicitly said this value is wrong
+-- deprecated: source is too old or no longer valid
+
+10 GENERATION-CRITICAL FIELDS (EvidenceBundle required from Day 1):
+
+arabic_dialect       -- Wrong dialect = wrong brand voice on every output
+
+brand_differentiator -- Cannot be inferred reliably from scrapes
+
+price_position       -- Drives tone calibration across all captions
+
+primary_channel      -- Determines format, frequency, content type
+
+ramadan_relevance    -- Most important seasonal signal for Saudi brands
+
+primary_audience_gender -- Affects visual rules, tone, product emphasis
+
+   primary_kpi_type  -- Engagement vs conversion = fundamentally different
+models
+
+                                                     OpenClaw Technical Docs v1.0 � weiBlocks � Page 11 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+   religious_sensitivity -- High-sensitivity brands need human gate on religious
+content
+
+   tone_anti_attribute_ids -- Empty = system generates content client consistently
+rejects
+
+bilingual_ratio          -- Every caption output affected
+
+routing_decisions -- APPEND-ONLY
+
+decision_id            UUID PRIMARY KEY
+brand_id               UUID FK (nullable for system-level decisions)
+flow_id                TEXT (N8N-A01, N8N-A02, etc.)
+request_type           TEXT
+pipeline_assigned      TEXT
+agents_dispatched      JSONB
+constraints_applied    JSONB
+confidence_mode        ENUM (Standard, Cautious, Minimal, Blocked)
+outcome                TEXT
+timestamp              TIMESTAMPTZ DEFAULT now()
+
+WRITE AUTHORITY: CEO via n8n ONLY
+APPEND-ONLY: No UPDATE or DELETE ever. RLS enforces INSERT only.
+This table is the permanent audit trail of every CEO decision.
+
+branddna_event_log -- APPEND-ONLY, NEVER DELETE
+
+event_id               UUID PRIMARY KEY
+brand_id               UUID FK  brand_profiles
+event_type             ENUM (source_ingested, contradiction_detected,
+
+event_data                       client_confirmed, override_added,
+created_at                       confidence_upgraded, brand_graduated)
+                       JSONB (full context of what changed and why)
+                       TIMESTAMPTZ DEFAULT now()
+
+WRITE AUTHORITY: Memory Controller ONLY
+APPEND-ONLY: No UPDATE or DELETE. Ever. Not even for PDPL deletion.
+On account deletion: anonymize brand_id field, retain event data for audit.
+Rollback: re-process event stream to reconstruct any past BrandDNA state.
+
+memory_controller_queue
+
+nomination_id          UUID PRIMARY KEY
+brand_id               UUID FK
+nomination_type        ENUM (field_update, confidence_upgrade,
+negative_pattern_add,
+                                 override_rule_add, sector_signal, global_signal)
+nomination_data        JSONB (what to write and where)
+nominated_by           TEXT DEFAULT CEO
+nominated_at           TIMESTAMPTZ DEFAULT now()
+status                 ENUM (pending, validated, written, rejected)
+processed_at           TIMESTAMPTZ
+
+                                  OpenClaw Technical Docs v1.0 � weiBlocks � Page 12 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+rejection_reason         TEXT
+
+WRITE AUTHORITY: CEO creates nominations. Memory Controller processes.
+No agent ever writes to brand_profiles, evidence_bundles, or any Layer 1 table
+directly.
+This queue is the ONLY path to BrandDNA writes.
+
+4.3 Layer 2 -- Sector Intelligence Tables
+
+sector_baselines
+
+baseline_id              UUID PRIMARY KEY
+
+sector                   ENUM
+
+dialect                  ENUM
+
+last_updated             TIMESTAMPTZ
+
+sample_size              INT (how many brands inform this baseline)
+
+recommended_content_mix  JSONB
+
+-- { emotional: 0.40, lifestyle: 0.35, offer: 0.25 }
+
+top_performing_tones     JSONB
+
+-- [{ tone_id: "warm_casual", approval_rate: 0.91, sample: 234 }]
+
+worst_performing_tones   JSONB
+
+occasion_insights        JSONB
+
+-- { ramadan: { best_type: "emotional", optimal_lead_weeks: 2, avg_score: 88 }}
+
+common_negative_patterns JSONB
+
+confidence_benchmarks    JSONB
+
+-- { emotional: { avg: 84, p25: 71, p75: 92 }}
+
+PRE-LOADED: F&B, Retail, Beauty_Wellness baselines loaded before launch.
+READ-ONLY for all agents in Phase 1.
+UPDATED monthly by CIO (Gemini 2.5 Pro) in Phase 2.
+
+4.4 Layer 3 -- Global Intelligence Tables
+
+content_performance_patterns
+
+pattern_id               UUID PRIMARY KEY
+sector                   ENUM
+dialect                  ENUM
+occasion                 TEXT
+content_type             TEXT
+objective                TEXT
+avg_confidence           FLOAT
+approval_rate            FLOAT
+revision_rate            FLOAT
+hard_block_rate          FLOAT
+sample_size              INT
+last_updated             TIMESTAMPTZ
+
+PRIVACY: Zero foreign keys to brand_profiles.
+
+                                                OpenClaw Technical Docs v1.0 � weiBlocks � Page 13 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+   Cannot be linked to any specific brand even by direct DB query.
+   CEO extracts anonymized signals -- no brand_id, no caption text, no PII.
+
+4.5 How BrandDNA Learns -- The Full Signal Flow
+
+  CLIENT approves post
+
+      
+      
+   CEO extracts ANONYMIZED signal:
+      { sector: "F&B", dialect: "Najdi", content_type: "lifestyle",
+
+          tone: "warm_casual", confidence_score: 89, outcome: "approved" }
+      NO brand_id. NO caption text. NO client email.
+      
+      
+   CEO nominates to memory_controller_queue:
+      nomination_type: "global_signal"
+      nomination_data: { anonymized signal above }
+      
+      
+   Memory Controller validates and writes to:
+      content_performance_patterns (Layer 3)
+      sector_baselines approval_rate update (Layer 2)
+      
+      
+   NEXT NEW BRAND onboards (F&B, Najdi, Riyadh):
+      COO compiles CaptionContext
+      COO reads Layer 2: "F&B Najdi brands: warm_casual lifestyle = 91% approval"
+      COO reads Layer 3: "warm_casual tone scores avg 89 across all sectors"
+      CaptionContext includes these insights
+      DeepSeek generates better content from Day 1
+      New brand benefits from every previous brand -- with zero privacy exposure
+
+4.6 Onboarding Question Evolution
+
+Onboarding questions are stored in the onboarding_questions table and linked to
+onboarding_responses per brand. CIO (Phase 2) analyses correlations between answer patterns and
+content quality outcomes monthly. New questions are proposed when patterns are statistically
+significant (minimum 50-brand sample).
+
+onboarding_questions:
+
+question_id            UUID PK
+
+question_text_ar TEXT
+
+question_text_en TEXT
+
+maps_to_field          TEXT (which BrandDNA field this answer populates)
+
+sector_relevance JSONB ({ F&B: true, Retail: true, Beauty: false })
+
+importance_score FLOAT (updated by CIO based on quality correlation)
+
+introduced_at          TIMESTAMPTZ
+
+introduced_because TEXT (audit trail for why question was added)
+
+                                    OpenClaw Technical Docs v1.0 � weiBlocks � Page 14 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+onboarding_responses:
+
+response_id            UUID PK
+
+brand_id               UUID FK
+
+question_id            UUID FK
+
+answer_raw             TEXT (exact text entered by client)
+
+answer_processed JSONB (structured by COO during BrandDNA build)
+
+confidence_weight FLOAT
+
+answered_at            TIMESTAMPTZ
+
+source                 ENUM (form, correction, scrape)
+
+                                    OpenClaw Technical Docs v1.0 � weiBlocks � Page 15 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+5. n8n Workflow Specifications
+
+5.1 All 11 Flows -- Reference
+
+Flow ID  Trigger   Schedule/Event           Primary Purpose
+N8N-A01  Cron                               Batch calendar generation -- full AI chain
+                   Sunday 23:00 AST (or
+                   shard night)
+
+N8N-A02  Webhook   Client clicks Generate   On-demand single post -- same chain as A01,
+                   Post                     high priority
+
+N8N-A03  Webhook   15-question form         Onboarding auto-extraction + BrandDNA v0.1
+N8N-A04  Webhook   submitted                build
+N8N-A05  Cron
+                   Client submits brand     CEO classifies  Memory Controller nomination
+                   correction
+                                            COO upgrade readiness scoring  CEO 
+                   1st of month 06:00 AST   Growth alert
+
+N8N-B03  Webhook   Client submits revision  CEO  COO scopes  DeepSeek  CCO 
+N8N-V01  Sub-flow  request                  CEO
+N8N-D02  Cron
+                   Called from A01/A02      Weavy visual chain + Sharp Arabic overlay
+                   post-generation
+                                            BrandDNA maintenance + stale flag detection +
+                   1st of month 04:00 AST   CIO trigger (Phase 2)
+
+N8N-S01 Cron       Every 15 minutes         COO pipeline health check  Tech Copilot alert
+                                            on failure
+
+N8N-S02 Event      COO cost threshold       70%/90%/100% ceiling alerts  Management
+N8N-S03 Event      triggered                Copilot
+
+                   CEO AnomalyRecord        Routes anomaly to correct Copilot by
+                   creation                 anomaly_type
+
+ NOTE: Every n8n flow MUST have: (1) trigger node, (2) credential references (never hardcoded),
+(3) error handling branch with 2x retry + exponential backoff, (4) logging node writing to usage_logs in
+Supabase, (5) error notification routing to N8N-S03 on final failure.
+
+5.2 N8N-A01 -- Complete Step-by-Step
+
+S
+
+t  n8n Node        API Call            Input  Output
+e                  Supabase DB
+                                       --  All active Starter clients sorted by occasion_priority
+p                                      DESC
+
+1 Supabase
+      Query
+
+2 HTTP Request CEO (Sonnet 4.6)        Client list + EvidenceBundle states  confidence_mode
+                                       + occasion_flags per client
+
+                                            OpenClaw Technical Docs v1.0 � weiBlocks � Page 16 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+3 Loop Over          --                    Ordered manifest  Per-client iteration (parallel batches
+      Items          COO (Haiku 4.5)       of 5-6)
+
+4 HTTP Request                             brand_id + confidence_mode  CaptionContext +
+                                           dialect_confirmed
+5 IF Node            --
+                                           dialect_confirmed  Branch: skip (false) or continue
+6 Supabase           Supabase DB (skip)    (true)
+      Write
+                     DeepSeek V3           skipped client  Log to admin QA queue, continue loop
+7 HTTP Request       CCO (GPT-5)
+                     CEO (Sonnet 4.6)      CaptionContext + month  20 Arabic caption drafts
+8 HTTP Request
+                                           captions[] + CaptionContext  score + flags per post
+9 HTTP Request
+                                           CCO results  clean/watermark/hold per post + 11
+1 IF Node            --                    override checks
+0                    N8N-V01
+                     Supabase DB           human_gate_required  Branch: QA queue or proceed
+1 Execute            Resend API            to Weavy
+1 Sub-flow           CEO (Sonnet 4.6)
+                     memory_controller_q   WeavyVisualContext per non-held post 
+1 Supabase           ueue                  supabase_storage_url
+2 Write
+                                           Assembled calendar  calendar_id written to calendars
+1 HTTP Request                             table
+3
+                                           Email template + client email  Delivery confirmation
+1 HTTP Request
+4                                          Batch result  RoutingDecision log + Memory Controller
+                                           nominations
+1 Supabase
+5 Write                                    CEO nominations  BrandDNA + Layer 2/3 signal
+                                           updates queued
+
+5.3 N8N-A03 -- Onboarding Flow
+
+S
+
+t  Action                Technical Detail                                                  SLA
+e
+
+p
+
+1 Receive webhook        Validate all required fields present in payload                   <1s
+
+2 Launch 3 parallel      (a) Apify Instagram scraper -- last 30 posts. (b)                 30-90s
+      extractors         Multi-strategy website scraper -- HTML fetch 
+                         Puppeteer fallback. (c) Google Places API --
+                         category, rating, reviews.
+
+3 POST to COO            COO maps all inputs to 39 BrandDNA fields with                    20-40s
+                         confidence states. Creates EvidenceBundle for 10
+                         critical fields.
+
+4 Write BrandDNA         Creates brand_profiles, evidence_bundles,                         <5s
+
+   v0.1                  source_records, Qdrant namespace.
+
+                                                            OpenClaw Technical Docs v1.0 � weiBlocks � Page 17 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+5 POST to CEO        CEO checks dialect confidence. Compiles                               10-20s
+                     OnboardingGapContext. Identifies top 3 gap                            60s partial, 3-5min full
+6 Progressive Brand  fields.                                                               <5s
+      Snapshot                                                                             Immediate
+                     Partial snapshot (form data only) available within                    Immediate
+7 Write Brand        60s. Full snapshot after scrape completion.
+      Snapshot
+                     CEO writes to brand_snapshots. Client platform
+8 Check              receives via Supabase realtime subscription.
+      completeness
+                     completeness_score >= 40% AND
+9 Gap notification   dialect_confirmed  trigger N8N-A01 for this
+                     client (high priority).
+
+                     completeness_score < 40% OR
+                     dialect_unconfirmed  send top 3 gap questions
+                     to client. Hold generation.
+
+5.4 Error Handling Pattern -- Applied to All Flows
+
+   Every external API call in n8n follows this pattern:
+
+TRY: Make API call
+
+
+
+ SUCCESS  Continue to next node
+
+
+
+ FAIL
+
+  
+
+   Wait 2 seconds
+
+   RETRY 1
+
+  
+
+    SUCCESS  Continue
+
+    FAIL
+
+       
+
+        Wait 4 seconds
+
+        RETRY 2
+
+       
+
+         SUCCESS  Continue
+
+         FINAL FAIL
+
+                     
+
+                      Write to anomaly_records (CEO)
+
+                      Write error to usage_logs
+
+                      Trigger N8N-S03 (anomaly router)
+
+                      Skip this client/post (do not fail entire batch)
+
+5.5 Scalability -- Batch Processing Design
+
+   PHASE 1 -- Sequential with small parallel batches:
+      brand_id shard = brand_id % 5
+      Shard 0  Sunday night
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 18 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+      Shard 1  Monday night
+      Shard 2  Tuesday night
+      Shard 3  Wednesday night
+      Shard 4  Thursday night
+      300 brands  60 per night  manageable
+      Each night runs 5-6 clients in parallel  ~2 hours per night
+
+   PHASE 2 -- Queue-based (when brand count > 500):
+      Add Redis queue layer
+      n8n pulls from queue instead of Supabase direct
+      Multiple n8n workers process in parallel
+      No ceiling on scale -- add workers = add throughput
+
+   PHASE 3 -- Dedicated generation service (when > 2000 brands):
+      Extract AI chain into dedicated Node.js service
+      n8n remains as trigger only
+      Horizontal scaling via container orchestration
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 19 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+6. AI C-Suite -- Integration Specifications
+
+6.1 CEO -- Claude Sonnet 4.6
+
+API Call Pattern
+
+   // Every CEO call from n8n HTTP node:
+   POST https://api.anthropic.com/v1/messages
+   {
+
+      model: "claude-sonnet-4-6",
+      max_tokens: 1024,
+      system: process.env.CEO_SYSTEM_PROMPT, // from n8n credential object
+      messages: [{
+
+          role: "user",
+          content: JSON.stringify({
+
+              flow_id: "N8N-A01",
+              request_type: "batch_generation",
+              brand_id: "uuid",
+              evidence_bundle_states: { arabic_dialect: "inferred_medium", ... },
+              occasion_flags: ["ramadan_approaching"],
+              current_month_spend_usd: 12.40,
+              monthly_ceiling_usd: 50.00
+          })
+      }]
+   }
+
+   // CEO ALWAYS responds in structured JSON -- prompt must enforce this
+   // Parse: JSON.parse(response.content[0].text)
+
+CEO Functions Reference
+
+Function           Input                      Output                       Writes To
+                                                                           routing_decisions
+Request            flow_id + request          request_type +               (append-only)
+classification     payload                    pipeline_assigned            confidence_classificatio
+                                                                           ns
+Confidence         brand_id + critical field  confidence_mode:
+classification     states                     Standard/Cautious/Minima     occasion_priority_flags
+                                              l/Blocked                    if update needed
+Occasion priority  current_date                                            Read only -- no write
+check                                         occasion_flags[] per client
+                   brand_id +                                              No write -- output only
+Cost ceiling       current_month_spend        cost_constraint:
+check                                         normal/approaching/critica   routing_decisions
+                                              l/breached                   update
+Agent dispatch     confidence_mode + all
+compilation        context                    Compiled dispatch
+                                              payload per target agent
+Confidence gate    CCO scores per post
+                                              clean/watermark/hold per
+                                              post
+
+                                              OpenClaw Technical Docs v1.0 � weiBlocks � Page 20 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+Human gate (11  CCO output + client     human_gate_required:                               qa_review_queue if
+triggers)       metadata                bool                                               triggered
+                                        Nomination payload
+Memory          Approval/rejection                                                         memory_controller_que
+governance      events                  AnomalyRecord created                              ue
+
+Anomaly         Cost/quality/namespace                                                     anomaly_records
+detection       thresholds
+
+6.2 COO -- Claude Haiku 4.5
+
+CaptionContext Structure (800-1200 tokens)
+
+   {
+      brand_identity: {
+          name_ar: " ",
+          sector: "F&B",
+          city: "Riyadh",
+          dialect: "Najdi",
+          price_position: "mid_market"
+      },
+      voice_and_tone: {
+          attributes: ["warm", "family-focused", "proud Saudi"],
+          anti_attributes: ["aggressive", "western-casual", "flashy"],
+          formality: "casual",
+          humor_tolerance: "light"
+      },
+      audience: {
+          description_ar: "45-25   ",
+          gender_mix: "60% female",
+          language_preference: "arabic_primary"
+      },
+      content_rules: {
+          negative_patterns: [{ text: "  ", severity: "SOFT_WARN" }],
+          occasion_context: { name: "Ramadan", lead_weeks: 2, priority: "CRITICAL" }
+      },
+      visual_brief: {
+          style_descriptor: "warm food photography, natural light, family settings",
+          color_palette: ["#C8860A", "#FFFFFF"],
+          platform_specs: { canvas: "1080x1080", safe_zone: "bottom-third" }
+      },
+      sector_intelligence: {
+          recommended_mix: { emotional: 0.40, lifestyle: 0.35, offer: 0.25 },
+          this_month: "Ramadan: prioritize emotional week 1-2, shift to offer week 3-4"
+      },
+      global_signals: {
+          avoid: ["aggressive CTAs performing poorly this month"],
+          opportunity: ["National Day in 3 weeks -- start building anticipation"]
+      }
+
+   }
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 21 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+6.3 CCO -- GPT-5
+
+Arabic QC Response Structure
+
+// CCO returns per post:
+
+[
+
+   {
+
+       post_id: "post_001",
+
+       score: 91,
+
+       dialect_flag: false,
+
+       negpat_flag: "NONE",       // NONE | SOFT_WARN | STRONG_WARN | HARD_BLOCK
+
+       cultural_flag: false,
+
+       brave_route_flag: false,
+
+       issues: []                 // Empty array = all clear
+
+   },
+
+   {
+
+       post_id: "post_007",
+
+       score: 63,
+
+       dialect_flag: true,
+
+       negpat_flag: "SOFT_WARN",
+
+       cultural_flag: false,
+
+       brave_route_flag: false,
+
+       issues: [
+
+          "Sentence 2 has translation smell -- sounds like translated English",
+
+          "Formality too high for confirmed casual brand voice",
+
+       ]
+
+   }
+
+]
+
+// HARD_BLOCK negpat_flag = immediate hold, no delivery, human review required
+// brave_route_flag: true = creative risk taken, human gate triggered (override #2)
+
+6.4 All 11 Human Override Triggers
+
+# Condition                 CEO Check                             Action
+                                                                  Hold ALL posts regardless of
+1 First-ever output for     client_total_calendars_generated ===  score
+     new client             0                                     Hold flagged posts
+
+2 CCO                       CCO response brave_route_flag ===     Hold flagged posts
+     brave_route_present    true on any post_id
+     on any post                                                  Hold flagged posts
+
+3 Healthcare + health       sector === Healthcare AND
+     claims                 content_type === educational OR
+                            testimonial
+
+4 Finance + investment      sector === Finance AND
+     claims                 prohibited_content_flag detected by
+                            CCO
+
+                                                             OpenClaw Technical Docs v1.0 � weiBlocks � Page 22 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+5 Government sector           sector === Government (always)           Hold ALL posts
+                                                                       Hold flagged posts
+6 High religious              EvidenceBundle religious_sensitivity
+     sensitivity + religious  === High AND CCO flags                   Hold hero content posts
+     context                  religious_reference_detected
+                                                                       Hold ALL posts
+7 Dialect inferred_low        EvidenceBundle
+     on hero content          arabic_dialect.confidence ===            Hold this post
+                              inferred_low                             Hold that post
+8 Unresolved                                                           Hold that post, alert admin
+     ConflictRecord on        conflict_records has unresolved record
+     critical field           for brand_id on critical field
+
+9 Third revision of same      revision_history count for post_id >= 3
+     output
+                              CCO score < 50 on any post_id
+1 Any CCO score below
+0 50                          CCO negpat_flag === HARD_BLOCK
+                              on any post_id
+1 HARD_BLOCK
+1 NegativePattern fired
+
+                              OpenClaw Technical Docs v1.0 � weiBlocks � Page 23 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+7. Database Architecture & RLS
+
+7.1 Supabase Configuration
+
+Config Item         Setting                     Reason
+PostgreSQL version  15+
+                                                Required for gen_random_uuid() and modern
+                                                RLS features
+
+Connection pooling  pgBouncer in Transaction    Prevents connection exhaustion under batch
+                    mode                        load
+
+Auth instances      Two separate projects       Client auth and Admin auth must be
+Storage bucket      clients (private)           completely isolated
+Realtime            Enabled on brand_snapshots
+                                                All generated images, logos. Signed URLs
+                                                for access.
+
+                                                Processing screen subscribes to status
+                                                changes
+
+Row Level Security  Enabled on ALL tables       No exceptions. Never disable for
+                                                convenience.
+
+7.2 RLS Policies -- Complete Reference
+
+   -- LAYER 1: Client isolation (every Layer 1 table)
+   CREATE POLICY "client_isolation" ON brand_profiles
+
+      FOR ALL USING (brand_id = auth.uid());
+
+   -- APPEND-ONLY tables (routing_decisions, branddna_event_log)
+   CREATE POLICY "insert_only" ON routing_decisions
+
+      FOR INSERT WITH CHECK (true);
+   CREATE POLICY "no_update" ON routing_decisions
+
+      FOR UPDATE USING (false); -- Blocks all updates
+   CREATE POLICY "no_delete" ON routing_decisions
+
+      FOR DELETE USING (false); -- Blocks all deletes
+
+   -- LAYER 2 & 3: Global tables readable by all authenticated users
+   CREATE POLICY "global_read" ON content_performance_patterns
+
+      FOR SELECT USING (auth.role() = "authenticated");
+
+   -- LAYER 2 & 3: Only service_role can write global tables
+   CREATE POLICY "service_write" ON content_performance_patterns
+
+      FOR INSERT WITH CHECK (auth.role() = "service_role");
+
+   -- ADMIN: Full access to all tables
+   CREATE POLICY "admin_full" ON brand_profiles
+
+      FOR ALL USING (auth.jwt() ->> "role" = "admin");
+
+   -- COPILOT: Management Copilot -- read all
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 24 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+   CREATE POLICY "mgmt_copilot_read" ON brand_profiles
+      FOR SELECT USING (auth.jwt() ->> "copilot_role" = "management");
+
+   -- COPILOT: Tech Copilot -- system tables only, NO client content
+   CREATE POLICY "tech_copilot_read" ON anomaly_records
+
+      FOR SELECT USING (auth.jwt() ->> "copilot_role" = "tech");
+   -- Tech Copilot has NO policy on brand_profiles -- zero access
+
+   -- COPILOT: Production Copilot -- QA queue only
+   CREATE POLICY "prod_copilot_read" ON qa_review_queue
+
+      FOR SELECT USING (auth.jwt() ->> "copilot_role" = "production");
+   -- Production Copilot has NO policy on usage_logs -- zero access
+
+7.3 Critical Indexes
+
+   -- brand_id is the most queried column in the system
+   CREATE INDEX idx_evidence_bundles_brand_id ON evidence_bundles(brand_id);
+   CREATE INDEX idx_source_records_brand_id ON source_records(brand_id);
+   CREATE INDEX idx_routing_decisions_brand_id ON routing_decisions(brand_id);
+   CREATE INDEX idx_usage_logs_brand_id_month ON usage_logs(brand_id, created_at);
+
+   -- Batch ordering -- used every Sunday batch
+   CREATE INDEX idx_brand_profiles_shard ON brand_profiles(batch_shard, tier);
+
+   -- QA queue performance
+   CREATE INDEX idx_qa_queue_status ON qa_review_queue(status, created_at);
+
+   -- Event log queries
+   CREATE INDEX idx_event_log_brand_type ON branddna_event_log(brand_id, event_type);
+
+   -- Confidence classification lookups
+   CREATE INDEX idx_confidence_brand_active ON confidence_classifications(brand_id)
+
+      WHERE superseded_at IS NULL;
+
+7.4 PDPL Cascade Delete Implementation
+
+   // Two-phase deletion for PDPL compliance
+
+   // Phase 1: Single atomic PostgreSQL transaction
+   async function deleteBrandPhase1(brand_id) {
+
+      await supabase.rpc("cascade_delete_brand", { p_brand_id: brand_id });
+      // SQL function deletes in dependency order:
+      // 1. qa_review_queue, 2. usage_logs, 3. confidence_classifications
+      // 4. routing_decisions (anonymize, do not delete)
+      // 5. branddna_event_log (anonymize brand_id, keep event data)
+      // 6. memory_controller_queue, 7. negative_patterns, 8. override_rules
+      // 9. source_records, 10. evidence_bundles, 11. brand_snapshots
+      // 12. onboarding_responses, 13. visual_style_profiles
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 25 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+      // 14. audience_profiles, 15. channel_profiles, 16. brand_profiles
+
+   }
+   // Phase 2: Async external cleanup (runs immediately after Phase 1)
+   async function deleteBrandPhase2(brand_id) {
+
+      // Delete Qdrant namespace
+      await qdrant.deleteCollection(`clients_${brand_id}`);
+      // Delete Supabase Storage folder
+      await supabase.storage
+
+          .from("clients")
+          .remove([`${brand_id}/`]); // Recursive delete
+      // Log deletion confirmation
+      await supabase.from("deletion_audit_log").insert({
+          brand_id, phase1_complete: true, phase2_complete: true,
+          deleted_at: new Date().toISOString()
+      });
+   }
+   // If Phase 2 fails: retry every 5 minutes for 24 hours
+   // Admin alert sent if not resolved within 1 hour
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 26 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+8. Frontend Architecture
+
+8.1 Next.js App Router Structure
+
+app/
+
+layout.tsx                     // Root layout -- Arabic RTL by default
+
+[slug]/                        // CLIENT PLATFORM -- Supabase Auth Instance 1
+
+      layout.tsx               // Client layout -- slug validation, auth guard
+
+      onboarding/page.tsx      // Screen 2: 15-question form
+
+       processing/page.tsx     // Screen 3: Loading + Supabase realtime
+subscription
+
+      snapshot/page.tsx        // Screen 4: Brand Snapshot Card
+
+      calendar/page.tsx        // Screen 5: Calendar Dashboard
+
+      calendar/[month]/page.tsx // Historical month view
+
+      profile/page.tsx         // Screen 6: Brand Profile
+
+      upgrade/page.tsx         // Screen 7: Stripe Checkout flow
+
+admin/                         // ADMIN PANEL -- Supabase Auth Instance 2
+
+      layout.tsx               // Admin layout -- separate auth guard
+
+      page.tsx                 // Client list overview
+
+      qa/page.tsx              // QA Review Queue (Production Copilot)
+
+      cost/page.tsx            // Cost Monitor (Management Copilot)
+
+      anomalies/page.tsx       // Anomaly Log
+
+      routing/page.tsx         // RoutingDecision Log
+
+      branddna/[brand_id]/page.tsx // BrandDNA Inspector
+
+      flows/page.tsx           // n8n Flow Status
+
+      baselines/page.tsx       // Sector Baselines
+
+      occasions/page.tsx       // Saudi Occasion Calendar
+
+api/
+
+      webhooks/stripe/route.ts // Stripe webhook handler
+
+      webhooks/n8n/route.ts    // n8n status callbacks
+
+      copilot/[role]/route.ts  // Copilot chat API (server action)
+
+8.2 Arabic RTL Implementation
+
+   // Root layout.tsx -- Arabic first
+   export default function RootLayout({ children }) {
+
+      return (
+          <html lang="ar" dir="rtl">
+              <head>
+                 {/* Arabic fonts -- loaded first, no flash */}
+                 <link rel="preconnect" href="https://fonts.googleapis.com" />
+                 <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic
+                            &family=Cairo:wght@400;600;700&display=swap" rel="stylesheet" />
+              </head>
+              <body className="font-arabic">
+                 <LanguageProvider>{children}</LanguageProvider>
+              </body>
+          </html>
+
+      )
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 27 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+   }
+
+   // Language toggle -- persisted to localStorage
+   function LanguageProvider({ children }) {
+
+      const [lang, setLang] = useState(localStorage.getItem("lang") || "ar")
+      return (
+
+          <html lang={lang} dir={lang === "ar" ? "rtl" : "ltr"}>
+              {children}
+
+          </html>
+      )
+   }
+
+   // Tailwind RTL -- all inputs
+   <input
+
+      dir="rtl"
+      className="text-right font-arabic placeholder:text-right"
+      placeholder={arabicPlaceholder}
+   />
+
+8.3 Realtime Processing Screen
+
+   // processing/page.tsx -- subscribes to brand_snapshots
+   useEffect(() => {
+
+      // Show partial snapshot immediately (from form data)
+      setPartialSnapshot(formDataSnapshot)
+
+// Subscribe to Supabase realtime
+const channel = supabase
+
+   .channel(`brand_snapshot_${slug}`)
+   .on("postgres_changes", {
+
+       event: "INSERT",
+       schema: "public",
+       table: "brand_snapshots",
+       filter: `brand_id=eq.${brandId}`
+   }, (payload) => {
+       // Full snapshot ready -- redirect immediately
+       router.push(`/${slug}/snapshot`)
+   })
+   .subscribe()
+
+// Timeout fallback -- 10 minutes
+const timeout = setTimeout(() => {
+
+   showTimeoutMessage()
+   notifyAdminViaAPI() // Triggers N8N-S03
+}, 10 * 60 * 1000)
+
+return () => {
+   supabase.removeChannel(channel)
+   clearTimeout(timeout)
+
+                                            OpenClaw Technical Docs v1.0 � weiBlocks � Page 28 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+      }
+   }, [])
+
+8.4 Client Platform -- All 7 Screens
+
+Screen    Route              Key Components                           Critical Requirements
+Sign Up   /[slug]/auth
+                             Email/password + Google OAuth,           Supabase Auth instance 1
+                             Arabic RTL form, slug auto-generation    only. Confirmation email via
+                             from brand_name_ar                       Resend.
+
+Onboardi  /[slug]/onboardin  15 questions ALL displayed at once       Dialect selector must be
+ng Form   g                  (no wizard). Auto-extraction pre-fills   labelled "most important
+                             detected values. Logo upload, color      question". All inputs Arabic
+                             picker, dialect selector.                RTL. Logo  Supabase
+                                                                      Storage.
+Processi  /[slug]/processin  Branded loading animation. Supabase
+ng        g                  realtime subscription. Partial snapshot  10-minute timeout  admin
+                             in 60s, full redirect on completion.     alert. Never block on failed
+Brand     /[slug]/snapshot                                            scrape.
+                             Detected voice (top 3 tones), visual
+Snapshot                     style, audience, completeness score      NOT a generic welcome
+                             (progress bar), dialect status.          screen. Dialect confirmation
+                                                                      prompt if inferred_low. This
+Calendar  /[slug]/calendar   8 posts displayed (free). Posts 9-20     is the hook moment.
+Dashboa                      blurred. Per-post: caption, image,
+rd                           posting time, content type.              Watermark badge visible if
+                             Approve/request changes/download         watermark_required=true.
+                             per post.                                Confidence score:
+                                                                      admin-only (not visible to
+Brand     /[slug]/profile    Read-only BrandDNA summary.              client). Stripe upgrade
+Profile                      Field-by-field completeness              overlay on blurred posts.
+                             (green/amber/red). Flag correction 
+Upgrade   /[slug]/upgrade    N8N-A04.                                 Dialect confirmation if
+Flow                                                                  unconfirmed. Correction
+                             Stripe Checkout redirect.                form  CEO classifies 
+                             Post-payment webhook  tier update        Memory Controller.
+                             in Supabase  unlock 20 posts.
+                             Subscription management link.            Tier update MUST be
+                                                                      server-side (webhook),
+                                                                      never client-side. Prevents
+                                                                      upgrade bypass attacks.
+
+8.5 Admin Copilots -- Server Action Pattern
+
+   // api/copilot/[role]/route.ts
+   export async function POST(request, { params }) {
+
+      const { role } = params // management | tech | production
+      const { message, history } = await request.json()
+
+      // 1. Authenticate admin user
+      const admin = await validateAdminAuth(request)
+      if (!admin) return Response.json({ error: "Unauthorized" }, { status: 401 })
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 29 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+      // 2. Fetch RLS-scoped data using role-specific service key
+      const contextData = await fetchCopilotContext(role, admin.id)
+      // Management: all tables | Tech: system only | Production: QA only
+      // 3. Call Claude Sonnet 4.6
+      const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          system: COPILOT_PROMPTS[role], // from env var, never hardcoded
+          messages: [
+              ...history,
+              {
+                 role: "user",
+                 content: `Context data: ${JSON.stringify(contextData)}Question: ${message}`
+              }
+          ]
+      })
+      return Response.json({ reply: response.content[0].text })
+
+   }
+   // CRITICAL: RLS is enforced at Supabase level for fetchCopilotContext
+   // Not just a UI filter. Direct DB query with role-scoped service key.
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 30 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+9. Security Architecture
+
+9.1 Security Requirements -- Complete Checklist
+
+Req ID  Requirement            Implementation                                              Tested At
+SEC-01                                                                                     M1 + M2
+        Supabase RLS on ALL    Per-table policies documented above.
+        tables                 No table exists without RLS.
+
+SEC-02 Zero API keys in source All keys in Vercel env vars. GitHub                         M1
+
+        code                   scan before every milestone.
+
+SEC-03 Separate admin auth     Admin credentials return 401 on                             M1
+                instance
+                               /[slug] routes. Client credentials return
+SEC-04 HTTPS enforced
+                               401 on /admin routes.
+SEC-05 PDPL cascade delete
+                               Vercel enforces HTTPS. HTTP                                 M1
+
+                               HTTPS redirect active before M1.
+
+                               Two-phase deletion with audit log. All M2
+                               tables + Qdrant + Storage.
+
+SEC-06 AI prompts in env vars  Never in workflow node text. Never in M3
+                only           GitHub. Deleted at M3 with written
+                               confirmation.
+
+SEC-07 Copilot RLS at DB level Each Copilot role has Supabase RLS M2
+                                                      policy. Not just UI filter. Tested via
+                                                      direct Supabase API query.
+
+SEC-08 No Weavy CDN URLs in All post records queried at M2. Any                            M2
+
+        DB                     weavy.ai domain URL = defect.
+
+SEC-09 Cross-client isolation  Client A authenticated at                                   M2
+
+                               /[client-b-slug] must return zero Client
+
+                               B data.
+
+SEC-10 Stripe webhook          All Stripe webhooks verified with                           M2
+                verification
+                               STRIPE_WEBHOOK_SECRET.
+
+                               Reject all unverified events.
+
+9.2 Arabic Text Security -- The Absolute Rule
+
+   WARNING: Arabic text MUST NEVER be passed as a prompt to any image generation model.
+  This includes: brand_name_ar, caption text, hashtags, any Arabic string. Arabic text produces
+  garbled, incorrect output in all current image models. This is an architectural constraint, not a style
+  preference.
+
+   // N8N-V01 Node 4 -- CORRECT image generation call:
+   {
+
+      visual_style: "warm food photography, natural light, family gathering",
+      hero_concept: "Ramadan family dinner, warm candlelight, authentic Saudi setting",
+      negative_prompt: "alcohol, non-halal food, western fast food imagery",
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 31 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+      cultural_guidance: "traditional Saudi hospitality, modest clothing, dates and
+
+   qahwa",
+      canvas: "1080x1080 Instagram square",
+      // NO Arabic text above
+
+   }
+   // N8N-V01 Node 6 -- Arabic applied AFTER generation (Sharp overlay):
+   const image = await sharp(generatedImageBuffer)
+
+      .composite([{
+          input: await renderArabicText({
+              text: brand_name_ar,
+              font: dialectFontMap[dialect], // Najdi  NotoNaskhArabic
+              size: 48,
+              color: primary_color_hex
+          }),
+          gravity: "south", // Safe zone: bottom area
+
+      }])
+      .toBuffer()
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 32 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+10. Performance & Uptime
+
+10.1 Performance Requirements
+
+Metric                Requirement              How Achieved                                Test Method
+Client platform LCP
+                      < 3 seconds on           Next.js ISR for static parts,               Lighthouse 3x
+                      10Mbps                   Vercel edge network, image                  average on
+                                               optimization                                production URL
+Calendar dashboard < 4 seconds full
+                                               Supabase Storage CDN URLs,                  Manual test on
+(8 posts)             visual load              Next.js Image component, lazy               10Mbps Saudi
+                                               loading posts 5-8                           connection
+N8N-A01 batch (300    < 6 hours from
+clients)              23:00 trigger            Parallel batches 5-6 clients,               n8n execution log
+                                               shard model reduces nightly                 reviewed Monday
+N8N-A02 on-demand < 5 minutes caption          volume to 60                                06:00
+                                   + visual
+                                               Priority queue, dedicated                   Timed from Generate
+N8N-A03               Partial in 60s, full in  execution thread, not queued                Post click to visual in
+onboarding            5min                     with batch                                  dashboard
+
+Admin QA queue (50    < 3 seconds load         Progressive loading pattern,                Timed from form
+items)                                         parallel scrapers, Supabase                 submit to Brand
+                      100 without              realtime push                               Snapshot display
+Concurrent            degradation
+sessions                                       Supabase indexed queries,                   Load QA queue with
+                                               pagination, server components               50 held items
+
+                                               Vercel edge, Supabase                       Load test at M2
+                                               connection pooling, stateless
+                                               API design
+
+10.2 Uptime Strategy
+
+Component             Uptime Target            Strategy
+
+Vercel (Frontend)     99.9%                    Managed by Vercel infrastructure. Edge
+                                               network. Automatic failover.
+Supabase (Database) 99.9%
+                                               Managed by Supabase. Daily backups.
+n8n Cloud             99%                      Point-in-time recovery.
+(Orchestration)       ~99%
+                                               N8N-S01 health check every 15 min. Manual
+AI APIs               ~95%                     trigger available as fallback.
+(Anthropic/OpenAI/De  99%
+epSeek)                                        Retry logic (2x with backoff). Fallback model
+                                               config for Phase 2.
+Weavy.ai (Visual
+generation)                                    Timeout fallback: failed visual  hold post in
+                                               QA queue, do not fail batch.
+Qdrant Cloud
+                                               Managed service. CaptionContext can be
+                                               recompiled on cache miss.
+
+                                               OpenClaw Technical Docs v1.0 � weiBlocks � Page 33 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+10.3 Monitoring & Alerting
+
+Alert Type             Trigger                         Routed To
+
+N8N-A01 batch failure  Any client batch fails after 3  Tech Copilot via N8N-S03
+Cost ceiling 70%       retries
+Cost ceiling 90%                                       Management Copilot via N8N-S02
+Cost ceiling 100%      Monthly API spend reaches
+                       70% of ceiling                  Management Copilot (urgent) + CEO
+                                                       AnomalyRecord
+                       Monthly API spend reaches       Management Copilot + halt generation for
+                       90% of ceiling                  that client
+
+                       Monthly ceiling breached
+
+Pipeline health        N8N-S01 detects                 Tech Copilot notification
+WARNING                degradation                     Tech Copilot urgent + CEO AnomalyRecord
+
+Pipeline health        N8N-S01 detects failure
+CRITICAL
+                       3 consecutive Weavy failures    Tech Copilot + posts held in QA queue
+Weavy timeout          Batch approval rate < 70%       Production Copilot + CEO AnomalyRecord
+                       N8N-A03 > 10 minutes            Admin notification via N8N-S03
+Arabic QA regression
+
+Brand Snapshot
+timeout
+
+                                                       OpenClaw Technical Docs v1.0 � weiBlocks � Page 34 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+11. Phase Evolution -- Architecture for Future Phases
+
+11.1 What Phase 1 Architecture Enables Without Refactoring
+
+Every architectural decision in Phase 1 is made with Phase 6 in mind. The following Phase 2�6
+features can be added without touching existing Phase 1 code -- only additions, no rewrites.
+
+Phase       Addition                       Phase 1 Foundation That Enables It
+Phase 2     Postiz auto-publishing
+                                           calendar table already has platform +
+Phase 2     CIO (Gemini) weekly            posting_time fields. Add Postiz API call after
+            analysis                       download step.
+Phase 2
+Phase 2     Meta Insights API integration  Layer 2 + Layer 3 tables already exist. CIO
+                                           reads and updates them. N8N-D02 extended
+Phase 3     Client Google Business         with CIO call.
+Phase 3     OAuth
+Phase 4                                    brand_performance_log table already exists.
+Phase 4     CARO Arabic QC                 Add performance data ingestion flow.
+Phase 5     (Jais/DeepSeek)
+            Video/motion chains            onboarding_responses table stores raw
+Phase 6                                    answers. Full GBP data replaces Places API
+            CPO (Claude Code)              data on same fields.
+
+            White-label API for agencies   CCO is model-agnostic. Swap GPT-5 for
+                                           CARO via env var. Same response schema.
+            Custom brand models
+                                           N8N-V01 has objective routing built in. Add
+            Arabic market data product     video chain as new objective type.
+
+                                           CEO routing already has agent dispatch
+                                           slots. Add CPO as new agent type.
+
+                                           Multi-tenant architecture already built. Add
+                                           API key auth layer on top.
+
+                                           BrandDNA schema supports arbitrary field
+                                           addition. Model fine-tuning connects to
+                                           existing EvidenceBundle.
+
+                                           Global Intelligence (Layer 3) is already being
+                                           built. Phase 6 adds API access to this
+                                           dataset.
+
+11.2 What Will Need Refactoring at Scale
+
+Component   Current (Phase 1)         When to Refactor    Refactor To
+                                      Brand count > 500
+n8n batch   Parallel batches of 5-6,                      Redis queue + multiple n8n
+processing  shard model                                   workers
+
+AI chain    n8n HTTP nodes            Brand count > 2000  Dedicated Node.js
+execution                                                 generation service
+
+Supabase    Single project,           Read load > 10k     Read replicas for dashboard
+            pgBouncer pooling         req/min             queries
+
+                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 35 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+Qdrant               Free tier Cloud         Vector count > 1M     Paid tier with dedicated
+                                                                   nodes
+Image storage        Supabase Storage        Storage > 500GB or
+                                             > 50k req/day         Dedicated S3 with
+CaptionContext       COO called per                                CloudFront CDN
+compilation          generation              Same brand
+Admin Copilots       Direct Claude API call  generates > 3x/week   Redis cache for unchanged
+                     per message                                   BrandDNA
+                                             Admin team > 5
+                                             people                Add rate limiting +
+                                                                   conversation persistence
+
+11.3 Version Control & Documentation Standards
+
+Standard                Requirement                   Enforcement
+
+GitHub commits          Weekly minimum.               OGz Studios admin access throughout.
+                        Descriptive commit            Verified at each milestone.
+                        messages. Feature
+                        branches.
+
+Schema migrations       Every migration documented    Any schema change after Week 2 requires
+                        with up/down scripts.         OGz written approval.
+                        Migration log in Supabase.
+
+n8n flow exports        All flows exported as JSON    M3 requirement. Flows not documented =
+                        monthly. README per flow.     M3 held.
+
+Environment variables   Documented list (key name +   M3 requirement. Vendor confirms deletion in
+                        purpose only, never values).  writing.
+                        Rotation procedure
+                        documented.
+
+API prompt versions     Prompt changes tracked with   OGz Studios owns all prompts. Vendor
+                        version numbers. Old          stores in env vars only.
+                        prompts archived.
+
+Architecture decisions  ADR (Architecture Decision    This document is the baseline ADR. Updates
+                        Record) for any non-obvious   go in CHANGELOG.md.
+                        decision.
+
+                                                      OpenClaw Technical Docs v1.0 � weiBlocks � Page 36 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+12. Developer Week-by-Week Build Plan
+
+12.1 Team Responsibilities
+
+Developer            Owns                          Works With
+Lead (Usama)                                       Developer 2 on API contracts. Developer 3
+                     n8n all 11 flows, AI C-Suite  on N8N-V01 integration.
+                     integration, BrandDNA
+                     schema, Memory Controller,    Lead on API response shapes. Developer 3
+                     Qdrant, system architecture   on image display.
+
+Developer 2          Next.js client platform (7    Lead on N8N-V01 handoff contract.
+                     screens), Admin panel (9      Developer 2 on Storage URL consumption.
+                     views + 3 Copilots), Stripe,
+                     Resend, PostHog
+
+Developer 3          Weavy visual chain, Sharp
+                     Arabic overlay, Supabase
+                     Storage pattern, website
+                     scraper, Apify integration,
+                     load testing
+
+12.2 Week-by-Week Critical Path
+
+W                                 Dev 2 (Frontend)              Dev 3 (Backend/Visual)
+ee Lead (Usama)
+k                                 Next.js project deployed to   Qdrant namespace pattern.
+                                  OGz Vercel. Both auth         Apify Instagram scraper
+1  Full Supabase schema -- all    instances. /[slug] routing.   integration test. Google Places
+                                  Admin skeleton.               API test.
+   15 tables all 3 layers. n8n
+
+   workspace setup, all 11 flow
+
+   scaffolds. CEO/COO API
+
+   connection test.
+
+2  N8N-A03 COO BrandDNA           Onboarding form (15           Multi-strategy website scraper
+                                  questions, Arabic RTL). Logo  (HTTP  Puppeteer). Parallel
+   build logic.                   upload to Supabase Storage.   scraper orchestration for
+                                  Processing screen with        N8N-A03.
+   ConfidenceClassification       realtime.
+
+   implementation.
+
+   CaptionContext compiler.
+
+   Qdrant cache write/read.
+
+3  CEO routing logic -- full      Brand Snapshot card. Brand    Weavy REST API connection
+
+   8-step protocol. All 11 override Profile page. Admin client list test. First image generation
+
+   triggers. DeepSeek calendar    view.                         test (English only). Sharp
+
+   generation partial. CCO                                      library setup.
+
+   GPT-5 Arabic QC integration.
+
+4  N8N-A01 end-to-end TEXT        Production Copilot queue UI.  M1 checkpoint support. Begin
+
+(M ONLY (no Weavy). Confidence Admin panel basic views. Start N8N-V01 node architecture.
+
+1) gate logic. All M1 criteria    50-post Arabic eval set
+
+   verified. CEO                  preparation.
+
+   ConfidenceClassification
+
+   modes tested.
+
+5  N8N-V01 full integration --    Calendar dashboard with       N8N-V01 complete: Nano
+                                                                Banana bulk, Flux Ultra
+   call from A01. Error handling  visual images. Human gate     first-post, Sharp Arabic
+
+   and fallback. Weavy timeout
+
+                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 37 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+      fallback. Storage URL          approve/reject in admin.        overlay, watermark, safe
+      validation.                    Download single post.           zones, Supabase Storage
+                                                                     upload.
+6     N8N-A02 on-demand.             Stripe Checkout integration.
+                                     Upgrade overlay (posts 9-20     Resend email templates
+      N8N-S01 health heartbeat.      blur). Download all (ZIP).      (Arabic). N8N-S03 anomaly
+                                     PostHog instrumentation.        router. Performance baseline
+      N8N-S02 cost monitor.                                          testing.
+                                     Admin panel all 9 views
+      N8N-A04 brand correction. All  complete. 3 sector baselines    Load test -- 100 concurrent
+                                     pre-loaded. Saudi Occasion      sessions. Supabase query
+      3 Copilots API integration.    Calendar pre-loaded.            EXPLAIN ANALYZE. All
+                                                                     performance requirements
+7     Arabic QA 50-post evaluation   Bug fixes. Walkthrough          verified.
+                                     session preparation. Frontend
+(M run. White-label isolation        documentation.                  Bug fixes. Performance fixes.
+                                                                     Database documentation.
+2) security test. N8N-A05            Code review final. GitHub       Schema diagram final.
+                                     clean commit history verified.
+      upgrade readiness. N8N-B03     No dead code.                   Load test final report. All
+                                                                     documentation complete.
+      revision request.                                              Credential deletion confirmed.
+
+8     Bug fixes from M2 only.
+
+      N8N-D02 maintenance flow.
+
+      N8N-S03 final testing.
+
+      Documentation -- n8n flow
+
+      READMEs.
+
+W Walkthrough session (2+
+k 9 hours). All credentials
+(M documented. Written prompt
+3) deletion confirmation.
+
+         Handover complete.
+
+12.3 Pre-Contract Checklist -- Required Before Day 1
+
+Item                               Required By Status    Action If Missing
+
+n8n Cloud Pro plan ($50/mo) OGz Studios         Must     Cannot start without -- Starter plan
+                                                confirm  fails in production
+Vercel admin access                OGz Studios
+                                                Must     Cannot deploy -- blocks all frontend
+                                                confirm  development
+                                                Day 1
+
+Supabase admin access              OGz Studios  Must     Cannot build schema -- blocks entire
+                                                confirm  system
+                                                Day 1
+
+n8n Cloud admin access             OGz Studios  Must     Cannot build workflows -- blocks AI
+                                                confirm  chain
+Qdrant Cloud admin access OGz Studios           Day 1
+                                                         Cannot set up namespaces -- blocks
+                                                Must     CaptionContext caching
+                                                confirm
+                                                Day 1
+
+Weavy API key                      OGz Studios  Must     Cannot build N8N-V01 -- delays
+                                                confirm  visuals to Week 6
+                                                Day 1
+
+GitHub org admin access            OGz Studios  Must     Cannot commit code -- breaks
+                                                confirm  contract terms
+                                                Day 1
+
+                                                         OpenClaw Technical Docs v1.0 � weiBlocks � Page 38 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+OpenAI Tier 4 confirmation    OGz Studios   Must       GPT-4o fallback used until Tier 4
+                              OGz Studios   confirm    reached
+Apify subscription            OGz Studios              Instagram scraper blocked -- affects
+                              OGz Studios   Must       onboarding quality
+AI system prompts                           confirm    AI chain works but outputs untested
+(CEO/COO/CCO)                 OGz Studios              until prompts arrive
+                              OGz Studios   Must
+CCO calibration test set (20  Both parties  have by    M2 Arabic QA at risk if prompts arrive
+posts)                                      Week 2     without calibration
+
+Stripe account access                       Must       Stripe integration delayed -- upgrade
+                                            have 2     flow blocked
+Single point of contact                     weeks
+named                                       before M2  Milestone acceptance delays payment
+Official contract start date
+confirmed                                   Must       Timeline calculations undefined
+                                            have by
+                                            Week 5
+
+                                            Must
+                                            confirm
+
+                                            Must
+                                            confirm
+
+                                                       OpenClaw Technical Docs v1.0 � weiBlocks � Page 39 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+13. Technical Feasibility Notes
+
+13.1 Items Requiring Adjusted Implementation
+
+The following RFP requirements are achievable but require implementation adjustments from how they
+are described in the spec. All adjustments are documented here so there are no surprises at milestone
+acceptance.
+
+Requirement        Issue                  Our Implementation                    Client Action
+Instagram scraper                                                               Needed
+                   Custom scraper         Integrate Apify third-party service.
+Instagram          violates ToS, gets     Handles rotation, CAPTCHA, ToS        OGz Studios pays
+competitor         IP-banned              compliance.                           Apify ($30-80/mo)
+engagement rates
+                   True engagement        Estimated engagement =                None --
+Google Business    (reach-based) only     (likes+comments)/followers.           expectation
+full data pull     available to account   Labelled as "estimated" in            adjustment
+                   owner                  EvidenceBundle with inferred_low
+300 clients in 6                          confidence.                           Full GBP  Phase
+hours              GBP API requires                                             2 with client OAuth
+                   client OAuth. Cannot   Google Places API for public data
+Brand Snapshot     pull privately.        (rating, category, reviews). COO      OGz Studios
+in 5 minutes                              runs sentiment analysis on review     confirms n8n Pro
+                   Sequential processing  text.                                 plan
+Arabic QA 80%      takes 18-22 hours
+pass rate                                 Parallel batch 5-6 clients + weekly   None -- UX
+                   Scraper rate limits    shard model. 60 clients per night     improvement
+Weavy at 6,000     can push to 7-10 min    completes in 2 hours.
+images/batch                                                                    OGz provides
+                   Pass rate depends on   Progressive loading: partial          CCO prompt by
+PDPL cascade       CCO prompt quality     snapshot (form data) in 60s. Full     Week 5
+delete -- all                             snapshot pushed via Supabase
+systems            Weavy reliability at   realtime on completion.               OGz confirms
+                   this scale unproven                                          fallback model
+GPT-5 API access                          Request CCO prompt 2 weeks            preference
+                   Qdrant + Storage       before M2. 20-post calibration run
+                   cannot join            before formal evaluation.             OGz confirms this
+                   PostgreSQL                                                   approach for PDPL
+                   transaction            Timeout fallback: Weavy fail          records
+                                          hold post in QA queue. Fallback
+                   Requires OpenAI Tier   image model configurable.             OGz confirms
+                   4 ($250+ spend                                               OpenAI account
+                   history)               Two-phase deletion: Phase 1 =         tier
+                                          DB transaction, Phase 2 = async
+                                          external cleanup with retry + audit
+                                          log.
+
+                                          Start with GPT-4o (comparable
+                                          Arabic quality). Upgrade to GPT-5
+                                          when Tier 4 confirmed.
+                                          Model-agnostic integration.
+
+13.2 Items Not Possible As Specified
+
+The following items as described in the RFP are technically not achievable. Below is the correct
+approach for each.
+
+                                                                                                           OpenClaw Technical Docs v1.0 � weiBlocks � Page 40 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+Requirement            Why Not Possible               Correct Approach
+Arabic dialect
+auto-detection (high   Saudi SME Instagram            Detection from scrapes is always output as
+confidence) from       captions frequently mix        inferred_low regardless of algorithm
+Instagram scrapes      dialects, use MSA, or use      confidence. Dialect confirmation from client is
+                       English regardless of spoken   mandatory, prominent, and blocks hero
+Reliable website       dialect. Detection accuracy    content generation until completed. This is
+scraper for all Saudi  ~60-70%. A wrong dialect       the correct design -- the RFP already
+SMEs                   classification corrupts every  specifies this blocking rule.
+                       output for that brand.
+n8n Starter plan                                      Multi-strategy: HTTP fetch  Puppeteer
+($20/mo) for           Large portion of Saudi SMEs    headless fallback  graceful skip. Failed
+production             are Instagram-only (no         scrape fields marked inferred_low and
+                       website), use                  surfaced as Brand Snapshot gaps.
+                       JavaScript-rendered sites      Onboarding never blocked on failed website
+                       that HTTP scrapers cannot      scrape.
+                       read, or are behind
+                       Cloudflare protection.         n8n Cloud Pro plan at $50/month is required
+                                                      before Day 1. Non-negotiable for any
+                       Starter allows ~2,500          meaningful client volume. $30/month
+                       executions/month. Single       difference prevents system-stopping failure
+                       Sunday batch for 300 clients   at launch.
+                       = 3,000+ executions. Hard
+                       limit hit before batch
+                       completes.
+
+                                                      OpenClaw Technical Docs v1.0 � weiBlocks � Page 41 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+14. Glossary & Quick Reference
+
+14.1 Key Terms                Definition
+
+  Term                        The governed intelligence schema per client. 39+ fields across 5
+  BrandDNA                    families. Three intelligence layers (Private, Sector, Global). All writes go
+  CaptionContext              through Memory Controller.
+
+  Memory Controller           The 800-1200 token structured brief compiled by COO before every
+  EvidenceBundle              generation. Contains brand identity, voice, audience, content rules,
+  RoutingDecision             sector intelligence, and global signals. What DeepSeek reads to write
+  Confidence Mode             captions.
+  Confidence Gate
+  Human Gate                  The only entity authorised to write to BrandDNA tables. Receives
+  WeavyVisualContext          nominations from CEO via memory_controller_queue, validates them,
+  NegativePattern             then writes with full evidence tracking.
+  Batch Shard
+  Sector Baseline             Per-field evidence tracking record. Contains supporting and
+  Progressive Brand Snapshot  contradicting source IDs, agreement ratio, recency score, and the
+  Layer 1/2/3                 auto-derived field_confidence state.
+
+                              An append-only record of every CEO decision. Never updated or
+                              deleted. The permanent audit trail of the intelligence pipeline.
+
+                              CEO's per-client generation mode: Standard (all critical fields
+                              confirmed), Cautious (some inferred_low), Minimal (multiple gaps),
+                              Blocked (dialect missing/rejected).
+
+                              CEO's post-QC routing: score 75 = clean delivery, 50-74 = watermark
+                              required, <50 = hold for human review.
+
+                              CEO's 11-condition check that forces Production Copilot queue
+                              regardless of confidence score. Override trigger conditions defined in
+                              Section 6.
+
+                              The 300-500 token payload compiled by CEO before calling N8N-V01.
+                              Contains brand visual variables. Never contains Arabic text.
+
+                              Prohibited content patterns per client. Three severity levels:
+                              HARD_BLOCK (never deliver), STRONG_WARN (review required),
+                              SOFT_WARN (flag only).
+
+                              An integer (0-6) assigned to each brand on signup. Determines which
+                              night of the week their calendar generates. Prevents all 300+ brands
+                              from running on Sunday simultaneously.
+
+                              Pre-loaded default BrandDNA values per sector (F&B, Retail, Beauty).
+                              Applied when brand has inferred_low critical fields. Updated monthly by
+                              CIO in Phase 2.
+
+                              The UX pattern where a partial Brand Snapshot (from form data) shows
+                              within 60 seconds, then automatically updates with scraped data via
+                              Supabase realtime when extraction completes.
+
+                              The three BrandDNA intelligence layers. Layer 1 = private per-brand
+                              data. Layer 2 = sector patterns (F&B, Retail, Beauty). Layer 3 = global
+                              anonymous patterns across all brands.
+
+                              OpenClaw Technical Docs v1.0 � weiBlocks � Page 42 of 43
+OpenClaw -- Technical Architecture & Developer Documentation -- weiBlocks -- CONFIDENTIAL
+
+14.2 Confidence State Reference
+
+State                     Meaning + Trigger
+
+explicitly_confirmed      Client directly confirmed this value. Highest confidence. No ceiling
+                          applied.
+
+inferred_high             3+ corroborating sources with agreement_ratio > 0.8. High confidence.
+
+inferred_medium           2+ sources with agreement_ratio > 0.6. Moderate confidence.
+
+inferred_low              1 source OR agreement_ratio < 0.6. CEO caps generation confidence
+                          at 74. Sector baseline default applied.
+
+rejected                  Client explicitly said this value is wrong via brand correction flow.
+                          Flagged in BrandDNA.
+
+deprecated                Source is too old or no longer valid. Field falls back to inferred_low.
+
+14.3 Document Version History
+
+Version       Date        Author             Changes
+
+v1.0          April 2026  weiBlocks          Initial complete documentation -- Phase 1
+                                             baseline + Phase 2-6 architecture notes
+
+ NOTE: This document is the single source of truth for OpenClaw Phase 1 architecture. Any
+architectural decision not documented here must be logged as an ADR (Architecture Decision
+Record) in CHANGELOG.md in the GitHub repository and reviewed with OGz Studios before
+implementation.
+
+                                             OpenClaw Technical Docs v1.0 � weiBlocks � Page 43 of 43
+

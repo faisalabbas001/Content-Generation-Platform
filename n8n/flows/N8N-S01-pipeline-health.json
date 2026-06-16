@@ -1,0 +1,189 @@
+{
+  "name": "N8N-S01: Pipeline Health Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 15 }]
+        }
+      },
+      "id": "node-1-cron",
+      "name": "Cron: Every 15 Minutes",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare health check payload\nreturn {\n  check_id: `health-${Date.now()}`,\n  timestamp: new Date().toISOString(),\n  services: ['supabase', 'anthropic', 'openai', 'deepseek', 'qdrant', 'fallai', 'resend', 'apify', 'google_places'],\n  results: {}\n};"
+      },
+      "id": "node-2-prepare",
+      "name": "Prepare Health Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 9,
+        "options": { "parallelProcessing": true }
+      },
+      "id": "node-3-split-services",
+      "name": "Split Services (9 Parallel)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine which service to check\nconst services = $input.first().json;\nconst service = services.service || services;\n\nconst checks = {\n  'supabase': { method: 'GET', url: `${$vars.SUPABASE_URL}/rest/v1/`, headers: { apikey: $vars.SUPABASE_ANON_KEY }, name: 'Supabase DB' },\n  'anthropic': { method: 'GET', url: 'https://api.anthropic.com/v1/models', headers: { 'x-api-key': $vars.ANTHROPIC_API_KEY }, name: 'Claude API' },\n  'openai': { method: 'GET', url: 'https://api.openai.com/v1/models', headers: { Authorization: `Bearer ${$vars.OPENAI_API_KEY}` }, name: 'OpenAI API' },\n  'deepseek': { method: 'GET', url: 'https://api.deepseek.com/v1/models', headers: { Authorization: `Bearer ${$vars.DEEPSEEK_API_KEY}` }, name: 'DeepSeek API' },\n  'qdrant': { method: 'GET', url: `${$vars.QDRANT_URL}/health`, headers: { 'api-key': $vars.QDRANT_API_KEY }, name: 'Qdrant Vector DB' },\n  'fallai': { method: 'GET', url: 'https://queue.fal.run/fal-ai/flux/dev/health', headers: { Authorization: `Key ${$vars.FAL_KEY}` }, name: 'Fall AI' },\n  'resend': { method: 'GET', url: 'https://api.resend.com/health', headers: { Authorization: `Bearer ${$vars.RESEND_API_KEY}` }, name: 'Resend Email' },\n  'apify': { method: 'GET', url: 'https://api.apify.com/v2/users/me', headers: { Authorization: `Bearer ${$vars.APIFY_API_KEY}` }, name: 'Apify Scraper' },\n  'google_places': { method: 'GET', url: `https://maps.googleapis.com/maps/api/place/health?key=${$vars.GOOGLE_API_KEY}`, headers: {}, name: 'Google Places' }\n};\n\nconst check = checks[service] || checks['supabase'];\n\nreturn {\n  service: service,\n  name: check.name,\n  method: check.method,\n  url: check.url,\n  headers: check.headers,\n  check_id: $('Prepare Health Check').first().json.check_id\n};"
+      },
+      "id": "node-4-prepare-check",
+      "name": "Prepare Service Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": "={{ Object.entries($json.headers || {}).map(([k,v]) => ({name:k, value:v})) }}" },
+        "options": { "timeout": 15000, "retryOnFail": false }
+      },
+      "id": "node-5-health-check",
+      "name": "HTTP: Service Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evaluate health result\nconst response = $input.first().json;\nconst serviceData = $('Prepare Service Check').first().json;\nconst statusCode = response.statusCode || response.status || 200;\nconst isHealthy = statusCode >= 200 && statusCode < 500;\nconst responseTime = response.responseTime || 0;\n\nreturn {\n  service: serviceData.service,\n  name: serviceData.name,\n  status: isHealthy ? 'healthy' : 'degraded',\n  response_time_ms: responseTime,\n  status_code: statusCode,\n  check_id: serviceData.check_id,\n  checked_at: new Date().toISOString()\n};"
+      },
+      "id": "node-6-evaluate",
+      "name": "Evaluate Health",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all service results\nconst allChecks = $input.all();\nconst checkId = allChecks[0]?.json?.check_id || `health-${Date.now()}`;\n\nconst healthy = allChecks.filter(c => c.json.status === 'healthy').length;\nconst degraded = allChecks.filter(c => c.json.status === 'degraded').length;\nconst totalServices = allChecks.length;\nconst healthScore = Math.round((healthy / totalServices) * 100);\n\nlet overallStatus = 'healthy';\nif (healthScore < 70) overallStatus = 'critical';\nelse if (healthScore < 100) overallStatus = 'degraded';\n\nconst degradedServices = allChecks.filter(c => c.json.status === 'degraded').map(c => ({\n  service: c.json.service,\n  name: c.json.name,\n  status_code: c.json.status_code\n}));\n\nreturn {\n  check_id: checkId,\n  overall_status: overallStatus,\n  health_score: healthScore,\n  total_services: totalServices,\n  healthy_services: healthy,\n  degraded_services: degraded,\n  degraded_list: degradedServices,\n  services_detail: allChecks.map(c => ({ service: c.json.service, name: c.json.name, status: c.json.status, response_time: c.json.response_time_ms })),\n  checked_at: new Date().toISOString()\n};"
+      },
+      "id": "node-7-aggregate",
+      "name": "Aggregate Health Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "id": "not-healthy",
+              "leftValue": "={{ $json.overall_status }}",
+              "rightValue": "healthy",
+              "operator": { "type": "string", "operation": "not_equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-8-check-status",
+      "name": "IF: Not Healthy?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Health report for anomaly table\nconst report = $input.first().json;\n\nreturn {\n  flow_id: 'N8N-S01',\n  check_id: report.check_id,\n  overall_status: report.overall_status,\n  health_score: report.health_score,\n  degraded_services: report.degraded_list,\n  checked_at: report.checked_at\n};"
+      },
+      "id": "node-9-log-health",
+      "name": "Log Health Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "table": "usage_logs",
+        "columns": "flow_id,event_type,event_data,created_at",
+        "value1": "N8N-S01",
+        "value2": "={{ $json.overall_status === 'healthy' ? 'health_check_ok' : 'health_check_degraded' }}",
+        "value3": "={{ JSON.stringify($json) }}",
+        "value4": "={{ $json.checked_at }}"
+      },
+      "id": "node-10-insert-log",
+      "name": "Supabase: Insert Usage Log",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [2050, 300],
+      "credentials": { "supabaseApi": { "id": "1", "name": "Supabase Service Role" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare anomaly alert for degraded services\nconst report = $input.first().json;\n\nreturn {\n  flow_id: 'N8N-S01',\n  anomaly_type: 'pipeline_degraded',\n  details: {\n    check_id: report.check_id,\n    health_score: report.health_score,\n    degraded_services: report.degraded_services || report.degraded_list,\n    message: `${report.degraded_services || 0} service(s) degraded`\n  },\n  severity: report.overall_status === 'critical' ? 'CRITICAL' : 'WARNING',\n  created_at: report.checked_at || new Date().toISOString()\n};"
+      },
+      "id": "node-11-prepare-alert",
+      "name": "Prepare Anomaly Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 500]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "table": "anomaly_records",
+        "columns": "flow_id,anomaly_type,details,severity,created_at",
+        "value1": "={{ $json.flow_id }}",
+        "value2": "={{ $json.anomaly_type }}",
+        "value3": "={{ JSON.stringify($json.details) }}",
+        "value4": "={{ $json.severity }}",
+        "value5": "={{ $json.created_at }}"
+      },
+      "id": "node-12-insert-anomaly",
+      "name": "Supabase: Insert Anomaly Record",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [2050, 500],
+      "credentials": { "supabaseApi": { "id": "1", "name": "Supabase Service Role" } }
+    },
+    {
+      "parameters": {
+        "workflowId": "N8N-S03",
+        "options": { "waitForSubWorkflow": false }
+      },
+      "id": "node-13-trigger-s03",
+      "name": "Execute N8N-S03 Anomaly Router",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2250, 500]
+    }
+  ],
+  "connections": {
+    "Cron: Every 15 Minutes": { "main": [[{ "node": "Prepare Health Check", "type": "main", "index": 0 }]] },
+    "Prepare Health Check": { "main": [[{ "node": "Split Services (9 Parallel)", "type": "main", "index": 0 }]] },
+    "Split Services (9 Parallel)": { "main": [[{ "node": "Prepare Service Check", "type": "main", "index": 0 }]] },
+    "Prepare Service Check": { "main": [[{ "node": "HTTP: Service Health Check", "type": "main", "index": 0 }]] },
+    "HTTP: Service Health Check": { "main": [[{ "node": "Evaluate Health", "type": "main", "index": 0 }]] },
+    "Evaluate Health": { "main": [[{ "node": "Aggregate Health Report", "type": "main", "index": 0 }]] },
+    "Aggregate Health Report": { "main": [[{ "node": "IF: Not Healthy?", "type": "main", "index": 0 }]] },
+    "IF: Not Healthy?": {
+      "main": [
+        [{ "node": "Prepare Anomaly Alert", "type": "main", "index": 0 }],
+        [{ "node": "Log Health Status", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Health Status": { "main": [[{ "node": "Supabase: Insert Usage Log", "type": "main", "index": 0 }]] },
+    "Prepare Anomaly Alert": { "main": [[{ "node": "Supabase: Insert Anomaly Record", "type": "main", "index": 0 }]] },
+    "Supabase: Insert Anomaly Record": { "main": [[{ "node": "Execute N8N-S03 Anomaly Router", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "saveExecutionProgress": true, "saveManualExecutions": true, "callerPolicy": "workflowsFromSameOwner", "errorWorkflow": "N8N-S03", "timezone": "Asia/Riyadh" },
+  "staticData": null, "pinData": {}, "versionId": "1.0.0", "id": "N8N-S01", "active": true
+}

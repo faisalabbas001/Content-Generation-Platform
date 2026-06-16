@@ -1,0 +1,1805 @@
+﻿{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6c097572-eb9c-4d82-8506-9a86995cc5c6",
+      "name": "On Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -16272,
+        -3968
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign /api/processing/stage call with stage='failed' so the brand row's\n// onboarding_status flips to 'failed'. This is what makes the red Retry\n// banner appear on /[slug]/processing — without it, the page only shows\n// the soft-timeout retry after 10 minutes, which resets every navigation.\nconst crypto = require('crypto');\nconst brand_id = $json.brand_id;\nif (!brand_id) {\n  // Failure happened before brand_id was extracted — skip the DB write.\n  return { json: { ...$json, _stage_skip: true } };\n}\nconst body = JSON.stringify({ brand_id, stage: 'failed' });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887').update(body).digest('hex');\nreturn { json: { ...$json,\n  _stage_url: 'https://vagrancy-pupil-spiritism.ngrok-free.dev/api/processing/stage',\n  _stage_body: body,\n  _stage_headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': reqId,\n    'x-n8n-timestamp': ts,\n  },\n}};"
+      },
+      "id": "fb76668e-dde4-4444-bc43-2a90c644349b",
+      "name": "Sign · stage=failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -15504,
+        -3696
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 5000
+        }
+      },
+      "id": "fd3aee79-b4f7-4ca0-9d6b-a92b6a4f161a",
+      "name": "POST · stage=failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -15168,
+        -3696
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build HMAC-signed S03 alert — fires on any unhandled A03 error.\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst e = $json;\n\nlet brand_id = null;\ntry { brand_id = $('Verify HMAC + parse').first().json.brand_id ?? null; } catch (_) {}\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst makeUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n  const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\n\nconst body = JSON.stringify({\n  anomaly_id:   makeUUID(),\n  anomaly_type: 'n8n_failure',\n  severity:     'error',\n  source_flow:  'N8N-A03',\n  brand_id,\n  message:      e.execution?.error?.message || 'A03 onboarding flow failed',\n  details: {\n    failed_node:  e.execution?.lastNodeExecuted ?? null,\n    error_name:   e.execution?.error?.name      ?? null,\n    execution_id: e.execution?.id               ?? null,\n  },\n  timestamp: new Date().toISOString(),\n});\n\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  _body: body,\n  _headers: {\n    'content-type':     'application/json',\n    'x-n8n-signature':  sig,\n    'x-n8n-request-id': `${$execution.id}-err-a03`,\n    'x-n8n-timestamp':  new Date().toISOString(),\n  },\n};"
+      },
+      "id": "8f5b4625-e710-4a21-bf66-53f8af9f32b8",
+      "name": "Build S03 alert1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16000,
+        -3968
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogztudios.app.n8n.cloud/webhook-test/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "08503061-f17a-47cb-86d5-4f89723ac1bf",
+      "name": "POST · S03 anomaly-alert1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -15488,
+        -4144
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "openclaw-onboarding",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "0ee4153c-4bdc-4147-a5c7-9d866b2e12ba",
+      "name": "Webhook · /openclaw-onboarding",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -18560,
+        -5424
+      ],
+      "webhookId": "762d898b-e479-4be8-a8c6-a7b569a02e23"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify HMAC + parse. Hard Rule #5 — n8n is just routing; we trust the\n// inbound signature from /lib/n8n-outbound.ts. HARDCODED secret + base URL\n// for paste-and-run import.\nconst WEBHOOK_SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887'; // ⚠️ HARDCODED SECRET\nconst APP_BASE_URL = 'https://vagrancy-pupil-spiritism.ngrok-free.dev'; // ⚠️ HARDCODED ngrok URL\nconst crypto = require('crypto');\nconst headers = $input.first().json.headers || {};\nconst given = headers['x-n8n-signature'];\nconst ts    = headers['x-n8n-timestamp'];\nconst rid   = headers['x-n8n-request-id'];\nif (!given || !ts || !rid) throw new Error('Missing required HMAC headers');\nconst drift = Math.abs(Date.now() - Date.parse(ts));\nif (drift > 5 * 60 * 1000) throw new Error(`Timestamp drift ${drift}ms > 5 min`);\nconst rawBody = JSON.stringify($input.first().json.body);\nconst expected = crypto.createHmac('sha256', WEBHOOK_SECRET).update(rawBody).digest('hex');\nif (expected !== given) throw new Error('HMAC signature mismatch');\nconst body = $input.first().json.body || {};\nif (!body.brand_id || !body.slug) throw new Error('brand_id and slug are required');\nreturn { json: {\n  brand_id:         body.brand_id,\n  slug:             body.slug,\n  instagram_handle: body.instagram_handle || null,\n  website_url:      body.website_url || null,\n  place_search:     body.place_search || { name: '', city: '' },\n  form_payload:     body.form_payload || {},\n  request_id:       rid,\n  _secret:          WEBHOOK_SECRET,\n  _base:            APP_BASE_URL,\n}};"
+      },
+      "id": "7e3dcd73-2a9a-4820-bb5a-8f9af9ded0b5",
+      "name": "Verify HMAC + parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18384,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"brand_id\": \"{{ $json.brand_id }}\", \"queued\": true }",
+        "options": {}
+      },
+      "id": "206a5f30-494a-4518-9b14-15dea9869e11",
+      "name": "Respond 202 · queued",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -18208,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// GAP 5 fix — emit stage='form_submitted' BEFORE work, not after.\n// Live UI shows pipeline transitions accurately.\nconst crypto = require('crypto');\nconst d = $('Verify HMAC + parse').first().json;\nconst body = JSON.stringify({ brand_id: d.brand_id, stage: 'form_submitted' });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(body).digest('hex');\nreturn { json: { ...d, _stage_url: d._base + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "28d220ca-32d7-48bd-a3b1-a1b8b8083535",
+      "name": "Sign · stage form_submitted",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18016,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "c1887a19-8fcc-4b39-ba24-21f7b1091530",
+      "name": "POST · stage form_submitted",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -17840,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the body for the CEO classify call.\n// Reads form_payload.review for critical fields + occasion_flags from top-level payload.\nconst d = $('Verify HMAC + parse').first().json;\nconst review = (d.form_payload && d.form_payload.review) || {};\nconst nonEmpty = (v) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0);\nconst critical = {\n  arabic_dialect:           nonEmpty(review.arabic_dialect),\n  brand_differentiator:     nonEmpty(review.brand_differentiator) && String(review.brand_differentiator).trim().length >= 20,\n  price_position:           nonEmpty(review.price_position),\n  primary_channel:          nonEmpty(review.primary_channel),\n  primary_kpi_type:         nonEmpty(review.primary_kpi_type),\n  religious_sensitivity:    nonEmpty(review.religious_sensitivity),\n  bilingual_ratio:          nonEmpty(review.bilingual_ratio),\n  formality_level:          nonEmpty(review.formality_level),\n  humor_tolerance:          nonEmpty(review.humor_tolerance),\n  tone_anti_attribute_ids:  Array.isArray(review.tone_anti_attribute_ids) && review.tone_anti_attribute_ids.length > 0,\n  ramadan_relevance:        nonEmpty(review.ramadan_relevance),\n  intent_state:             nonEmpty(review.intent_state),\n};\nconst providedCount = Object.values(critical).filter(Boolean).length;\n// Read occasion_flags from top-level payload (passed by submitFinal from form occasions_ranked)\nconst occasionFlags = Array.isArray(d.occasion_flags) && d.occasion_flags.length > 0 ? d.occasion_flags : ['none'];\nreturn { json: {\n  ...d,\n  body: {\n    flow_id: 'N8N-A03',\n    brand_id: d.brand_id,\n    payload: {\n      request_type: 'onboarding_new',\n      trigger_payload: {\n        slug: d.slug,\n        has_instagram: !!d.instagram_handle,\n        has_website: !!d.website_url,\n        intake_form_complete: providedCount >= 11,\n        critical_fields_provided_count: providedCount,\n        critical_fields_provided: critical,\n      },\n      occasion_flags: occasionFlags,\n      current_month_spend_usd: 0,\n      monthly_ceiling_usd: 50,\n    },\n  },\n}};"
+      },
+      "id": "b9bd206a-daa5-4ea3-9ec7-ce719bc07242",
+      "name": "Build CEO body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17664,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign the CEO classify body.\nconst crypto = require('crypto');\nconst d = $json;\nconst body = JSON.stringify(d.body);\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(body).digest('hex');\nreturn { json: { ...d, _ceo_url: d._base + '/api/agents/ceo/classify', _ceo_body: body, _ceo_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "6fdee252-ed93-4538-928e-6f43e3509aa2",
+      "name": "Sign · CEO classify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17488,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._ceo_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._ceo_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._ceo_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._ceo_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._ceo_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._ceo_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 90000
+        }
+      },
+      "id": "33a87978-60fe-49f9-bf8e-d7e18feb9473",
+      "name": "POST · /api/agents/ceo/classify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -17296,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse CEO result. confidence_mode === 'Blocked' short-circuits.\nconst ceoResp = $input.first().json;\nconst decision = ceoResp.result?.decision || ceoResp.decision || {};\nconst blocked = decision.confidence_mode === 'Blocked';\nreturn { json: {\n  blocked,\n  decision,\n  ...$('Verify HMAC + parse').first().json,\n}};"
+      },
+      "id": "514138b6-c73a-4e51-9d02-9235320ab8b5",
+      "name": "Parse CEO result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17120,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// GAP 5 — emit stage=ceo_classified BEFORE the IF branch so the live UI\n// shows the step transition immediately.\nconst crypto = require('crypto');\nconst d = $json;\nconst body = JSON.stringify({ brand_id: d.brand_id, stage: 'ceo_classified', metadata: { confidence_mode: d.decision?.confidence_mode ?? null }});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(body).digest('hex');\nreturn { json: { ...d, _stage_url: d._base + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "8c6159a3-a040-48c6-b391-1426acbbc452",
+      "name": "Sign · stage ceo_classified",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16944,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "d3106236-a206-4549-9dc2-a0e92fa7a8e1",
+      "name": "POST · stage ceo_classified",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -16768,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Parse CEO result').first().json.blocked }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a17220af-a17e-460d-aa3e-8562b54d7f62",
+      "name": "IF · Blocked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -16576,
+        -5424
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Emit stage=blocked so UI shows blocked state immediately.\nconst crypto = require('crypto');\nconst d = $('Verify HMAC + parse').first().json;\nconst decision = $('Parse CEO result').first().json.decision || {};\nconst body = JSON.stringify({\n  brand_id: d.brand_id,\n  stage: 'blocked',\n  metadata: {\n    stage: 'blocked',\n    confidence_mode: 'Blocked',\n    human_gate_required: true,\n    human_gate_reasons: decision.human_gate_reasons || [],\n    reasoning: decision.reasoning || 'Pipeline blocked — complete the onboarding form and retry.'\n  }\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(body).digest('hex');\nreturn { json: { ...d, _stage_url: d._base + '/api/processing/stage', _stage_body: body, _stage_headers: { 'content-type': 'application/json', 'x-n8n-signature': sig, 'x-n8n-request-id': reqId, 'x-n8n-timestamp': ts } } };"
+      },
+      "id": "734161a0-6526-468e-97f9-956d432c5654",
+      "name": "Sign · blocked stage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16240,
+        -5840
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 5000
+        }
+      },
+      "id": "adef4823-e56e-45d9-9e90-2369b7877cca",
+      "name": "POST · blocked stage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -16064,
+        -5840
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"blocked\": true, \"reason\": \"Confidence mode is Blocked — onboarding paused awaiting human review\" }",
+        "options": {}
+      },
+      "id": "d28a5b92-339b-4ac9-a39f-10e3e45a845b",
+      "name": "Respond · Blocked",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -15808,
+        -5840
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign /api/extraction/source-records — replaces the Supabase LOAD node\n// (Gap 4). n8n now needs ZERO DB credentials.\nconst crypto = require('crypto');\nconst d = $('Parse CEO result').first().json;\nconst body = JSON.stringify({ brand_id: d.brand_id });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(body).digest('hex');\nreturn { json: { ...d, _src_url: d._base + '/api/extraction/source-records', _src_body: body, _src_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "71192732-9b29-4e83-b6e6-a74424f76d20",
+      "name": "Sign · load source_records",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16400,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._src_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._src_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._src_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._src_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._src_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._src_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "fb80738d-4b61-4eef-85c1-dcc238eaf286",
+      "name": "POST · load source_records",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -16224,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Consolidate extractions — GAP 1 + GAP 3 fix.\n// • Reads the API response (which already returns the consolidated shape\n//   from migration 0028's `normalised` column with legacy fallbacks).\n// • Detects PRE-LAUNCH brands: 0 sources from any lane → flag so COO\n//   uses form-only Vulnerability-Method default and skips scrape inference.\nconst api = $input.first().json;\nconst extractions = api.extractions || { instagram: null, website: null, places: null };\nconst raw = api.raw || { instagram: null, website: null, places: null };\nconst sourcesCount = api.sources_count || 0;\nconst d = $('Parse CEO result').first().json;\nconst review = (d.form_payload && d.form_payload.review) || {};\nconst hasFormSignal = !!(review.brand_differentiator || review.arabic_dialect || review.intent_state);\n// Pre-launch = no scraped sources AND we have form signal to fall back on.\nconst isPreLaunch = sourcesCount === 0 && hasFormSignal;\nreturn { json: {\n  ...d,\n  ceo_decision: d.decision,\n  extractions,\n  raw_extractions: raw,\n  sources_count: sourcesCount,\n  is_pre_launch: isPreLaunch,\n  data_richness: sourcesCount === 0 ? 'form_only' : sourcesCount === 1 ? 'single_source' : sourcesCount === 2 ? 'partial' : 'rich',\n}};"
+      },
+      "id": "fff3df40-b4a5-4729-96ab-95ea7076389a",
+      "name": "Consolidate extractions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16048,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// GAP 5 — stage scraping_complete BEFORE the snapshot write.\nconst crypto = require('crypto');\nconst d = $json;\nconst body = JSON.stringify({\n  brand_id: d.brand_id,\n  stage: 'scraping_complete',\n  metadata: {\n    sources_count: d.sources_count,\n    data_richness: d.data_richness,\n    is_pre_launch: d.is_pre_launch,\n    has_instagram: !!d.extractions.instagram,\n    has_website: !!d.extractions.website,\n    has_places: !!d.extractions.places,\n  },\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(body).digest('hex');\nreturn { json: { ...d, _stage_url: d._base + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "7df059a4-20a7-4fec-923e-046cf53ba64b",
+      "name": "Sign · stage scraping_complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -15856,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "735fdaf4-b845-4352-a91f-3a69c8d8985c",
+      "name": "POST · stage scraping_complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -15680,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build COO build-branddna body.\n// GAP 2 — explicitly request three-axis inference + method profile so\n// COO Pass 3 produces archetype_primary / lifecycle_stage / intent_state\n// AND a method composition (per Three-Axis Framework v2 §Composition Matrix).\n// GAP 3 — pre-launch brands tell COO to default to Vulnerability Method\n// and skip scrape-derived inference (form-only).\n// NOTE: $json here is the stage-emit API response (no _secret/_base/etc),\n// so we pull state from Verify HMAC + Consolidate extractions explicitly.\nconst d = $('Consolidate extractions').first().json;\nconst v = $('Verify HMAC + parse').first().json;\nconst review = (d.form_payload && d.form_payload.review) || {};\nreturn { json: {\n  ...d,\n  _secret: v._secret,\n  _base:   v._base,\n  body: {\n    flow_id: 'N8N-A03',\n    brand_id: d.brand_id,\n    payload: {\n      form_answers:                d.form_payload,\n      instagram_extraction:        d.extractions.instagram,\n      website_extraction:          d.extractions.website,\n      google_business_extraction:  d.extractions.places,\n      raw_instagram:               d.raw_extractions?.instagram ?? null,\n      request_axes: {\n        archetype_primary:    true,\n        archetype_secondary:  true,\n        lifecycle_stage:      true,\n        intent_state:         true,\n      },\n      method_profile_request: {\n        compose: true,\n        default_method: d.is_pre_launch ? 'Vulnerability' : null,\n        score_threshold: 80,\n      },\n      data_richness:    d.data_richness,\n      is_pre_launch:    d.is_pre_launch,\n      form_dialect:     review.arabic_dialect ?? null,\n      // GAP 9 — thread the Three-Axis Framework v2 form priors so COO\n      // can anchor axis_inference + method composition on user-stated\n      // values, not just scraped evidence. All optional/nullable.\n      form_priors: {\n        archetype_primary:        review.archetype_primary ?? null,\n        lifecycle_stage:          review.lifecycle_stage ?? null,\n        intent_state:             review.intent_state ?? null,\n        primary_kpi_type:         review.primary_kpi_type ?? null,\n        primary_channel:          review.primary_channel ?? null,\n        bilingual_ratio:          review.bilingual_ratio ?? null,\n        formality_level:          review.formality_level ?? null,\n        humor_tolerance:          review.humor_tolerance ?? null,\n        religious_sensitivity:    review.religious_sensitivity ?? null,\n        ramadan_relevance:        review.ramadan_relevance ?? null,\n        tone_anti_attribute_ids:  review.tone_anti_attribute_ids ?? null,\n        price_position:           review.price_position ?? null,\n        brand_differentiator:     review.brand_differentiator ?? null,\n      },\n    },\n  },\n}};"
+      },
+      "id": "84c81ab8-8f76-4757-b57a-19088b963f4c",
+      "name": "Build COO body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -15504,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst d = $json;\nconst body = JSON.stringify(d.body);\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(body).digest('hex');\nreturn { json: { ...d, _coo_url: d._base + '/api/agents/coo/build-branddna', _coo_body: body, _coo_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "e5bf940b-4782-4475-8b1a-ca49cd54e0af",
+      "name": "Sign · COO build-branddna",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -15328,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._coo_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._coo_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._coo_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._coo_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._coo_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._coo_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "6e97d14a-61fe-4e23-83ab-d547b947f6e4",
+      "name": "POST · /api/agents/coo/build-branddna",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -15136,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// GAP 5 — stage coo_branddna_built BEFORE memory drain.\nconst crypto = require('crypto');\nconst d = $('Build COO body').first().json;\nconst cooResult = $input.first().json.result || $input.first().json;\nconst body = JSON.stringify({\n  brand_id: d.brand_id,\n  stage: 'coo_branddna_built',\n  metadata: {\n    completeness_score:  cooResult.completeness_score ?? null,\n    dialect_confirmed:   cooResult.dialect_confirmed ?? false,\n    field_nominations:   (cooResult.field_nominations || []).length,\n    method_profile:      cooResult.method_profile?.method_name ?? null,\n    archetype_primary:   cooResult.axis_inference?.archetype_primary ?? null,\n    lifecycle_stage:     cooResult.axis_inference?.lifecycle_stage ?? null,\n    intent_state:        cooResult.axis_inference?.intent_state ?? null,\n  },\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(body).digest('hex');\nreturn { json: { ...d, _coo_full_result: cooResult, _stage_url: d._base + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "af549e84-1d09-4180-91fd-05b1ab123330",
+      "name": "Sign · stage coo_branddna_built",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -14960,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "5e1417e0-2c75-4961-bad2-b7788910a8ad",
+      "name": "POST · stage coo_branddna_built",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -14784,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// GAP 3 — Doc §5.3 step 5: SECOND CEO call (confidence gate / refinement).\n// First CEO call (step 1) routed with no evidence. Now COO has produced\n// real field_nominations + axis_inference, so CEO can re-classify with\n// actual evidence_bundle_states and upgrade/downgrade confidence_mode.\nconst crypto = require('crypto');\nconst v = $('Verify HMAC + parse').first().json;\nconst coo = $('Sign · stage coo_branddna_built').first().json._coo_full_result || {};\n// Build evidence_bundle_states map: field_path → confidence_state.\nconst evidence = {};\nfor (const n of (coo.field_nominations || [])) {\n  if (n && n.field_path && n.confidence_state) {\n    evidence[n.field_path] = n.confidence_state;\n  }\n}\nconst body = JSON.stringify({\n  flow_id: 'N8N-A03',\n  brand_id: v.brand_id,\n  payload: {\n    request_type: 'onboarding_new',\n    trigger_payload: {\n      slug: v.slug,\n      pass: 'confidence_gate_post_coo',\n      coo_completeness:    coo.completeness_score ?? null,\n      coo_dialect_confirmed: !!coo.dialect_confirmed,\n      method_recommended:  coo.method_profile?.method_name ?? null,\n      archetype_primary:   coo.axis_inference?.archetype_primary ?? null,\n      lifecycle_stage:     coo.axis_inference?.lifecycle_stage ?? null,\n      intent_state:        coo.axis_inference?.intent_state ?? null,\n    },\n    evidence_bundle_states: evidence,\n    occasion_flags: ['none'],\n    current_month_spend_usd: 0,\n    monthly_ceiling_usd: 50,\n  },\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', v._secret).update(body).digest('hex');\nreturn { json: {\n  brand_id: v.brand_id,\n  _secret: v._secret, _base: v._base,\n  _gate_url: v._base + '/api/agents/ceo/classify',\n  _gate_body: body,\n  _gate_headers: {\n    'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts,\n  },\n}};"
+      },
+      "id": "97ef3a6f-b67c-4775-9679-4e767540ba22",
+      "name": "Sign · CEO confidence gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -14560,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._gate_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._gate_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._gate_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._gate_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._gate_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._gate_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 90000
+        }
+      },
+      "id": "566bd8f9-e818-4743-8a01-e3fbe9defd9b",
+      "name": "POST · CEO confidence gate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -14368,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// GAP 10 — emit a visible stage transition between the second CEO call\n// and the Memory Controller drain, so the live tracker doesn't jump from\n// coo_branddna_built straight to memory_drained.\nconst crypto = require('crypto');\nconst v = $('Verify HMAC + parse').first().json;\nconst gateResp = $input.first().json || {};\nconst decision = gateResp?.result?.decision || gateResp?.decision || {};\nconst body = JSON.stringify({\n  brand_id: v.brand_id,\n  stage: 'ceo_confidence_refined',\n  metadata: {\n    confidence_mode:     decision.confidence_mode ?? null,\n    human_gate_required: !!decision.human_gate_required,\n    human_gate_reasons:  decision.human_gate_reasons ?? [],\n    pipeline_assigned:   decision.pipeline_assigned ?? null,\n    gate_ok:             !!(gateResp?.ok ?? false),\n  },\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', v._secret).update(body).digest('hex');\nreturn { json: { brand_id: v.brand_id, _secret: v._secret, _base: v._base, _stage_url: v._base + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "91c30af5-1234-42a5-bc40-f1e3c6f8db1c",
+      "name": "Sign · stage ceo_confidence_refined",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -14112,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "77adebf5-d9d5-4900-851b-a01c7765c2dd",
+      "name": "POST · stage ceo_confidence_refined",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -13840,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// $json here is the stage-emit API response — no _secret. Pull from Verify HMAC.\nconst crypto = require('crypto');\nconst v = $('Verify HMAC + parse').first().json;\nconst memBody = { flow_id: 'N8N-A03', batch_size: 100 };\nconst innerBody = JSON.stringify(memBody);\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', v._secret).update(innerBody).digest('hex');\nreturn { json: {\n  brand_id: v.brand_id,\n  _secret: v._secret, _base: v._base,\n  _mem_url: v._base + '/api/memory/process',\n  _mem_body: innerBody,\n  _mem_headers: {\n    'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts,\n  },\n}};"
+      },
+      "id": "a8abe42d-009c-4322-90b2-f2fa62c1168d",
+      "name": "Sign · Memory process",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -13552,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._mem_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._mem_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._mem_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._mem_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._mem_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._mem_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 90000
+        }
+      },
+      "id": "90084da0-a013-4bae-aa5a-47ff3aa6fd0a",
+      "name": "POST · /api/memory/process",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -13360,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// GAP 5 — stage memory_drained BEFORE qdrant + final snapshot.\nconst crypto = require('crypto');\nconst d = $('Sign · Memory process').first().json;\nconst memResult = $input.first().json.result || $input.first().json;\nconst body = JSON.stringify({ brand_id: d.brand_id, stage: 'memory_drained', metadata: { written: memResult.written ?? 0, rejected: memResult.rejected ?? 0 } });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(body).digest('hex');\nreturn { json: { ...d, _mem_full_result: memResult, _stage_url: d._base + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "166bd6cb-e3ff-4f51-8831-18f53bcbd38f",
+      "name": "Sign · stage memory_drained",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -13184,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "b222a3f8-99c8-4d8a-88f7-d7c05ba39efa",
+      "name": "POST · stage memory_drained",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -13008,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign /api/vectors/setup body. Best-effort — Qdrant failure is non-fatal.\n// $json here is the stage-emit API response — pull state from Verify HMAC.\nconst crypto = require('crypto');\nconst v = $('Verify HMAC + parse').first().json;\nconst body = JSON.stringify({ brand_id: v.brand_id, flow_id: 'N8N-A03' });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', v._secret).update(body).digest('hex');\nreturn { json: {\n  brand_id: v.brand_id,\n  _secret: v._secret, _base: v._base,\n  _q_url: v._base + '/api/vectors/setup',\n  _q_body: body,\n  _q_headers: {\n    'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts,\n  },\n}};"
+      },
+      "id": "448644a3-7efa-459a-a92e-74a7f00bcba5",
+      "name": "Sign · qdrant setup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -12800,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._q_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._q_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._q_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._q_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._q_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._q_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 70000
+        }
+      },
+      "id": "77663c3a-01a5-4937-b31f-2b14da20175b",
+      "name": "POST · /api/vectors/setup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -12608,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the FULL final snapshot.\n// GAP 4 — emit via /api/processing/stage with mark_complete=true. Replaces 2\n// Supabase nodes. GAP 6 — lenient dialect_confirmed (COO explicit OR form\n// dialect + axis_inference present). GAP 3 — refined confidence_mode from\n// the SECOND CEO call (post-COO confidence gate). GAP 7 — surface\n// archetype_secondary so A01 sees the composition pair. GAP 8 — validate\n// method_name against the 6 framework methods (Three-Axis v2).\nconst crypto = require('crypto');\nconst d = $('Build COO body').first().json;\nconst coo = $('Sign · stage coo_branddna_built').first().json._coo_full_result || {};\nconst memory = $('Sign · stage memory_drained').first().json._mem_full_result || {};\nconst consolidated = $('Consolidate extractions').first().json;\nconst extractions = consolidated.extractions;\nconst review = (d.form_payload && d.form_payload.review) || {};\nconst dialectConfirmed = !!coo.dialect_confirmed || !!(review.arabic_dialect && coo.axis_inference?.lifecycle_stage);\n// GAP 8 — Three-Axis Framework v2: the only 6 valid method names.\nconst VALID_METHODS = ['Authenticity','Heritage','Metaphor','Paradox','Diagnostic','Vulnerability'];\nconst rawMethodName = coo.method_profile?.method_name ?? null;\nconst methodValid = !!rawMethodName && VALID_METHODS.includes(rawMethodName);\nif (rawMethodName && !methodValid) {\n  console.warn('[A03] method_name out of framework set:', rawMethodName);\n}\n// Pull refined confidence_mode from the post-COO confidence gate when present.\n// If the gate failed (neverError swallows it), fall back to the first CEO\n// classify result which is always available.\nlet refinedDecision = null;\ntry {\n  const gateResp = $('POST · CEO confidence gate').first().json;\n  refinedDecision = gateResp?.result?.decision || gateResp?.decision || null;\n} catch (_) { /* gate node never ran — keep first CEO decision */ }\nconst firstDecision = $('Parse CEO result').first().json.decision || {};\nconst confidenceMode = refinedDecision?.confidence_mode || firstDecision.confidence_mode || 'Cautious';\nconst snapshotData = {\n  stage: 'snapshot_ready',\n  completeness:            coo.completeness_score ?? 70,\n  dialect_confirmed:       dialectConfirmed,\n  field_nominations_total: (coo.field_nominations || []).length,\n  memory_written:          memory.written ?? 0,\n  memory_rejected:         memory.rejected ?? 0,\n  extractions,\n  axis_inference:          coo.axis_inference ?? null,\n  // GAP 7 — pair surfaces so A01 / downstream can do composition lookups.\n  archetype_primary:       coo.axis_inference?.archetype_primary ?? null,\n  archetype_secondary:     coo.axis_inference?.archetype_secondary ?? null,\n  lifecycle_stage:         coo.axis_inference?.lifecycle_stage ?? null,\n  intent_state:            coo.axis_inference?.intent_state ?? null,\n  method_profile:          coo.method_profile ?? null,\n  method_name:             methodValid ? rawMethodName : null,\n  method_valid:            methodValid,\n  coo_reasoning:           coo.reasoning ?? null,\n  // GAP 5 — pre-launch flag rides the snapshot so the A01 readiness IF\n  // can short-circuit (no scraped content → no calendar evidence).\n  is_pre_launch:           !!consolidated.is_pre_launch,\n  data_richness:           consolidated.data_richness ?? null,\n  // GAP 3 — refined CEO verdict (vs the initial pre-COO routing).\n  confidence_mode:         confidenceMode,\n  confidence_refined:      !!refinedDecision,\n  human_gate_required:     !!(refinedDecision || firstDecision).human_gate_required,\n  human_gate_reasons:      (refinedDecision || firstDecision).human_gate_reasons || [],\n};\nconst body = JSON.stringify({\n  brand_id: d.brand_id,\n  stage: 'snapshot_ready',\n  metadata: snapshotData,\n  mark_complete: true,\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(body).digest('hex');\nreturn { json: { ...d, _snapshot_data: snapshotData, _stage_url: d._base + '/api/processing/stage', _stage_body: body, _stage_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "17c333df-a62d-4110-a0d4-e442693b46d1",
+      "name": "Build + sign final snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -12432,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "6241bc86-abaf-42b7-a687-6976896d9d37",
+      "name": "POST · final snapshot + mark complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -12256,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Status callback to /api/webhooks/n8n.\nconst crypto = require('crypto');\nconst d = $('Build + sign final snapshot').first().json;\nconst snap = d._snapshot_data;\nconst innerBody = JSON.stringify({\n  event_type: 'onboarding_complete',\n  flow_id: 'N8N-A03',\n  brand_id: d.brand_id,\n  payload: {\n    completeness_score: snap.completeness,\n    dialect_confirmed: snap.dialect_confirmed,\n    memory_written: snap.memory_written,\n    method_profile: snap.method_profile?.method_name ?? null,\n    archetype_primary: snap.axis_inference?.archetype_primary ?? null,\n    lifecycle_stage: snap.axis_inference?.lifecycle_stage ?? null,\n    intent_state: snap.axis_inference?.intent_state ?? null,\n  },\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', d._secret).update(innerBody).digest('hex');\nreturn { json: { ...d, _cb_url: d._base + '/api/webhooks/n8n', _cb_body: innerBody, _cb_headers: {\n  'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts\n}}};"
+      },
+      "id": "8e93bc91-919a-4d1b-bf39-20a77e93450f",
+      "name": "Sign · status callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -12080,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._cb_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._cb_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._cb_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._cb_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._cb_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._cb_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "cbad4f00-ca1c-4bc6-bf32-dd493d4a2cc4",
+      "name": "POST · /api/webhooks/n8n (status)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -11888,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-completeness",
+              "leftValue": "={{ $('Build + sign final snapshot').first().json._snapshot_data.completeness ?? 0 }}",
+              "rightValue": 40,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "cond-dialect",
+              "leftValue": "={{ $('Build + sign final snapshot').first().json._snapshot_data.dialect_confirmed ?? false }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "cond-not-blocked",
+              "leftValue": "={{ $('Build + sign final snapshot').first().json._snapshot_data.confidence_mode ?? 'Cautious' }}",
+              "rightValue": "Blocked",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "cond-not-blocked-hard",
+              "leftValue": "={{ $('Build + sign final snapshot').first().json._snapshot_data.onboarding_status ?? '' }}",
+              "rightValue": "failed",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0b0d7773-3be3-4584-825b-9d3511b7b188",
+      "name": "IF · ready for A01?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -11696,
+        -5312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogzstudios.app.n8n.cloud/webhook/openclaw-batch-calendar",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ brand_id: $('Verify HMAC + parse').first().json.brand_id, source: 'N8N-A03', auto_triggered: true }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "0e1df761-e6a0-4ac6-9651-f14ee07098cb",
+      "name": "POST · trigger N8N-A01",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -11344,
+        -5520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// GAP 2 — Doc §5.3 step 9. Emitted when completeness_score < 40 OR\n// dialect_unconfirmed. Builds 3 gap questions for the user from the COO's\n// `critical_fields_missing` array (or, if absent, derives from\n// field_nominations confidence_state). UI reads brand_snapshots.snapshot_data.\n// .gap_questions[] and asks the user to fill them in.\nconst crypto = require('crypto');\nconst v = $('Verify HMAC + parse').first().json;\nconst snap = $('Build + sign final snapshot').first().json._snapshot_data || {};\nconst coo = $('Sign · stage coo_branddna_built').first().json._coo_full_result || {};\n// Prefer COO's explicit critical_fields_missing; fall back to deriving from\n// field_nominations (any with confidence < inferred_medium).\nlet missing = Array.isArray(coo.critical_fields_missing) ? coo.critical_fields_missing.slice() : [];\nif (missing.length === 0) {\n  for (const n of (coo.field_nominations || [])) {\n    if (n && (n.confidence_state === 'inferred_low' || n.confidence_state === 'rejected' || !n.confidence_state)) {\n      missing.push(n.field_path);\n    }\n  }\n}\n// Field-name → human-friendly question. Doc-anchored vocab.\nconst QUESTIONS = {\n  arabic_dialect:           'Which Arabic dialect best matches your brand voice — Najdi, Hejazi, Gulf, MSA accessible, MSA formal, or Mixed?',\n  brand_differentiator:     'In one or two sentences, what makes this brand distinctive vs. competitors?',\n  primary_color_hex:        'What is your primary brand color (hex code)?',\n  archetype_primary:        'Which Jungian archetype best fits this brand — Hero, Sage, Lover, Outlaw, Caregiver, Magician, Explorer, Innocent, Jester, Everyman, Ruler, or Creator?',\n  lifecycle_stage:          'Where is this brand in its lifecycle — pre_launch, launch, growth, maturity, or recovery?',\n  intent_state:             'What is your primary intent this month — launch, grow, defend, harvest, or recover?',\n  primary_kpi_type:         'What is the primary KPI you optimise for — engagement, conversion, awareness, or trust?',\n  religious_sensitivity:    'How religiously sensitive should the brand voice be — Low, Medium, or High?',\n  bilingual_ratio:          'What Arabic-vs-English ratio fits — arabic_only, arabic_primary, balanced, or english_primary?',\n  formality_level:          'Pick the formality level — casual, semi_formal, or formal.',\n  humor_tolerance:          'Pick the humor tolerance — none, light, or moderate.',\n  tone_anti_attribute_ids:  'Which tones should this brand NEVER sound like? (pick from: aggressive, salesy, flashy, edgy, ironic, formal_corporate, casual_humor, western_casual)',\n  ramadan_relevance:        'How relevant is Ramadan to your campaigns — Critical, High, Medium, Low, or Not_relevant?',\n  primary_channel:          'Which platform is your primary channel — Instagram, Snapchat, TikTok, or Twitter?',\n};\n// Map raw field paths (which may include namespaces) to base names.\nconst seen = new Set();\nconst topThree = [];\nfor (const fp of missing) {\n  const base = String(fp).split('.').pop();\n  if (!base || seen.has(base)) continue;\n  seen.add(base);\n  if (QUESTIONS[base]) {\n    topThree.push({ field: base, question: QUESTIONS[base] });\n    if (topThree.length === 3) break;\n  }\n}\n// If COO didn't surface anything but the gate failed (e.g. dialect_unconfirmed\n// with no field_nominations populated), seed at least the dialect question\n// so the user has something to act on.\nif (topThree.length === 0 && !snap.dialect_confirmed) {\n  topThree.push({ field: 'arabic_dialect', question: QUESTIONS.arabic_dialect });\n}\n// Suppression: if the form is complete (no real gaps), use a self-resolving\n// stage emission instead of a user-facing gap. /api/processing/stage with\n// stage='gap_notification' + metadata.gap_questions=[] is treated as a benign\n// audit row by the UI (no banner shown). Better than failing the HTTP node.\nconst metadata = topThree.length === 0\n  ? { reason: 'suppressed_no_gaps', completeness: snap.completeness ?? 0, dialect_confirmed: !!snap.dialect_confirmed, gap_questions: [], human_gate_reasons: snap.human_gate_reasons || [], suppressed: true }\n  : {\n  reason: snap.completeness < 40 ? 'low_completeness' : 'dialect_unconfirmed',\n  completeness: snap.completeness ?? 0,\n  dialect_confirmed: !!snap.dialect_confirmed,\n  gap_questions: topThree,\n  human_gate_reasons: snap.human_gate_reasons || [],\n};\nconst body = JSON.stringify({\n  brand_id: v.brand_id,\n  stage: 'gap_notification',\n  metadata,\n});\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', v._secret).update(body).digest('hex');\nreturn { json: {\n  brand_id: v.brand_id,\n  _secret: v._secret, _base: v._base,\n  _stage_url: v._base + '/api/processing/stage',\n  _stage_body: body,\n  _stage_headers: {\n    'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':reqId,'x-n8n-timestamp':ts,\n  },\n}};"
+      },
+      "id": "26c2184d-66b9-4168-b925-e6631aac3f9a",
+      "name": "Sign · gap notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11504,
+        -5232
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._stage_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "2afbb9f0-3b65-4d4a-b445-a41961b38af7",
+      "name": "POST · gap notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -11312,
+        -5232
+      ]
+    }
+  ],
+  "connections": {
+    "On Error": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage=failed": {
+      "main": [
+        [
+          {
+            "node": "POST · stage=failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build S03 alert1": {
+      "main": [
+        [
+          {
+            "node": "POST · S03 anomaly-alert1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sign · stage=failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook · /openclaw-onboarding": {
+      "main": [
+        [
+          {
+            "node": "Verify HMAC + parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify HMAC + parse": {
+      "main": [
+        [
+          {
+            "node": "Respond 202 · queued",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 202 · queued": {
+      "main": [
+        [
+          {
+            "node": "Sign · stage form_submitted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage form_submitted": {
+      "main": [
+        [
+          {
+            "node": "POST · stage form_submitted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage form_submitted": {
+      "main": [
+        [
+          {
+            "node": "Build CEO body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build CEO body": {
+      "main": [
+        [
+          {
+            "node": "Sign · CEO classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · CEO classify": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/agents/ceo/classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/agents/ceo/classify": {
+      "main": [
+        [
+          {
+            "node": "Parse CEO result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse CEO result": {
+      "main": [
+        [
+          {
+            "node": "Sign · stage ceo_classified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage ceo_classified": {
+      "main": [
+        [
+          {
+            "node": "POST · stage ceo_classified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage ceo_classified": {
+      "main": [
+        [
+          {
+            "node": "IF · Blocked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF · Blocked?": {
+      "main": [
+        [
+          {
+            "node": "Sign · blocked stage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sign · load source_records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · blocked stage": {
+      "main": [
+        [
+          {
+            "node": "POST · blocked stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · blocked stage": {
+      "main": [
+        [
+          {
+            "node": "Respond · Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · load source_records": {
+      "main": [
+        [
+          {
+            "node": "POST · load source_records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · load source_records": {
+      "main": [
+        [
+          {
+            "node": "Consolidate extractions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consolidate extractions": {
+      "main": [
+        [
+          {
+            "node": "Sign · stage scraping_complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage scraping_complete": {
+      "main": [
+        [
+          {
+            "node": "POST · stage scraping_complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage scraping_complete": {
+      "main": [
+        [
+          {
+            "node": "Build COO body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build COO body": {
+      "main": [
+        [
+          {
+            "node": "Sign · COO build-branddna",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · COO build-branddna": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/agents/coo/build-branddna",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/agents/coo/build-branddna": {
+      "main": [
+        [
+          {
+            "node": "Sign · stage coo_branddna_built",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage coo_branddna_built": {
+      "main": [
+        [
+          {
+            "node": "POST · stage coo_branddna_built",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage coo_branddna_built": {
+      "main": [
+        [
+          {
+            "node": "Sign · CEO confidence gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · CEO confidence gate": {
+      "main": [
+        [
+          {
+            "node": "POST · CEO confidence gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · CEO confidence gate": {
+      "main": [
+        [
+          {
+            "node": "Sign · stage ceo_confidence_refined",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage ceo_confidence_refined": {
+      "main": [
+        [
+          {
+            "node": "POST · stage ceo_confidence_refined",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage ceo_confidence_refined": {
+      "main": [
+        [
+          {
+            "node": "Sign · Memory process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · Memory process": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/memory/process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/memory/process": {
+      "main": [
+        [
+          {
+            "node": "Sign · stage memory_drained",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · stage memory_drained": {
+      "main": [
+        [
+          {
+            "node": "POST · stage memory_drained",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage memory_drained": {
+      "main": [
+        [
+          {
+            "node": "Sign · qdrant setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · qdrant setup": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/vectors/setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/vectors/setup": {
+      "main": [
+        [
+          {
+            "node": "Build + sign final snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build + sign final snapshot": {
+      "main": [
+        [
+          {
+            "node": "POST · final snapshot + mark complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · final snapshot + mark complete": {
+      "main": [
+        [
+          {
+            "node": "Sign · status callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · status callback": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/webhooks/n8n (status)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/webhooks/n8n (status)": {
+      "main": [
+        [
+          {
+            "node": "IF · ready for A01?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF · ready for A01?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Sign · gap notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · gap notification": {
+      "main": [
+        [
+          {
+            "node": "POST · gap notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6b82bfa883d8b0ed7859b6f0ce362a41be2730aad080ae279216f1911379c19c"
+  }
+}

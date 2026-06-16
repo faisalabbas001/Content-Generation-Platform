@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# n8n flow exports — git hygiene
+#
+# Flow JSONs can contain hardcoded secrets (HMAC secret, Supabase service-role
+# key, API keys, private ngrok URLs). N8N-A01 and N8N-V01-Worker have been
+# externalized to $vars and are safe to commit. The flows listed below still
+# carry inline secrets — keep them OUT of git until their secrets are moved to
+# n8n Credentials/Variables.
+#
+# IMPORTANT: .gitignore does NOT untrack files already committed. For any flow
+# below that `git ls-files` still shows as tracked, run:
+#     git rm --cached "n8n/flows/<file>.json"
+# (keeps your local copy) and rotate the exposed secret — it remains in history.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Local backups & helper scripts produced during refactors — never commit
+*.backup-*
+*.bak
+_*.py
+
+# ── Flows still holding inline secrets (DO NOT COMMIT) ───────────────────────
+N8N-A03-onboarding.json
+N8N-A04-brand-correction.json
+N8N-A05-monthly-cycle.json
+N8N-A06-extraction.json
+N8N-A07-competitor-extraction.json
+N8N-D02-maintenance.json
+N8N-P01-instagram-publisher.json
+N8N-S03-anomaly-router.json
+
+# Belt-and-suspenders: ignore ANY *Testing Mode* export (these inline secrets
+# by design) and any ad-hoc secret-bearing export not yet hardened.
+*Testing Mode*.json
+
+# Hardened & safe to commit (explicitly un-ignored):
+!N8N-A01 & N8N-V01-Sub Flow.json
+!N8N-V01-Worker.json

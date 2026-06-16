@@ -1,0 +1,17 @@
+{
+  "name": "@repo/scraping",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Apify Instagram + website + Google Places",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "^5.5.0"
+  }
+}

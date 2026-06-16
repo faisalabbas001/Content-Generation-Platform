@@ -1,0 +1,581 @@
+{
+  "name": "N8N-A07: Competitor Extraction",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "competitor-extraction",
+        "responseMode": "responseNode"
+      },
+      "id": "a07-node-1-webhook",
+      "name": "Webhook: Competitor Extraction Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "a07-cron-biweekly",
+      "name": "Cron: Biweekly Competitor Refresh",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify HMAC signature + parse payload (webhook path)\n// Cron path: load all brands with active competitors\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\n\nconst isCron = !$input.first().json.body && !$input.first().json.headers;\nif (isCron) {\n  return [{ json: { brand_id: null, competitors: [], extraction_type: 'light', triggered_by: 'cron', is_cron: true } }];\n}\n\nconst rawBody = $input.first().json.body ?? JSON.stringify($input.first().json);\nconst sig = $input.first().json.headers?.['x-n8n-signature'] ?? '';\nconst expected = crypto.createHmac('sha256', SECRET).update(rawBody).digest('hex');\nif (sig !== expected) throw new Error('HMAC verification failed');\n\nconst payload = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody;\nreturn [{ json: {\n  brand_id: payload.brand_id,\n  competitors: payload.competitors || [],\n  extraction_type: payload.extraction_type || 'light',\n  triggered_by: payload.triggered_by || 'A03',\n  is_cron: false,\n} }];"
+      },
+      "id": "a07-node-2-parse",
+      "name": "Verify + Parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load all active competitor_accounts via the API route (same pattern as A03)\n// For webhook calls: already have competitors[] in payload — build per-item list directly.\n// For cron calls: we need to fetch all active competitors across all brands.\nconst parsed = $input.first().json;\nif (!parsed.is_cron && parsed.competitors && parsed.competitors.length > 0) {\n  // Webhook: use the competitors passed directly in the payload\n  return parsed.competitors.map(c => ({ json: {\n    competitor_id: c.competitor_id,\n    brand_id: parsed.brand_id,\n    handle_instagram: c.handle_instagram,\n    extraction_type: parsed.extraction_type || 'light',\n    triggered_by: parsed.triggered_by,\n    is_cron: false,\n  } }));\n}\n// Cron: signal that we need a full fetch — handled by next node\nreturn [{ json: { ...parsed, needs_full_fetch: true } }];"
+      },
+      "id": "a07-node-split-or-fetch",
+      "name": "Split or Prepare Fetch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.needs_full_fetch }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      },
+      "id": "a07-node-if-cron",
+      "name": "IF: Cron Full Fetch?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign request to /api/competitors/fetch-active\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst BASE = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\nconst body = JSON.stringify({ extraction_type: 'light', triggered_by: 'cron' });\nconst requestId = crypto.randomUUID();\nconst ts = new Date().toISOString();\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn [{ json: {\n  url: `${BASE}/api/competitors/fetch-active`,\n  body,\n  headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': requestId,\n    'x-n8n-timestamp': ts,\n  }\n} }];"
+      },
+      "id": "a07-node-sign-fetch",
+      "name": "Sign: Fetch Active Competitors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json.headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a07-node-fetch-active",
+      "name": "POST · fetch-active competitors",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1250,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge: cron result items come from fetch-active API, webhook items already split\n// This node only runs after fetch-active (cron path). Pass items through.\nconst result = $input.first().json;\nif (!result.ok || !Array.isArray(result.competitors)) return [{ json: { _no_competitors: true } }];\nreturn result.competitors.map(c => ({ json: c }));"
+      },
+      "id": "a07-node-merge-cron",
+      "name": "Expand Cron Competitors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json._no_competitors }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ]
+        }
+      },
+      "id": "a07-node-guard",
+      "name": "IF: Has Competitors?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Apify Instagram scraper input for this competitor\nconst c = $input.first().json;\nconst isDeep = c.extraction_type === 'deep';\nreturn [{ json: {\n  competitor_id: c.competitor_id,\n  brand_id: c.brand_id,\n  handle_instagram: c.handle_instagram,\n  extraction_type: c.extraction_type || 'light',\n  triggered_by: c.triggered_by,\n  apify_body: {\n    directUrls: [`https://www.instagram.com/${c.handle_instagram}/`],\n    resultsType: 'posts',\n    resultsLimit: isDeep ? 50 : 12,\n    addParentData: true,\n    scrapePostsUntilDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]\n  }\n} }];"
+      },
+      "id": "a07-node-5-prep-apify",
+      "name": "Prepare Apify Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-and-get-dataset-items?token={{ $env.APIFY_API_KEY }}&timeout=120&memory=512",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.apify_body) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a07-node-apify-call",
+      "name": "Apify: Scrape Competitor Instagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1450,
+        400
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Apify result with competitor metadata and sign the persist-snapshot call\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst BASE = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\n\nconst prep = $('Prepare Apify Inputs').first().json;\nconst apifyItems = $input.first().json;\nconst posts = Array.isArray(apifyItems) ? apifyItems : (apifyItems.items || []);\n\nconst bodyObj = {\n  brand_id:         prep.brand_id,\n  competitor_id:    prep.competitor_id,\n  handle_instagram: prep.handle_instagram,\n  extraction_type:  prep.extraction_type || 'light',\n  triggered_by:     prep.triggered_by,\n  apify_posts:      posts,\n};\nconst body = JSON.stringify(bodyObj);\nconst requestId = crypto.randomUUID();\nconst ts = new Date().toISOString();\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\n\nreturn [{ json: {\n  url: `${BASE}/api/competitors/persist-snapshot`,\n  body,\n  headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': requestId,\n    'x-n8n-timestamp': ts,\n  },\n  _meta: { brand_id: prep.brand_id, competitor_id: prep.competitor_id, handle_instagram: prep.handle_instagram, extraction_type: prep.extraction_type || 'light', posts_scraped: posts.length }\n} }];"
+      },
+      "id": "a07-node-sign-snapshot",
+      "name": "Sign: persist-snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1650,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json.headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a07-node-call-snapshot",
+      "name": "POST · persist-snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1850,
+        400
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sign the log-cost API call\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst BASE = 'https://vagrancy-pupil-spiritism.ngrok-free.dev';\n\n// Recover metadata from Sign node (two nodes back)\nconst signNode = $('Sign: persist-snapshot').first().json._meta || {};\n\nconst bodyObj = {\n  brand_id:         signNode.brand_id,\n  competitor_id:    signNode.competitor_id,\n  handle_instagram: signNode.handle_instagram,\n  extraction_type:  signNode.extraction_type || 'light',\n  posts_scraped:    signNode.posts_scraped || 0,\n  flow_id:          'N8N-A07',\n};\nconst body = JSON.stringify(bodyObj);\nconst requestId = crypto.randomUUID();\nconst ts = new Date().toISOString();\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\n\nreturn [{ json: {\n  url: `${BASE}/api/competitors/log-cost`,\n  body,\n  headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': requestId,\n    'x-n8n-timestamp': ts,\n  }\n} }];"
+      },
+      "id": "a07-node-sign-cost",
+      "name": "Sign: log-cost",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2050,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json.headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "a07-node-call-cost",
+      "name": "POST · log-cost",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2250,
+        400
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, brand_id: $('Verify + Parse').first().json.brand_id, triggered_by: $('Verify + Parse').first().json.triggered_by, competitors_processed: 1 }) }}"
+      },
+      "id": "a07-node-13-respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2450,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Apify call failed — log and pass through so the flow doesn't hang\nconsole.error('[A07] Apify scrape failed for', $('Prepare Apify Inputs').first().json.handle_instagram);\nreturn [{ json: { _apify_failed: true } }];"
+      },
+      "id": "a07-node-apify-error",
+      "name": "Log Apify Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1650,
+        600
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: Competitor Extraction Trigger": {
+      "main": [
+        [
+          {
+            "node": "Verify + Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron: Biweekly Competitor Refresh": {
+      "main": [
+        [
+          {
+            "node": "Verify + Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify + Parse": {
+      "main": [
+        [
+          {
+            "node": "Split or Prepare Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split or Prepare Fetch": {
+      "main": [
+        [
+          {
+            "node": "IF: Cron Full Fetch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Cron Full Fetch?": {
+      "main": [
+        [
+          {
+            "node": "Sign: Fetch Active Competitors",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: Has Competitors?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign: Fetch Active Competitors": {
+      "main": [
+        [
+          {
+            "node": "POST · fetch-active competitors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · fetch-active competitors": {
+      "main": [
+        [
+          {
+            "node": "Expand Cron Competitors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Cron Competitors": {
+      "main": [
+        [
+          {
+            "node": "IF: Has Competitors?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Has Competitors?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Apify Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Apify Inputs": {
+      "main": [
+        [
+          {
+            "node": "Apify: Scrape Competitor Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify: Scrape Competitor Instagram": {
+      "main": [
+        [
+          {
+            "node": "Sign: persist-snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Apify Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign: persist-snapshot": {
+      "main": [
+        [
+          {
+            "node": "POST · persist-snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · persist-snapshot": {
+      "main": [
+        [
+          {
+            "node": "Sign: log-cost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign: log-cost": {
+      "main": [
+        [
+          {
+            "node": "POST · log-cost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · log-cost": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "N8N-S03",
+    "timezone": "Asia/Riyadh"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "2.0.0",
+  "id": "N8N-A07",
+  "active": true
+}

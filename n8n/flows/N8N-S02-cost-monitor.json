@@ -1,0 +1,232 @@
+{
+  "name": "N8N-S02: Cost Ceiling Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 6 }] }
+      },
+      "id": "node-0-cron",
+      "name": "Schedule: Every 6h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [100, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cost-check",
+        "responseMode": "responseNode"
+      },
+      "id": "node-1-webhook",
+      "name": "Webhook: Cost Check Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [100, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json || {};\nreturn {\n  brand_id: payload.brand_id || null,\n  triggered_by: payload.triggered_by || 'schedule',\n  checked_at: new Date().toISOString()\n};"
+      },
+      "id": "node-2-parse",
+      "name": "Parse Trigger",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [350, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "table": "v_brand_monthly_spend",
+        "returnAll": true
+      },
+      "id": "node-3-fetch-view",
+      "name": "Supabase: Fetch v_brand_monthly_spend",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [580, 300],
+      "credentials": { "supabaseApi": { "id": "1", "name": "Supabase Service Role" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const brands = $input.all().map(b => b.json);\nconst at_risk = brands.filter(b => b.cost_status !== 'normal');\nconst now = new Date();\nconsole.log(`[S02] checked ${brands.length} brands, ${at_risk.length} at risk`);\nif (at_risk.length === 0) {\n  return [{ at_risk_count: 0, action: 'none', triggered_by: $('Parse Trigger').first().json.triggered_by, checked_at: now.toISOString() }];\n}\n// Dedup: skip brands already alerted within cooldown window.\n// Breached = 1h cooldown (urgent), approaching = 24h cooldown.\nconst COOLDOWN_BREACHED_MS  = 60 * 60 * 1000;       // 1 hour\nconst COOLDOWN_APPROACH_MS  = 24 * 60 * 60 * 1000;  // 24 hours\nconst needs_alert = at_risk.filter(b => {\n  if (!b.last_alert_sent_at) return true;\n  const lastSent = new Date(b.last_alert_sent_at).getTime();\n  const elapsed  = now.getTime() - lastSent;\n  const cooldown = (b.cost_status === 'breached' || b.cost_status === 'critical')\n    ? COOLDOWN_BREACHED_MS\n    : COOLDOWN_APPROACH_MS;\n  return elapsed >= cooldown;\n});\nconsole.log(`[S02] ${needs_alert.length}/${at_risk.length} brands need alert after dedup`);\nif (needs_alert.length === 0) {\n  return [{ at_risk_count: 0, action: 'none', note: 'all_within_cooldown', triggered_by: $('Parse Trigger').first().json.triggered_by, checked_at: now.toISOString() }];\n}\nreturn needs_alert.map(b => ({\n  brand_id: b.brand_id,\n  current_month_spend_usd: b.current_month_spend_usd,\n  monthly_ceiling_usd: b.monthly_ceiling_usd,\n  spend_pct: b.spend_pct,\n  cost_status: b.cost_status,\n  action: (b.cost_status === 'breached' || b.cost_status === 'critical') ? 'halt_generation' : 'alert_management',\n  triggered_by: $('Parse Trigger').first().json.triggered_by,\n  checked_at: now.toISOString()\n}));"
+      },
+      "id": "node-4-classify",
+      "name": "Classify At-Risk Brands",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "id": "has-risk",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "none",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-5-check",
+      "name": "IF: Brand at Risk?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1020, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return { status: 'ok', message: 'All brands within limits', triggered_by: $json.triggered_by };"
+      },
+      "id": "node-6-normal",
+      "name": "All Clear",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1240, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json;\nconst isBreached = b.cost_status === 'breached' || b.cost_status === 'critical';\nconst anomaly_type = isBreached ? 'cost_ceiling_breached' : 'cost_ceiling_approaching';\nconst severity = b.cost_status === 'breached' ? 'critical'\n  : b.cost_status === 'critical' ? 'error'\n  : 'warning';\nreturn {\n  brand_id: b.brand_id,\n  flow_id: 'N8N-S02',\n  anomaly_type,\n  severity,\n  details: {\n    cost_status: b.cost_status,\n    current_spend_usd: b.current_month_spend_usd,\n    ceiling_usd: b.monthly_ceiling_usd,\n    spend_pct: b.spend_pct,\n    action: b.action\n  },\n  source_flow: 'N8N-S02',\n  resolved: false,\n  triggered_by: b.triggered_by,\n  created_at: b.checked_at\n};"
+      },
+      "id": "node-7-prepare",
+      "name": "Prepare Anomaly",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1240, 200]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "table": "anomaly_records",
+        "upsertColumns": "brand_id,anomaly_type,source_flow",
+        "columns": "flow_id,anomaly_type,details,severity,brand_id,source_flow,resolved,created_at",
+        "value1": "={{ $json.flow_id }}",
+        "value2": "={{ $json.anomaly_type }}",
+        "value3": "={{ JSON.stringify($json.details) }}",
+        "value4": "={{ $json.severity }}",
+        "value5": "={{ $json.brand_id }}",
+        "value6": "={{ $json.source_flow }}",
+        "value7": "false",
+        "value8": "={{ $json.created_at }}"
+      },
+      "id": "node-8-upsert",
+      "name": "Supabase: Upsert Anomaly",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1460, 200],
+      "credentials": { "supabaseApi": { "id": "1", "name": "Supabase Service Role" } }
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_S03_WEBHOOK_URL }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "brand_id",     "value": "={{ $json.brand_id }}" },
+            { "name": "anomaly_type", "value": "={{ $json.anomaly_type }}" },
+            { "name": "severity",     "value": "={{ $json.severity }}" },
+            { "name": "source_flow",  "value": "N8N-S02" },
+            { "name": "details",      "value": "={{ $json.details }}" }
+          ]
+        },
+        "options": { "timeout": 10000 },
+        "onError": "continueRegularOutput"
+      },
+      "id": "node-9-s03",
+      "name": "Trigger S03 Anomaly Router",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1680, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stamp last_alert_sent_at on brand_cost_config so next S02 run\n// can skip this brand within the cooldown window.\nconst SUPABASE_URL         = 'https://redzmrlzhxkkpgcokgvl.supabase.co';\nconst SUPABASE_SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst b = $('Prepare Anomaly').first().json;\nif (!b.brand_id) return { stamped: false };\ntry {\n  await $helpers.httpRequest({\n    method: 'PATCH',\n    url: `${SUPABASE_URL}/rest/v1/brand_cost_config?brand_id=eq.${b.brand_id}`,\n    headers: {\n      apikey: SUPABASE_SERVICE_KEY,\n      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,\n      'Content-Type': 'application/json',\n      Prefer: 'return=minimal',\n    },\n    body: JSON.stringify({\n      last_alert_sent_at: new Date().toISOString(),\n      last_alert_type: b.anomaly_type,\n    }),\n    json: false,\n  });\n  console.log(`[S02] stamped last_alert_sent_at for brand ${b.brand_id}`);\n} catch (e) {\n  console.error('[S02] stamp failed:', e.message);\n}\nreturn { stamped: true, brand_id: b.brand_id, anomaly_type: b.anomaly_type };"
+      },
+      "id": "node-9b-stamp",
+      "name": "Stamp: Last Alert Sent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 80]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true },
+          "conditions": [
+            {
+              "id": "is-webhook",
+              "leftValue": "={{ $json.triggered_by }}",
+              "rightValue": "schedule",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-10-is-webhook",
+      "name": "IF: Webhook-triggered?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1900, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"checked\": true, \"severity\": \"{{ $('Prepare Anomaly').first().json.severity }}\" }"
+      },
+      "id": "node-11-respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2100, 150]
+    },
+    {
+      "parameters": {
+        "jsCode": "return { done: true };"
+      },
+      "id": "node-12-noop",
+      "name": "Schedule end",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2100, 280]
+    }
+  ],
+  "connections": {
+    "Schedule: Every 6h":            { "main": [[{ "node": "Parse Trigger",                      "type": "main", "index": 0 }]] },
+    "Webhook: Cost Check Trigger":   { "main": [[{ "node": "Parse Trigger",                      "type": "main", "index": 0 }]] },
+    "Parse Trigger":                 { "main": [[{ "node": "Supabase: Fetch v_brand_monthly_spend","type": "main", "index": 0 }]] },
+    "Supabase: Fetch v_brand_monthly_spend": { "main": [[{ "node": "Classify At-Risk Brands",    "type": "main", "index": 0 }]] },
+    "Classify At-Risk Brands":       { "main": [[{ "node": "IF: Brand at Risk?",                 "type": "main", "index": 0 }]] },
+    "IF: Brand at Risk?": {
+      "main": [
+        [{ "node": "Prepare Anomaly", "type": "main", "index": 0 }],
+        [{ "node": "All Clear",       "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Anomaly":               { "main": [[{ "node": "Supabase: Upsert Anomaly",           "type": "main", "index": 0 }]] },
+    "Supabase: Upsert Anomaly":      { "main": [[{ "node": "Stamp: Last Alert Sent", "type": "main", "index": 0 }, { "node": "Trigger S03 Anomaly Router", "type": "main", "index": 0 }]] },
+    "Stamp: Last Alert Sent":        { "main": [[]] },
+    "Trigger S03 Anomaly Router":    { "main": [[{ "node": "IF: Webhook-triggered?",             "type": "main", "index": 0 }]] },
+    "IF: Webhook-triggered?": {
+      "main": [
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }],
+        [{ "node": "Schedule end",       "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "N8N-S03",
+    "timezone": "Asia/Riyadh"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "3.0.0",
+  "id": "N8N-S02",
+  "active": true
+}

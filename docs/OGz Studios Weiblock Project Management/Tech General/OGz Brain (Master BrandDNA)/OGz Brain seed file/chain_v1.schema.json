@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ogz-knowledge/schemas/chain_v1.schema.json",
+  "title": "Chain v1",
+  "description": "A single content production chain. The system has 88 chains organized in 23 families. Each chain is a named, parameterized generation workflow producing one type of content.",
+  "type": "object",
+  "required": [
+    "chain_ulid",
+    "chain_id_short",
+    "family",
+    "schema_version",
+    "name_en",
+    "name_ar",
+    "purpose",
+    "models_used",
+    "input_schema",
+    "prompt_template",
+    "output_type",
+    "target_dimensions",
+    "eligibility_filters",
+    "cultural_constraints",
+    "cost_estimate_usd",
+    "latency_estimate_seconds",
+    "provenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "chain_ulid": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "26-char ULID"
+    },
+    "chain_id_short": {
+      "type": "string",
+      "pattern": "^tf[0-9]{2}_[0-9]{2}$",
+      "description": "Stable short identifier, e.g., 'tf23_01'"
+    },
+    "family": {
+      "type": "string",
+      "pattern": "^TF[0-9]{2}$",
+      "description": "Chain family, e.g., 'TF23'"
+    },
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "name_en": {
+      "type": "string",
+      "description": "Human-readable English name"
+    },
+    "name_ar": {
+      "type": "string",
+      "description": "Human-readable Arabic name"
+    },
+    "purpose": {
+      "type": "string",
+      "description": "What this chain produces; what business job it does",
+      "minLength": 30
+    },
+    "models_used": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["provider", "model_id", "role"],
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": ["fal", "replicate", "openai", "anthropic", "google", "other"]
+          },
+          "model_id": {
+            "type": "string",
+            "description": "Provider's model identifier, e.g., 'fal-ai/flux/schnell'"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "primary_image_generation",
+              "primary_video_generation",
+              "image_to_image_edit",
+              "upscaling",
+              "caption_generation",
+              "text_overlay",
+              "style_transfer",
+              "character_consistency",
+              "background_removal",
+              "audio_generation",
+              "other"
+            ]
+          },
+          "version_pinned": {
+            "type": "string",
+            "description": "Pinned model version if applicable"
+          }
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "description": "Schema for inputs this chain accepts. Each key is an input parameter name.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type", "description", "required"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["string", "integer", "number", "boolean", "image_uri", "video_uri", "array", "object"]
+          },
+          "description": {"type": "string"},
+          "required": {"type": "boolean"},
+          "default": {},
+          "enum": {"type": "array"},
+          "min_length": {"type": "integer"},
+          "max_length": {"type": "integer"}
+        }
+      }
+    },
+    "prompt_template": {
+      "type": "string",
+      "description": "Parameterized prompt sent to the primary model. Uses {parameter_name} for substitutions. Composed at runtime with brand fingerprint + cultural spec + occasion context.",
+      "minLength": 50
+    },
+    "output_type": {
+      "type": "string",
+      "enum": ["image", "video", "carousel", "audio", "mixed"]
+    },
+    "target_dimensions": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": {"type": "integer", "minimum": 256},
+        "height": {"type": "integer", "minimum": 256},
+        "aspect_ratio_label": {
+          "type": "string",
+          "enum": ["1:1", "4:5", "9:16", "16:9", "3:4", "4:3", "21:9", "other"]
+        },
+        "duration_seconds": {
+          "type": "number",
+          "description": "For video/audio output only"
+        }
+      }
+    },
+    "eligibility_filters": {
+      "type": "object",
+      "description": "Which contexts this chain is eligible for. Used by the routing layer to filter the 88 chains per brand.",
+      "required": ["sectors_allowed", "occasions_allowed", "quality_tiers_allowed"],
+      "properties": {
+        "sectors_allowed": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Sectors this chain is eligible for. Use ['*'] for universal eligibility."
+        },
+        "sectors_excluded": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Sectors this chain must NOT be used for"
+        },
+        "occasions_allowed": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Occasions this chain is eligible for. Use ['*'] for universal."
+        },
+        "occasions_excluded": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "quality_tiers_allowed": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["starter", "growth", "enterprise"]}
+        },
+        "min_brand_maturity_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum days since brand onboarding before this chain can be used"
+        },
+        "regional_orientations_allowed": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "cultural_constraints": {
+      "type": "object",
+      "description": "Which cultural-spec gates this chain triggers strongly. Used for routing and pre-generation gate selection.",
+      "properties": {
+        "requires_wardrobe_check": {"type": "boolean"},
+        "requires_gesture_check": {"type": "boolean"},
+        "requires_cultural_coherence_check": {"type": "boolean"},
+        "requires_arabic_text_validation": {"type": "boolean"},
+        "high_religious_sensitivity": {"type": "boolean"},
+        "high_gender_sensitivity": {"type": "boolean"},
+        "human_review_recommended_above_quality_tier": {
+          "type": "string",
+          "enum": ["never", "starter", "growth", "enterprise", "always"]
+        }
+      }
+    },
+    "cost_estimate_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Approximate cost in USD per execution. Used by the runtime budget enforcement."
+    },
+    "latency_estimate_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Approximate wall-clock latency per execution. Used by the COO Agent for scheduling."
+    },
+    "best_for_cd_brains": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["cd_01", "cd_02", "cd_03", "cd_04", "cd_05"]
+      },
+      "description": "CD brain methodologies this chain pairs especially well with"
+    },
+    "anti_patterns": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Known failure modes; what NOT to do with this chain"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-text operational notes for the maintainer"
+    },
+    "provenance": {
+      "$ref": "provenance_mixin_v1.schema.json"
+    }
+  }
+}

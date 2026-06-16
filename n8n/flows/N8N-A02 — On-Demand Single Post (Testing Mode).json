@@ -1,0 +1,2217 @@
+{
+  "name": "N8N-A02 — On-Demand Single Post (Testing Mode)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-test/openclaw-a02",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "2768add5-0935-4a8b-a403-d10bd1c6f964",
+      "name": "Webhook (POST /webhook-test/openclaw-a02)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -4672,
+        -1168
+      ],
+      "webhookId": "openclaw-a02-test"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst secret = 'test-webhook-secret-123';\nconst headers = $json.headers || {};\nconst signature = headers['x-n8n-signature'];\nconst raw = typeof $json.body === 'string' ? $json.body : JSON.stringify($json.body || {});\nconst expected = crypto.createHmac('sha256', secret).update(raw).digest('hex');\nif (expected !== signature) throw new Error('Invalid signature');\nconst payload = JSON.parse(raw);\nreturn [{ json: { request_id: payload.request_id, brand_id: payload.brand_id, brief: payload.brief, started_at: new Date().toISOString() } }];\n"
+      },
+      "id": "72b10027-1517-47a3-a02f-fbf6735522d9",
+      "name": "Verify HMAC + parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4416,
+        -1168
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "brand_profiles",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "brand_id",
+              "keyValue": "={{ $json.brand_id }}"
+            }
+          ]
+        }
+      },
+      "id": "d23a6ec8-2ba8-4786-9a0f-3916cddbff57",
+      "name": "Supabase: load brand_profiles",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -3952,
+        -1168
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const brand = $json;\nconst completeness = brand.completeness_score || 0;\nlet mode = 'Standard';\nif (completeness < 0.3) mode = 'Blocked';\nelse if (completeness < 0.75) mode = 'Cautious';\nconst watermark = (mode !== 'Standard');\nreturn [{ json: { brand, confidenceMode: mode, forceWatermark: watermark } }];\n"
+      },
+      "id": "f54bf016-9eef-4898-9079-64d97fef1639",
+      "name": "Initial confidence gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3696,
+        -1168
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.confidenceMode }}",
+              "rightValue": "Blocked",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "d87b0b3a-7ace-47f7-9bed-98b98d5cfa3b",
+      "name": "Is Blocked?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3456,
+        -1168
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Verify HMAC + parse').first().json;\nreturn [{ json: { request_id: trigger.request_id, status: 'held', failure_reason: 'low_confidence_blocked' } }];\n"
+      },
+      "id": "ff723381-3911-413f-a0b4-43093eb44400",
+      "name": "Handle Blocked",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2464,
+        -1648
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst trigger = $(\"Verify HMAC + parse\").first().json;\nconst brand = $(\"Initial confidence gate\").first().json.brand;\n\nconst payload = {\n  flow_id: 'N8N-A02',\n  brand_id: trigger.brand_id,\n  payload: {\n    request_type: 'calendar_ondemand',\n    trigger_payload: {\n      request_id:   trigger.request_id,\n      objective:    trigger.brief.objective,\n      content_type: trigger.brief.content_type,\n      media_type:   trigger.brief.media_type || 'image',\n      user_prompt:  trigger.brief.hero_concept || null,\n    },\n    occasion_flags: trigger.brief.occasion_name ? [trigger.brief.occasion_name] : [],\n  },\n};\n\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', (function(){try{return $env.N8N_WEBHOOK_SECRET||null}catch(_){return null}})()||'test-webhook-secret-123').update(raw).digest('hex');\nreturn [{ json: { url: 'https://petition-cupid-buffed.ngrok-free.dev/api/agents/ceo/classify', body: raw, headers: { 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() } } }];"
+      },
+      "id": "f5bc8112-795c-4f1e-9af0-9882aeb6838a",
+      "name": "Prepare CEO classify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2848,
+        -944
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "15fc6c41-4a19-4832-b089-4d52114dae38",
+      "name": "POST /api/agents/ceo/classify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2528,
+        -944
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const decision = $json.result?.decision || $json;\nconst trigger = $('Verify HMAC + parse').first().json;\nreturn [{ json: { decision, trigger, requires_ref_img: decision.requires_ref_img || false } }];\n"
+      },
+      "id": "6fa8fbd2-c41e-442b-8634-795c47fa9796",
+      "name": "Log routing_decision (CEO1)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2240,
+        -960
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "routing_decisions",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.trigger.brand_id }}"
+            },
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-A02"
+            },
+            {
+              "fieldId": "outcome",
+              "fieldValue": "={{ JSON.stringify($json.decision) }}"
+            }
+          ]
+        }
+      },
+      "id": "037bf8d4-eb99-432a-be80-d34612056380",
+      "name": "Insert routing_decisions",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -2000,
+        -960
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "on_demand_requests",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Verify HMAC + parse').first().json.request_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "current_step",
+              "fieldValue": "ceo"
+            }
+          ]
+        }
+      },
+      "id": "ec1557e2-9abf-4cfb-83cc-e50c50539ca7",
+      "name": "Step: ceo",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1712,
+        -960
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.requires_ref_img }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "4041852d-5f3c-45dd-9f49-71fc5859952a",
+      "name": "IF requires reference image",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1504,
+        -960
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "brand_assets",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "brand_id",
+              "keyValue": "={{ $('Verify HMAC + parse').first().json.brand_id }}"
+            },
+            {
+              "keyName": "asset_type",
+              "keyValue": "product"
+            },
+            {
+              "keyName": "processing_status",
+              "keyValue": "approved"
+            }
+          ]
+        }
+      },
+      "id": "6e7dbbe1-00ba-45a1-84ff-f79eb65df12c",
+      "name": "Fetch reference image",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        -1296
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ref = $json[0] || null; return [{ json: { reference_image_url: ref?.storage_url || null } }];\n"
+      },
+      "id": "c3d93164-0959-4013-bf2f-b2311c6cbf1c",
+      "name": "Extract ref URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        -1296
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { reference_image_url: null } }];\n"
+      },
+      "id": "4889cf41-9e01-44fb-93a0-5bd074f574d9",
+      "name": "No reference needed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        -960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = { brand: $('Initial confidence gate').first().json.brand, trigger: $('Verify HMAC + parse').first().json, confidenceMode: $('Initial confidence gate').first().json.confidenceMode, reference_image_url: $json.reference_image_url };\nreturn [{ json: ctx }];\n"
+      },
+      "id": "2a1ede3e-f15b-40ba-ab50-b5f38886e57f",
+      "name": "Merge context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -960
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst ctx = $json;\nconst trigger = ctx.trigger;\nconst brand = ctx.brand;\nconst objectiveMix = {\n  educational: { educational: 0.5, experiential: 0.3, promotional: 0.2 },\n  promotional: { educational: 0.2, experiential: 0.3, promotional: 0.5 },\n  experiential: { educational: 0.3, experiential: 0.5, promotional: 0.2 }\n};\nconst contentMix = objectiveMix[trigger.brief.content_type] || { educational: 0.3, experiential: 0.4, promotional: 0.3 };\nconst payload = {\n  flow_id: 'N8N-A02',\n  brand_id: trigger.brand_id,\n  payload: {\n    confidence_mode: ctx.confidenceMode,\n    request_type: 'calendar_ondemand',\n    occasion_flags: trigger.brief.occasion_name ? [trigger.brief.occasion_name] : [],\n    platform_spec: brand.primary_channel || 'Instagram',\n    content_mix: contentMix,\n    post_count: 1,\n    brand: {\n      brand_id: brand.brand_id,\n      sector: brand.sector,\n      dialect: brand.arabic_dialect,\n      brand_name_ar: brand.brand_name_ar,\n      primary_color_hex: brand.primary_color_hex\n    },\n    reference_image_url: ctx.reference_image_url\n  }\n};\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', (function(){try{return $env.N8N_WEBHOOK_SECRET||null}catch(_){return null}})()||'test-webhook-secret-123').update(raw).digest('hex');\nreturn [{ json: { url: 'https://petition-cupid-buffed.ngrok-free.dev/api/agents/coo/compile-caption-context', body: raw, headers: { 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() } } }];\n"
+      },
+      "id": "79268f93-1c39-47d5-bb2f-1e56cabc1112",
+      "name": "Prepare COO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        -960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "459f43d7-a648-4970-bd5e-ad71fe813cd0",
+      "name": "POST /api/agents/coo/compile-caption-context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        256,
+        -960
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "on_demand_requests",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Verify HMAC + parse').first().json.request_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "current_step",
+              "fieldValue": "coo"
+            }
+          ]
+        }
+      },
+      "id": "7bcdca64-92e1-4674-97a1-66f37c26ece6",
+      "name": "Step: coo",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        704,
+        -1136
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $('POST /api/agents/coo/compile-caption-context').first().json.result?.dialect_confirmed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "f4819449-e407-4c8f-8f14-6fc1572ea993",
+      "name": "IF dialect_confirmed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        944,
+        -1136
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Verify HMAC + parse').first().json;\n// Carry request_id inside flags so the admin QA classifier tags this hold as\n// on_demand (packages/db/src/queries/admin.ts: classifyQa keys on flags.request_id).\n// Without it the dialect hold has no post_id and no flags.request_id, so it\n// silently defaulted into the Calendar QA tab.\nconst flags = { reason: 'dialect_unconfirmed', request_id: trigger.request_id };\nreturn [{ json: { request_id: trigger.request_id, brand_id: trigger.brand_id, status: 'pending', failure_reason: 'dialect_unconfirmed', flags } }];\n"
+      },
+      "id": "a38097dc-b773-42ed-a131-0b496d2ac395",
+      "name": "Hold: dialect",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        -1104
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "qa_review_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "flags",
+              "fieldValue": "={{ JSON.stringify($json.flags ?? {}) }}"
+            },
+            {
+              "fieldId": "trigger_reason",
+              "fieldValue": "={{ $json.failure_reason }}"
+            }
+          ]
+        }
+      },
+      "id": "025a25f5-5de3-4e52-a04b-0ca0cd2032cb",
+      "name": "Insert into qa_review_queue",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1744,
+        -1104
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst trigger = $('Verify HMAC + parse').first().json;\nconst watermark = $('Initial confidence gate').first().json.forceWatermark;\n\n// Explicitly read the COO HTTP response — $json here is the Supabase Step:coo\n// output (a DB row), not the COO API result, so we must reference it by name.\nconst cooResp = $('POST /api/agents/coo/compile-caption-context').first().json;\nconst cooResult = cooResp.result || cooResp;\nconst captionContext = cooResult.caption_context || null;\n\nif (!captionContext) throw new Error('COO caption_context missing — cannot call DeepSeek');\n\n// Build schedule_dates from the on-demand posting_time.\n// The DeepSeek prompt contract: post_count MUST equal schedule_dates.length and\n// the model must never invent its own dates. Sending schedule_dates=[] with\n// post_count=1 causes DeepSeek to return posts=[] (triggering the 502 guard).\nconst rawPostingTime = trigger.brief.posting_time || new Date().toISOString();\nconst scheduleDate = rawPostingTime.slice(0, 10);\nconst hourMatch = rawPostingTime.match(/T(\\d{2}):/);\nconst scheduleHour = hourMatch ? parseInt(hourMatch[1], 10) : 12;\nconst schedule_dates = [{ date: scheduleDate, posting_time: rawPostingTime, hour: scheduleHour }];\n\nconst payload = { flow_id: 'N8N-A02', brand_id: trigger.brand_id, payload: { month: trigger.brief.month, caption_context: captionContext, post_count: 1, schedule_dates, start_date: scheduleDate, occasion_context: trigger.brief.occasion_name ? { name: trigger.brief.occasion_name } : undefined, watermark_required: watermark } };\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', (function(){try{return $env.N8N_WEBHOOK_SECRET||null}catch(_){return null}})()||'test-webhook-secret-123').update(raw).digest('hex');\nreturn [{ json: { url: 'https://petition-cupid-buffed.ngrok-free.dev/api/agents/deepseek/generate', body: raw, headers: { 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() } } }];\n"
+      },
+      "id": "b111f01f-0a1c-480c-851e-92228430ff49",
+      "name": "Prepare DeepSeek",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        -1376
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "2f88fe59-0058-4a68-84ef-a7f8bc09acdb",
+      "name": "POST /api/agents/deepseek/generate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1408,
+        -1376
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "on_demand_requests",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Verify HMAC + parse').first().json.request_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "current_step",
+              "fieldValue": "caption"
+            }
+          ]
+        }
+      },
+      "id": "70813c9e-65b0-41ea-9c22-3fea5d4723ba",
+      "name": "Step: caption",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1632,
+        -1392
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst trigger = $('Verify HMAC + parse').first().json;\n\n// $json here is Step:caption (Supabase UPDATE) — must reference DeepSeek directly.\nconst dsResp = $('POST /api/agents/deepseek/generate').first().json;\nconst ds = dsResp.result || dsResp;\nconst caption = (ds.captions || ds.posts || [])[0];\n\nif (!caption) throw new Error('DeepSeek returned no captions — cannot run CCO QC');\n\nconst cooResponse = $('POST /api/agents/coo/compile-caption-context').first().json;\nconst captionContext = cooResponse.result?.caption_context || cooResponse.caption_context || '';\nconst captionContextExcerpt = captionContext.slice(0, 500) || 'context unavailable';\n\nconst payload = {\n  flow_id: 'N8N-A02',\n  brand_id: trigger.brand_id,\n  payload: {\n    caption_context_excerpt: captionContextExcerpt,\n    posts: [{\n      post_id: crypto.randomUUID(),\n      caption_ar: caption.caption_ar,\n      content_type: trigger.brief.content_type\n    }]\n  }\n};\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', (function(){try{return $env.N8N_WEBHOOK_SECRET||null}catch(_){return null}})()||'test-webhook-secret-123').update(raw).digest('hex');\nreturn [{ json: { url: 'https://petition-cupid-buffed.ngrok-free.dev/api/agents/cco/qc', body: raw, headers: { 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() }, __caption: caption } }];\n"
+      },
+      "id": "eec021d1-5f8b-4f00-8f9a-d85a3a6c85c1",
+      "name": "Prepare CCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        -1392
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "37faec4d-4913-4361-9835-7132ec47ba29",
+      "name": "POST /api/agents/cco/qc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        -1424
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "on_demand_requests",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Verify HMAC + parse').first().json.request_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "current_step",
+              "fieldValue": "qc"
+            }
+          ]
+        }
+      },
+      "id": "56610746-b395-4acf-bdb9-9b542613e297",
+      "name": "Step: qc",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2544,
+        -1488
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst trigger = $(\"Verify HMAC + parse\").first().json;\n\n// $json here is Step:qc (a Supabase UPDATE row), NOT the CCO response — read the\n// CCO HTTP response by node name. cco/qc returns `result` as an ARRAY of\n// evaluations (older builds nested it under .evaluations) — parse both shapes.\n// FIX: the old code read cco.evaluations[0] off the wrong object, so the CEO\n// confidence gate ALWAYS received a fabricated score of 85. Also `score || 85`\n// destroyed real hard-block zeros (0 is falsy) — typeof check preserves them.\nconst ccoResp = $(\"POST /api/agents/cco/qc\").first().json;\nconst ccoArr = Array.isArray(ccoResp.result) ? ccoResp.result\n  : (Array.isArray(ccoResp.evaluations) ? ccoResp.evaluations\n  : (ccoResp.result?.evaluations || ccoResp.evaluations || []));\nconst eval0 = ccoArr[0] || {};\nconst braveRouteFlag = eval0.brave_route_flag || false;\nconst negpatFlag     = eval0.negpat_flag || 'NONE';\nconst ccoScore       = (typeof eval0.score === 'number') ? eval0.score : 85;\n\nconst ceoStep1    = $(\"Log routing_decision (CEO1)\").first().json.decision || {};\nconst selectedChain = ceoStep1.selected_chain || null;\nconst chainContext  = ceoStep1.chain_context  || null;\n\nconst payload = {\n  flow_id:  'N8N-A02',\n  brand_id: trigger.brand_id,\n  payload: {\n    request_type:   'calendar_ondemand',\n    trigger_payload: { request_id: trigger.request_id },\n    cco_results: [{\n      post_id:          crypto.randomUUID(),\n      score:            ccoScore,\n      brave_route_flag: braveRouteFlag,\n      negpat_flag:      negpatFlag,\n    }],\n    selected_chain: selectedChain,\n    chain_context:  chainContext,\n  },\n};\n\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', (function(){try{return $env.N8N_WEBHOOK_SECRET||null}catch(_){return null}})()||'test-webhook-secret-123').update(raw).digest('hex');\nreturn [{ json: { url: 'https://petition-cupid-buffed.ngrok-free.dev/api/agents/ceo/confidence-gate', body: raw, headers: { 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() }, __caption: $(\"Prepare CCO\").first().json.__caption } }];"
+      },
+      "id": "3e5f7a2c-315a-41b8-b230-2d8ee789d474",
+      "name": "Prepare CEO confidence gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        -1520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "a89fb4f7-8b4e-4972-82af-3ec8865193f7",
+      "name": "POST /api/agents/ceo/confidence-gate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3104,
+        -1520
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const gate = ($json.result?.decision && typeof $json.result.decision === 'object') ? $json.result.decision : ($json.decision || {});\nconst trigger = $('Verify HMAC + parse').first().json;\nconst forceWatermark = $('Initial confidence gate').first().json.forceWatermark;\nlet route = 'clean';\nif (gate.human_gate_required) route = 'hold';\nelse if (forceWatermark || gate.confidence_mode === 'Cautious' || gate.confidence_mode === 'Minimal') route = 'watermark';\nreturn [{ json: { route, __caption: $('Prepare CEO confidence gate').first().json.__caption, gate, trigger } }];\n"
+      },
+      "id": "33f3a3de-cb94-4642-b02c-1df3157e781e",
+      "name": "Derive route",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3376,
+        -1536
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the qa_review_queue hold row AFTER the post exists, so post_id links the\n// already-generated media into admin QA (Generate-Then-Review).\nconst cal = $('Prepare calendar row').first().json;\nconst insertedPost = $('Insert calendar_posts').first().json;\nreturn [{ json: {\n  brand_id: cal.brand_id,\n  caption_ar: cal.caption_ar,\n  cco_score: cal.cco_score,\n  flags: cal.flags,\n  trigger_reason: cal.trigger_reason,\n  status: 'pending',\n  post_id: insertedPost.post_id || null,\n} }];"
+      },
+      "id": "8646dc8e-2135-4406-9035-ae50b297405a",
+      "name": "Prepare hold record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8016,
+        -832
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "qa_review_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "caption_ar",
+              "fieldValue": "={{ $json.caption_ar }}"
+            },
+            {
+              "fieldId": "cco_score",
+              "fieldValue": "={{ $json.cco_score }}"
+            },
+            {
+              "fieldId": "flags",
+              "fieldValue": "={{ JSON.stringify($json.flags ?? {}) }}"
+            },
+            {
+              "fieldId": "trigger_reason",
+              "fieldValue": "={{ $json.trigger_reason }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "post_id",
+              "fieldValue": "={{ $json.post_id }}"
+            }
+          ]
+        }
+      },
+      "id": "ae8edad0-a653-48e1-a789-e9d6da3e0d33",
+      "name": "Insert hold into qa_review_queue",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        9040,
+        -1280
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst d = $json;\nconst ctx = $('Merge context').first().json;\nconst brand = ctx.brand;\nconst trigger = ctx.trigger;\n\nlet chainId = null;\nlet productDescriptor = null;\ntry {\n  const ceoDecision = $('Log routing_decision (CEO1)').first().json.decision;\n  chainId = (ceoDecision && ceoDecision.selected_chain) || null;\n  productDescriptor = (ceoDecision && ceoDecision.chain_context && ceoDecision.chain_context.product_descriptor) || null;\n} catch (e) {\n  chainId = null;\n}\n\n// FIX: On-demand mode — user's explicit prompt ALWAYS takes precedence (Hard Rule #1: CEO routes)\n// On-demand users supply their own prompt — NEVER use chain descriptors or DeepSeek auto-brief\n// Priority: User's hero_concept/style_descriptor > NOTHING ELSE in on-demand mode\nconst rawPrompt = ((trigger.brief.hero_concept || '') + ' ' + (trigger.brief.style_descriptor || '')).trim();\nconst visualBriefEn = (d.__caption && d.__caption.visual_brief_en) || null;\n\nconst weavyContext = {\n  brand_id: trigger.brand_id,\n  post_id: crypto.randomUUID(),\n  prompt_en: rawPrompt || visualBriefEn,  // IGNORE productDescriptor entirely in on-demand mode\n  brand_name_ar: brand.brand_name_ar,\n  headline_ar: (d.__caption && d.__caption.caption_ar ? d.__caption.caption_ar : '').slice(0, 50),\n  dialect: brand.arabic_dialect,\n  channel: trigger.brief.platform || 'Instagram',\n  objective: trigger.brief.objective,\n  confidence_flag: (d.route === 'watermark' || d.route === 'hold') ? 'watermark_required' : 'clean',\n  reference_image_url: ctx.reference_image_url,\n  expected_media_type: (trigger.brief && trigger.brief.media_type) || 'image',\n  chain_id: chainId,\n  chain_context: undefined,  // CRITICAL: on-demand MUST NOT send chain_context — N8N-V01 uses product_descriptor over prompt_en\n  // sharp_text_gravity: provide explicit null so N8N-V01 layout lookup is defined.\n  // TODO: derive from CEO visual zone recommendation once available.\n  sharp_text_gravity: (d.__caption && d.__caption.text_gravity) || null\n};\nreturn [{ json: { ...weavyContext, __caption: d.__caption, trigger, route: d.route } }];\n"
+      },
+      "id": "5699cedf-0890-48df-9486-a1fdb103bf06",
+      "name": "Prepare V01 call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3664,
+        -1504
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "on_demand_requests",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Verify HMAC + parse').first().json.request_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "current_step",
+              "fieldValue": "={{ ($('Verify HMAC + parse').first().json.brief && $('Verify HMAC + parse').first().json.brief.media_type === 'video') ? 'video' : 'image' }}"
+            }
+          ]
+        }
+      },
+      "id": "a2f15e9e-e964-41e0-9593-f70b2587aba2",
+      "name": "Step: image",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5168,
+        -1136
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step: image (Supabase UPDATE) returns the on_demand_requests row,\n// which has no brand_name_ar / dialect / headline_ar / prompt_en.\n// This node restores the weavyContext that Prepare V01 call built so\n// Execute N8N-V01 sub-workflow receives the correct overlay fields.\nreturn [{ json: $('Prepare V01 call').first().json }];\n"
+      },
+      "id": "bcce6ff7-6bce-4362-ae63-5533450f26fe",
+      "name": "Restore V01 input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5536,
+        -1136
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst v01result = $json;\nconst storage_url = v01result.storage_url;\nconst clean_storage_url = v01result.clean_storage_url || null;\nconst keyframe_url = v01result.keyframe_url || null;\nconst trigger = $('Prepare V01 call').first().json.trigger;\n\n// For async video, storage_url is null at this point (fal job is queued, not yet\n// rendered). DO NOT throw — QC runs on the KEYFRAME instead (see below).\nconst isVideo = !!(trigger.brief && trigger.brief.media_type === 'video');\nif (!isVideo && !storage_url) throw new Error('Image generation failed (V01): ' + (v01result.error || v01result.message || 'no storage_url returned'));\n\n// VIDEO BRAND QC: the keyframe IS the first frame the animator (Kling) animates —\n// an off-brand keyframe means an off-brand video. Run cco/visual-qc on it so video\n// gets the SAME brand_relevance + cultural gate as images. __video_qc_real tells\n// 'Prepare calendar row' the verdict is meaningful; only when NO keyframe exists\n// do we fall back to the placeholder + forced pass (fail-open, never blocks).\nconst videoQcReal = isVideo && !!keyframe_url;\nconst qcImageUrl = isVideo\n  ? (keyframe_url || 'https://app.openclaw.com/assets/visual-placeholder.png')\n  : storage_url;\n\nconst payload = { flow_id: 'N8N-A02', brand_id: trigger.brand_id, payload: { image_url: qcImageUrl } };\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', (function(){try{return $env.N8N_WEBHOOK_SECRET||null}catch(_){return null}})()||'test-webhook-secret-123').update(raw).digest('hex');\nreturn [{ json: { url: 'https://petition-cupid-buffed.ngrok-free.dev/api/agents/cco/visual-qc', body: raw, headers: { 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() }, __storage_url: storage_url, __clean_storage_url: clean_storage_url || (isVideo ? keyframe_url : null), __video_qc_real: videoQcReal, __caption: $('Prepare V01 call').first().json.__caption, __trigger: trigger, __route: $('Prepare V01 call').first().json.route, __image_prompt_en: (v01result.image_prompt_en || null) } }];\n"
+      },
+      "id": "74446756-4647-484b-9806-e6df55b20af8",
+      "name": "Prepare visual QC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6144,
+        -1136
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "17d78902-a9f0-412c-ab8f-267487530976",
+      "name": "POST /api/agents/cco/visual-qc",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6512,
+        -1232
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ (($('Prepare visual QC').first().json.__trigger.brief && $('Prepare visual QC').first().json.__trigger.brief.media_type === 'video') && !$('Prepare visual QC').first().json.__video_qc_real) ? 100 : ($('POST /api/agents/cco/visual-qc').first().json.result?.score || $('POST /api/agents/cco/visual-qc').first().json.score || 0) }}",
+              "rightValue": 75,
+              "operator": {
+                "type": "number",
+                "operation": "greaterThanOrEqual"
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          }
+        },
+        "options": {}
+      },
+      "id": "7c4f67de-3b71-470e-9c88-2ff3f845a108",
+      "name": "IF visual QC passes",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        7056,
+        -1344
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate-Then-Review: always insert the generated post. Decide moderation here.\nconst prep = $('Prepare visual QC').first().json;\nconst vqcResp = $('POST /api/agents/cco/visual-qc').first().json;\nconst isVideo = !!(prep.__trigger.brief && prep.__trigger.brief.media_type === 'video');\nconst PASS_THRESHOLD = 70; // keep in lockstep with apps/web/src/app/api/agents/cco/visual-qc/route.ts (PASS_THRESHOLD)\nconst vqcPass = vqcResp.result?.pass ?? vqcResp.pass;\n// VIDEO BRAND QC: when the KEYFRAME was QC'd (__video_qc_real), the verdict is real —\n// the animator renders that exact frame, so an off-brand keyframe = off-brand video.\n// Only when no keyframe exists (legacy/error path) does video fall back to forced pass.\nconst videoQcReal = prep.__video_qc_real === true;\nconst videoBypass = isVideo && !videoQcReal;\nconst vqcScore = videoBypass ? 100 : (vqcResp.result?.score ?? vqcResp.score ?? null);\n// Trust the API's authoritative pass flag (score >= 70 AND no hard-block violations\n// AND on-brand). cco/visual-qc scores brand_relevance, so an OFF-BRAND image OR video\n// keyframe returns pass:false and is held here for admin review.\nconst visualPass = videoBypass ? true : (typeof vqcPass === 'boolean' ? vqcPass : (vqcScore != null && vqcScore >= PASS_THRESHOLD));\n// off_brand flag set by cco/visual-qc when brand_relevance < threshold (image unrelated to brand).\nconst offBrand = (vqcResp.result?.off_brand ?? vqcResp.off_brand) === true;\nconst route = prep.__route;\n\n// CCO Arabic QC returns an ARRAY of evaluations ({ ok, result: [ {score, negpat_flag,...} ] }).\n// FIX: read result[0] (NOT result.evaluations[0], which made cco_score always 0). A missing\n// score is null (unknown) and never forces a hold. cco_score is metadata only — brand relevance\n// is judged on the IMAGE in cco/visual-qc, so we do NOT gate on the caption-level cco_score.\nconst ccoResp = $('POST /api/agents/cco/qc').first().json;\nconst ccoArr = Array.isArray(ccoResp.result) ? ccoResp.result\n  : (Array.isArray(ccoResp.evaluations) ? ccoResp.evaluations\n  : (ccoResp.result?.evaluations || ccoResp.evaluations || []));\nconst ccoEval = ccoArr[0] || {};\nconst cco_score = (typeof ccoEval.score === 'number') ? ccoEval.score : null;\nconst gate = ($('Derive route').first().json.gate) || {};\n\n// HOLD POLICY (generate-then-review): hold for admin review when visual QC fails (this now\n// includes OFF-BRAND images), or when the CEO raised a non-maturity human-gate. A purely\n// brand-maturity soft gate (e.g. first_ever_client_output) still auto-delivers.\nconst ceoHumanGate = !!(gate && gate.human_gate_required === true);\nconst SOFT_IGNORE = new Set(['first_ever_client_output','brand_maturity_low']);\nconst gateReasons = (gate.human_gate_reasons || []).filter(Boolean);\nconst onlySoftMaturity = gateReasons.length > 0 && gateReasons.every(function (r) { return SOFT_IGNORE.has(r); });\n\n// IMAGE VERIFICATION GATE (cco/image-verify): second vision gate scoring how well\n// the generated asset matches the user's request (prompt_adherence) + the brand\n// guidelines (brand_consistency). FAIL-OPEN: a missing / errored / vision_failed\n// response NEVER holds — the gate adds protection, never new failure modes.\nlet verifyResp = {};\ntry { verifyResp = $('POST /api/agents/cco/image-verify').first().json || {}; } catch (e) { verifyResp = {}; }\nconst verify = verifyResp.result || verifyResp || {};\nconst verifyRan = (typeof verify.pass === 'boolean') && verify.vision_failed !== true;\nconst verifyPass = verifyRan ? verify.pass : true;\n\nconst needs_review = (!visualPass) || (!verifyPass) || (ceoHumanGate && !onlySoftMaturity);\n\nlet trigger_reason;\nif (!visualPass) {\n  trigger_reason = offBrand ? 'off_brand' : 'visual_qc_failed';\n} else if (!verifyPass) {\n  trigger_reason = (verify.brand_consistency != null && verify.brand_consistency < 60) ? 'brand_mismatch' : 'prompt_mismatch';\n} else {\n  trigger_reason = gateReasons.length > 0 ? gateReasons.join('|') : 'ceo_hold';\n}\nconst flags = {\n  reason: !visualPass ? (offBrand ? 'off_brand' : 'visual_qc_failed') : (!verifyPass ? trigger_reason : 'human_gate'),\n  request_id: prep.__trigger.request_id,\n  negpat_flag: ccoEval.negpat_flag || 'NONE',\n  brave_route_flag: ccoEval.brave_route_flag || false,\n  brand_relevance: (vqcResp.result?.brand_relevance ?? vqcResp.brand_relevance ?? null),\n  cco_score: cco_score,\n  // Image-verify evaluation details — shown in admin QA (flags JSONB passthrough).\n  prompt_adherence: (verify.prompt_adherence != null ? verify.prompt_adherence : null),\n  brand_consistency: (verify.brand_consistency != null ? verify.brand_consistency : null),\n  verify_missing: (verify.missing_elements || []).slice(0, 10),\n  verify_mismatches: (verify.mismatches || []).slice(0, 10),\n  verify_reasoning: (((verify.reasoning || '') + '').slice(0, 500)) || null,\n};\n// ACCURATE SCORING: when the vision model failed (safe-pass path returns a\n// fabricated 85/90), store NULL so the admin UI shows '—' instead of a fake\n// number. A real score is stored as-is; there is no invented fallback anymore.\nconst vqcFailed = ((vqcResp.result?.vision_failed ?? vqcResp.vision_failed) === true);\nconst confidence_score = vqcFailed ? null\n  : (vqcResp.result?.score != null) ? vqcResp.result.score\n  : (vqcResp.score != null ? vqcResp.score : null);\n\n// CHAIN TRACEABILITY: the selected chain + product descriptor were resolved by the CEO and\n// passed to N8N-V01 via \"Prepare V01 call\" (weavyContext.chain_id, e.g. \"U05\"). Persist them\n// to calendar_posts so the admin QA UI can show which chain generated the asset.\n// generation_model is best-effort: use V01's resolved model when it echoes one, otherwise\n// leave null and let the admin UI derive it from the chain (chains.fal_model_primary).\nconst v01ctx = $('Prepare V01 call').first().json || {};\nconst chain_id = v01ctx.chain_id || null;\nlet generation_model = null;\ntry {\n  const v01out = $('Restore V01 input').first().json || {};\n  generation_model = v01out.generation_model || v01out.model || v01out.fal_model || v01ctx.generation_model || null;\n} catch (e) { generation_model = null; }\n\nreturn [{ json: {\n  brand_id: prep.__trigger.brand_id,\n  caption_ar: prep.__caption.caption_ar,\n  storage_url: prep.__storage_url,\n  clean_storage_url: prep.__clean_storage_url || null,\n  confidence_score,\n  watermark: route === 'watermark' || route === 'hold' || needs_review,\n  // pending_review = generated but awaiting admin moderation; otherwise draft.\n  status: needs_review ? 'pending_review' : 'draft',\n  media_type: (prep.__trigger.brief && prep.__trigger.brief.media_type) || 'image',\n  on_demand_request_id: prep.__trigger.request_id,\n  // Chain provenance persisted to calendar_posts (read by admin QA UI).\n  chain_id,\n  generation_model,\n  // Final English prompt actually sent to fal.ai (admin QA visibility).\n  image_prompt_en: prep.__image_prompt_en || null,\n  // passthrough (not inserted) — read by \"Prepare hold record\" / \"Needs review?\"\n  needs_review, trigger_reason, flags, cco_score, request_id: prep.__trigger.request_id,\n} }];"
+      },
+      "id": "0310234d-635f-40ec-9d46-352d24eafdf6",
+      "name": "Prepare calendar row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7264,
+        -1344
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "calendar_posts",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "position",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "caption_ar",
+              "fieldValue": "={{ $json.caption_ar }}"
+            },
+            {
+              "fieldId": "storage_url",
+              "fieldValue": "={{ $json.storage_url }}"
+            },
+            {
+              "fieldId": "clean_storage_url",
+              "fieldValue": "={{ $json.clean_storage_url }}"
+            },
+            {
+              "fieldId": "confidence_score",
+              "fieldValue": "={{ $json.confidence_score }}"
+            },
+            {
+              "fieldId": "watermark",
+              "fieldValue": "={{ $json.watermark }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "on_demand_request_id",
+              "fieldValue": "={{ $json.on_demand_request_id }}"
+            },
+            {
+              "fieldId": "media_type",
+              "fieldValue": "={{ $json.media_type }}"
+            },
+            {
+              "fieldId": "chain_id",
+              "fieldValue": "={{ $json.chain_id }}"
+            },
+            {
+              "fieldId": "generation_model",
+              "fieldValue": "={{ $json.generation_model }}"
+            },
+            {
+              "fieldId": "image_prompt_en",
+              "fieldValue": "={{ $json.image_prompt_en }}"
+            },
+            {
+              "fieldId": "post_id",
+              "fieldValue": "={{ $('Prepare V01 call').first().json.post_id }}"
+            }
+          ]
+        }
+      },
+      "id": "1cb7317d-be3d-4392-ac90-60e4f7e11e3c",
+      "name": "Insert calendar_posts",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        7488,
+        -1344
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Prepare V01 call').first().json.trigger;\nconst insertedPost = $('Insert calendar_posts').first().json;\n// BUG FIX 5: For video, the fal.ai animation job is still queued — the video has NOT rendered\n// yet. Set status='generating' so the UI shows a progress placeholder. The video-callback\n// route (/api/webhooks/fal-ai/video-callback) will set status='delivered' when the MP4 is\n// uploaded to Supabase Storage (2-5 min later). For images the asset is already in Storage,\n// so 'delivered' is correct immediately.\nconst isVideo = !!(trigger.brief && trigger.brief.media_type === 'video');\nreturn [{ json: { request_id: trigger.request_id, status: isVideo ? 'generating' : 'delivered', delivered_at: isVideo ? null : new Date().toISOString(), post_id: insertedPost.post_id || null } }];\n"
+      },
+      "id": "92ffbc84-76e2-4adc-a18e-48055b2fb5cc",
+      "name": "Prepare on_demand update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8480,
+        -1776
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "on_demand_requests",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Verify HMAC + parse').first().json.request_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ ['delivered','held','failed','generating'].includes(($json.status||'').trim()) ? ($json.status||'').trim() : 'held' }}"
+            }
+          ]
+        }
+      },
+      "id": "8d4b85ca-63c2-49b6-97f0-82803c4a54ef",
+      "name": "Update on_demand_requests",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        9328,
+        -1520
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst trigger = $('Verify HMAC + parse').first().json;\nconst status = ($json.status || '').toString().trim();\nconst failureReason = ($json.failure_reason || '').toString().trim();\nconst nominations = (status === 'failed' && failureReason === 'visual_qc_failed')\n  ? [{ nomination_type: 'negative_pattern_add', nomination_data: { pattern: 'visual_qc_failed' } }]\n  : [];\nconst payload = { flow_id: 'N8N-A02', brand_id: trigger.brand_id, payload: { nominations } };\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', (function(){try{return $env.N8N_WEBHOOK_SECRET||null}catch(_){return null}})()||'test-webhook-secret-123').update(raw).digest('hex');\nreturn [{ json: { url: 'https://petition-cupid-buffed.ngrok-free.dev/api/agents/ceo/nominate', body: raw, headers: { 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() } } }];\n"
+      },
+      "id": "6e6b3df3-11be-4263-a467-fa71cf05dd68",
+      "name": "Prepare memory nomination",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9536,
+        -1520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "309f1157-2a14-40ec-8e6b-96c98dcec83d",
+      "name": "POST /api/agents/ceo/nominate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9760,
+        -1520
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst trigger = $('Verify HMAC + parse').first().json;\nconst payload = { event_type: 'on_demand_complete', flow_id: 'N8N-A02', brand_id: trigger.brand_id, payload: { request_id: trigger.request_id } };\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', (function(){try{return $env.N8N_WEBHOOK_SECRET||null}catch(_){return null}})()||'test-webhook-secret-123').update(raw).digest('hex');\nreturn [{ json: { url: 'https://petition-cupid-buffed.ngrok-free.dev/api/webhooks/n8n', body: raw, headers: { 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() } } }];\n"
+      },
+      "id": "4e364558-9406-4139-81bc-8a1dd3f2fcf2",
+      "name": "Prepare final callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9984,
+        -1520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "77cba35e-b350-4fbb-9142-5102eba03922",
+      "name": "POST final callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10208,
+        -1520
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, request_id: $('Verify HMAC + parse').first().json.request_id }) }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "e370f5e6-781e-4443-a423-6b75f58cd183",
+      "name": "Respond 202",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -4192,
+        -1168
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Catches HTTP-level failures from agent call nodes.\n// Runs in the SAME execution — $('Verify HMAC + parse') is accessible here.\nconst err = $json.error ?? {};\nlet request_id = null;\nlet brand_id   = null;\ntry {\n  const p = $('Verify HMAC + parse').first().json;\n  request_id = p.request_id ?? null;\n  brand_id   = p.brand_id   ?? null;\n} catch (_) {}\nreturn [{ json: {\n  _error_message: String(err.message || err.description || 'node_error').slice(0, 500),\n  _failed_node:   ($json.node?.name ?? 'unknown'),\n  _request_id:    request_id,\n  _brand_id:      brand_id,\n}}];\n"
+      },
+      "id": "a706a53e-8c47-457d-8459-95d86b309451",
+      "name": "Catch Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11376,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// HMAC-signed S03 anomaly alert built from Catch Error output.\n// request_id is always available here — Catch Error reads it from Verify HMAC + parse\n// within the same execution.\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\n\nconst request_id    = $json._request_id    ?? null;\nconst brand_id      = $json._brand_id      ?? null;\nconst error_message = $json._error_message ?? 'A02 on-demand flow failed';\nconst failed_node   = $json._failed_node   ?? null;\n\nconst makeUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n  const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\n\nconst body = JSON.stringify({\n  anomaly_id:   makeUUID(),\n  anomaly_type: 'n8n_failure',\n  severity:     'error',\n  source_flow:  'N8N-A02',\n  brand_id,\n  message:      error_message,\n  details:      { failed_node, request_id },\n  timestamp:    new Date().toISOString(),\n});\n\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn [{ json: {\n  _body: body,\n  _headers: {\n    'content-type':     'application/json',\n    'x-n8n-signature':  sig,\n    'x-n8n-request-id': `${$execution.id}-err-a02`,\n    'x-n8n-timestamp':  new Date().toISOString(),\n  },\n  _request_id:     request_id,\n  _failure_reason: error_message,\n}}];\n"
+      },
+      "id": "fccee69c-dc3c-4cce-867f-85bae73d6124",
+      "name": "Build S03 alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11600,
+        1168
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogztudios.app.n8n.cloud/webhook/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "b4d1af7e-045e-4393-a746-23b39c4bd283",
+      "name": "POST · S03 anomaly-alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        12016,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const request_id = $json._request_id;\nif (!request_id) return [];\nconst msg = (() => { try { return JSON.parse($json._body).message; } catch(_) { return 'workflow_error'; } })();\nreturn [{ json: { request_id, failure_reason: String(msg).slice(0, 500) } }];\n"
+      },
+      "id": "faa3e2eb-b091-44c0-a710-dcd81a3b6728",
+      "name": "Extract request_id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11824,
+        1296
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "on_demand_requests",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.request_id }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "queued"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "failed"
+            },
+            {
+              "fieldId": "failure_reason",
+              "fieldValue": "={{ $json.failure_reason }}"
+            }
+          ]
+        }
+      },
+      "id": "c9082c45-5d04-4ace-8cbb-ce07f33f9eed",
+      "name": "Mark as failed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        12032,
+        1296
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a02-needs-review-cond",
+              "leftValue": "={{ $('Prepare calendar row').first().json.needs_review }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "863c0662-0fbd-441f-884e-bea56e55f2d5",
+      "name": "Needs review?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        7712,
+        -1328
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "jwue3vLKCosPK5U2",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/jwue3vLKCosPK5U2",
+          "cachedResultName": "N8N-V01 — Visual Generation (Testing Mode1)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        5856,
+        -1136
+      ],
+      "id": "2e360fab-febe-4713-8842-75f7afb3a887",
+      "name": "Call 'N8N-V01 — Visual Generation (Testing Mode1)'",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst prep = $('Prepare visual QC').first().json;\nconst trigger = prep.__trigger;\n\n// IMAGE VERIFICATION GATE (prompt adherence + brand consistency).\n// Judge the CLEAN asset when available (no Arabic overlay to confuse adherence);\n// for video __clean_storage_url is the keyframe (the frame the animator renders).\n// A null image_url is handled by the route as a SAFE PASS (fail-open) — this\n// gate can hold, but can never fail a request that would otherwise deliver.\nconst imageUrl = prep.__clean_storage_url || prep.__storage_url || null;\nconst userPrompt = (((trigger.brief && trigger.brief.hero_concept) || '') + '').slice(0, 2000);\nconst composed = ((prep.__image_prompt_en || '') + '').slice(0, 2000);\n\nconst payload = { flow_id: 'N8N-A02', brand_id: trigger.brand_id, payload: { image_url: imageUrl, user_prompt: userPrompt || 'no specific request provided', composed_prompt_en: composed || null } };\nconst raw = JSON.stringify(payload);\nconst sig = crypto.createHmac('sha256', (function(){try{return $env.N8N_WEBHOOK_SECRET||null}catch(_){return null}})()||'test-webhook-secret-123').update(raw).digest('hex');\nreturn [{ json: { url: 'https://petition-cupid-buffed.ngrok-free.dev/api/agents/cco/image-verify', body: raw, headers: { 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() } } }];\n"
+      },
+      "id": "a02-imgverify-prep-0001-000000000001",
+      "name": "Prepare image verify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6688,
+        -1232
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "a02-imgverify-http-0001-000000000002",
+      "name": "POST /api/agents/cco/image-verify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6880,
+        -1232
+      ],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook (POST /webhook-test/openclaw-a02)": {
+      "main": [
+        [
+          {
+            "node": "Verify HMAC + parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify HMAC + parse": {
+      "main": [
+        [
+          {
+            "node": "Respond 202",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 202": {
+      "main": [
+        [
+          {
+            "node": "Supabase: load brand_profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: load brand_profiles": {
+      "main": [
+        [
+          {
+            "node": "Initial confidence gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initial confidence gate": {
+      "main": [
+        [
+          {
+            "node": "Is Blocked?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Blocked?": {
+      "main": [
+        [
+          {
+            "node": "Handle Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare CEO classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Blocked": {
+      "main": [
+        [
+          {
+            "node": "Update on_demand_requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare CEO classify": {
+      "main": [
+        [
+          {
+            "node": "POST /api/agents/ceo/classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/agents/ceo/classify": {
+      "main": [
+        [
+          {
+            "node": "Log routing_decision (CEO1)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Catch Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log routing_decision (CEO1)": {
+      "main": [
+        [
+          {
+            "node": "Insert routing_decisions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert routing_decisions": {
+      "main": [
+        [
+          {
+            "node": "Step: ceo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step: ceo": {
+      "main": [
+        [
+          {
+            "node": "IF requires reference image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF requires reference image": {
+      "main": [
+        [
+          {
+            "node": "Fetch reference image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No reference needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch reference image": {
+      "main": [
+        [
+          {
+            "node": "Extract ref URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract ref URL": {
+      "main": [
+        [
+          {
+            "node": "Merge context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No reference needed": {
+      "main": [
+        [
+          {
+            "node": "Merge context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge context": {
+      "main": [
+        [
+          {
+            "node": "Prepare COO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare COO": {
+      "main": [
+        [
+          {
+            "node": "POST /api/agents/coo/compile-caption-context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/agents/coo/compile-caption-context": {
+      "main": [
+        [
+          {
+            "node": "Step: coo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Catch Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step: coo": {
+      "main": [
+        [
+          {
+            "node": "IF dialect_confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF dialect_confirmed": {
+      "main": [
+        [
+          {
+            "node": "Prepare DeepSeek",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hold: dialect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hold: dialect": {
+      "main": [
+        [
+          {
+            "node": "Insert into qa_review_queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare DeepSeek": {
+      "main": [
+        [
+          {
+            "node": "POST /api/agents/deepseek/generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/agents/deepseek/generate": {
+      "main": [
+        [
+          {
+            "node": "Step: caption",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Catch Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step: caption": {
+      "main": [
+        [
+          {
+            "node": "Prepare CCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare CCO": {
+      "main": [
+        [
+          {
+            "node": "POST /api/agents/cco/qc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/agents/cco/qc": {
+      "main": [
+        [
+          {
+            "node": "Step: qc",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Catch Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step: qc": {
+      "main": [
+        [
+          {
+            "node": "Prepare CEO confidence gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare CEO confidence gate": {
+      "main": [
+        [
+          {
+            "node": "POST /api/agents/ceo/confidence-gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/agents/ceo/confidence-gate": {
+      "main": [
+        [
+          {
+            "node": "Derive route",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Catch Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Derive route": {
+      "main": [
+        [
+          {
+            "node": "Prepare V01 call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare hold record": {
+      "main": [
+        [
+          {
+            "node": "Insert hold into qa_review_queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert hold into qa_review_queue": {
+      "main": [
+        [
+          {
+            "node": "Update on_demand_requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare V01 call": {
+      "main": [
+        [
+          {
+            "node": "Step: image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Step: image": {
+      "main": [
+        [
+          {
+            "node": "Restore V01 input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore V01 input": {
+      "main": [
+        [
+          {
+            "node": "Call 'N8N-V01 — Visual Generation (Testing Mode1)'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare visual QC": {
+      "main": [
+        [
+          {
+            "node": "POST /api/agents/cco/visual-qc",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Catch Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/agents/cco/visual-qc": {
+      "main": [
+        [
+          {
+            "node": "Prepare image verify",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Catch Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare image verify": {
+      "main": [
+        [
+          {
+            "node": "POST /api/agents/cco/image-verify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/agents/cco/image-verify": {
+      "main": [
+        [
+          {
+            "node": "IF visual QC passes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF visual QC passes": {
+      "main": [
+        [
+          {
+            "node": "Prepare calendar row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare calendar row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare calendar row": {
+      "main": [
+        [
+          {
+            "node": "Insert calendar_posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert calendar_posts": {
+      "main": [
+        [
+          {
+            "node": "Needs review?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare on_demand update": {
+      "main": [
+        [
+          {
+            "node": "Update on_demand_requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update on_demand_requests": {
+      "main": [
+        [
+          {
+            "node": "Prepare memory nomination",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare memory nomination": {
+      "main": [
+        [
+          {
+            "node": "POST /api/agents/ceo/nominate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST /api/agents/ceo/nominate": {
+      "main": [
+        [
+          {
+            "node": "Prepare final callback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Catch Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare final callback": {
+      "main": [
+        [
+          {
+            "node": "POST final callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST final callback": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Catch Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert into qa_review_queue": {
+      "main": [
+        [
+          {
+            "node": "Update on_demand_requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build S03 alert": {
+      "main": [
+        [
+          {
+            "node": "POST · S03 anomaly-alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extract request_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract request_id": {
+      "main": [
+        [
+          {
+            "node": "Mark as failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Catch Error": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs review?": {
+      "main": [
+        [
+          {
+            "node": "Prepare hold record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare on_demand update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'N8N-V01 — Visual Generation (Testing Mode1)'": {
+      "main": [
+        [
+          {
+            "node": "Prepare visual QC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Catch Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d2899b54-9bbb-46ad-b182-90d503217dac",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6b82bfa883d8b0ed7859b6f0ce362a41be2730aad080ae279216f1911379c19c"
+  },
+  "id": "twnN7HG8zHNiGpwP",
+  "tags": []
+}

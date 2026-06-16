@@ -1,0 +1,260 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// ── PARALLEL GENERATE (replaces serial Loop + Call V01 each) ──────────────────\n// Fires every claimed post's /api/image/generate (or /generate-video) call\n// CONCURRENTLY with bounded parallelism, then PATCHes each result to the DB.\n// The Sharp Arabic overlay + Supabase upload happen INSIDE /api/image/generate\n// (server side), so calling it directly keeps Hard Rule #3 + C2PA intact.\n// ~60 images ÷ CONCURRENCY × ~15s  →  ~2-3 min instead of ~22 min serial.\nconst crypto = require('crypto');\nconst SUPABASE_URL = 'https://redzmrlzhxkkpgcokgvl.supabase.co';\nconst SERVICE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo';\nconst SECRET       = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst API_HOST     = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nconst CONCURRENCY  = 5;     // 5 in flight. Math: image≈12s, video≈25s (keyframe sync).\n                             // CONCURRENCY=8 caused all 10 posts to start simultaneously\n                             // → video posts blocked slots for 25s → image posts piled up\n                             // → some HTTP calls still in flight when n8n 60s kill hit\n                             // → those posts left as visual_processing zombies forever.\n                             // 5 concurrent: 5 start, slot frees at ~12s, next 5 start,\n                             // wall-clock ≈ 24s for 8 image + 2 video → safe within 50s deadline.\n\nconst http = async (opts) => {\n  try { const r = await this.helpers.httpRequest({ ...opts, returnFullResponse:true });\n        return { ok:(r.statusCode>=200&&r.statusCode<300), status:r.statusCode, body:r.body }; }\n  catch (e) { const b=e&&e.response&&e.response.body; return { ok:false, status:(e&&e.statusCode)||0, body: b!==undefined?b:{error:(e&&e.message)} }; }\n};\nconst sign = (s) => crypto.createHmac('sha256', SECRET).update(s).digest('hex');\nconst patch = (post_id, fields) => http({\n  method:'PATCH', url: SUPABASE_URL+'/rest/v1/calendar_posts?post_id=eq.'+post_id,\n  headers:{ apikey:SERVICE_KEY, Authorization:'Bearer '+SERVICE_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },\n  body: fields, json:true, timeout:20000,\n});\n\n// ── route + payload builder (ported from 'Map Post -> V01 Input') ──\nfunction buildReq(post) {\n  // FAIL-SAFE: a missing CCO score must route to HOLD (human review), never\n  // default to 75 (=CLEAN). scoreKnown distinguishes 'no score' from a real low one.\n  const scoreKnown = typeof post.cco_score === 'number';\n  const score = scoreKnown ? post.cco_score : null;\n  const forcedReview = post.requires_human_review === true || !!post.hold_reason || !scoreKnown;\n  let route;\n  if (forcedReview) route='HOLD';\n  else if (post.negpat_flag==='HARD_BLOCK') route='HOLD';\n  else if (score<50) route='HOLD';\n  else if (score<75 || post.negpat_flag==='STRONG_WARN' || post.brave_route_flag) route='WATERMARK';\n  else route='CLEAN';\n  const isVideo = (post.format==='video')||(post.format_tier==='video');\n  const month = (post.posting_time||'').substring(0,7) || '2026-06';\n  const GRAVITY={ south:'bottom-right', north:'top-right', center:'center-right' };\n  const hexes = ((post.primary_color_hex||'')+' '+(post.brand_color_palette||'')).match(/#[0-9a-fA-F]{3,8}/g)||[];\n  const palette_hex = [...new Set(hexes)].length ? [...new Set(hexes)] : ['#000000','#ffffff'];\n  const prompt_en = post.image_prompt_en || post.visual_brief_en || 'product lifestyle photography, clean background, natural lighting';\n  const payload = {\n    prompt_en, visual_brief_en: prompt_en,\n    brand_name_ar: post.brand_name_ar || '', headline_ar: post.caption_ar || '',\n    caption_ar: post.caption_ar || '', dialect: post.dialect || 'MSA_formal',\n    channel: post.channel || 'Instagram',\n    objective: post.content_type==='offer' ? 'conversion' : 'awareness',\n    confidence_flag: route==='WATERMARK' ? 'watermark_required' : 'clean',\n    cost_constraint: 'normal', palette_hex,\n    month, score, confidence_score: score,\n    expected_media_type: isVideo ? 'video' : 'image',\n    chain_id: post.chain_id || null,\n    chain_context: { product_descriptor: post.product_descriptor || 'product',\n      brand_color_palette: post.brand_color_palette || '', occasion_visual_motif: post.occasion_visual_motif || '' },\n    layout: GRAVITY[post.sharp_text_gravity || 'south'] || 'bottom-right',\n    first_ever_post: (Number(post.total_calendars_generated)||0)===0,\n  };\n  const body = JSON.stringify({ flow_id:'N8N-V01', brand_id: post.brand_id, post_id: post.post_id, payload });\n  // ALL posts go to /api/image/generate — it handles async video internally via\n  // expected_media_type='video' + NEXT_PUBLIC_APP_URL webhook. /api/image/generate-video\n  // is a legacy minimal route that lacks brand_name_ar, dialect, palette_hex, score,\n  // confidence_flag and does its own incomplete prompt assembly — sending video posts\n  // there caused irrelevant images (red doors etc.) because the brief was ignored.\n  const url = API_HOST+'/api/image/generate';\n  return { post, route, score, isVideo, month, url, body };\n}\n\n// ── process ONE post: call API, then PATCH DB ──\nasync function processOne(post) {\n  const req = buildReq(post);\n  const reqId = crypto.randomUUID();\n  console.log('[Worker][DEBUG] post='+post.post_id+' isVideo='+req.isVideo+' url='+req.url+' prompt_len='+(post.image_prompt_en||'').length+' prompt_preview=\"'+(post.image_prompt_en||'').slice(0,120)+'\"');\n  // Per-call deadline guard: if the node-level deadline already passed by the time\n  // a slot starts this post (can happen if prior processOne() ran long), immediately\n  // release back to pending_visual instead of starting a new 38s HTTP call.\n  if (Date.now() - START > DEADLINE_MS) {\n    await patch(post.post_id, { status:'pending_visual', claimed_at:null }).catch(()=>{});\n    released.push(post.post_id);\n    return { post_id:post.post_id, action:'released_deadline' };\n  }\n  const res = await http({\n    method:'POST', url: req.url,\n    headers:{ 'Content-Type':'application/json', 'x-n8n-signature': sign(req.body),\n              'x-n8n-request-id': reqId, 'x-n8n-timestamp': new Date().toISOString() },\n    body: req.body, timeout: 38000,  // 38s hard cap per call. Image ≈ 12s, video (keyframe) ≈ 25s.\n                                     // 38s ensures a timed-out call returns (error-caught) before\n                                     // the DEADLINE_MS=42s guard fires, giving the guard time to\n                                     // patch remaining posts back to pending_visual before n8n kills\n                                     // the node at 60s. Previous 45s was too close to the 50s deadline.\n  });\n  const r = (res.body && (res.body.result || res.body)) || {};\n  const needsReview = req.route==='HOLD' || req.route==='WATERMARK';\n  console.log('[Worker][DEBUG] post='+post.post_id+' response status='+res.status+' ok='+res.ok+' storage_url='+(r.storage_url||r.clean_storage_url||'null')+' async_submitted='+(r.async_submitted||false)+' compliance_blocked='+(r.compliance_blocked||false));\n\n  // VIDEO: /api/image/generate handles video async internally and returns\n  // { async_submitted:true, clean_storage_url: keyframe_url } — park as video_processing.\n  // Sweep Video Processing finalizes it when the .mp4 lands via fal webhook.\n  if (req.isVideo) {\n    if (res.ok) {\n      // async_submitted=true  → video queued, keyframe stored as fallback still\n      // async_submitted=false → sync video completed, storage_url has the .mp4\n      const asyncVideo = r.async_submitted === true;\n      const videoUrl = r.storage_url || null;\n      await patch(post.post_id, {\n        status: asyncVideo ? 'video_processing' : (videoUrl ? 'clean' : 'failed_visual'),\n        video_status: asyncVideo ? 'processing' : (videoUrl ? 'completed' : 'failed'),\n        ...(videoUrl && !asyncVideo ? { storage_url: videoUrl } : {}),\n        route_decision:req.route.toLowerCase(), cco_score:req.score, confidence_score:req.score,\n        claimed_at:null, hold_reason: post.hold_reason||null,\n        visual_failed: !asyncVideo && !videoUrl,\n      });\n      return { post_id:post.post_id, kind:'video', action: asyncVideo ? 'submitted' : (videoUrl ? 'clean' : 'failed') };\n    }\n    await patch(post.post_id, { status:'failed_visual', video_status:'failed', visual_failed:true,\n      claimed_at:null, last_error:('video submit '+res.status) });\n    return { post_id:post.post_id, kind:'video', action:'failed', status:res.status };\n  }\n\n  // IMAGE: storage_url from response, else self-heal via deterministic path.\n  let storage_url = r.storage_url || r.clean_storage_url || null;\n  if (!storage_url) {\n    const cand = SUPABASE_URL+'/storage/v1/object/public/post-images/clients/'+post.brand_id+'/calendars/'+req.month+'/'+post.post_id+'.jpg';\n    const head = await http({ method:'GET', url:cand, json:false, timeout:15000 });\n    if (head.ok) storage_url = cand;\n  }\n  const visual_failed = !res.ok || !storage_url;\n  await patch(post.post_id, {\n    storage_url, status: visual_failed ? 'failed_visual' : 'clean',\n    route_decision: req.route.toLowerCase(), cco_score:req.score, confidence_score:req.score,\n    watermark: req.route==='WATERMARK', visual_failed, claimed_at:null,\n    requires_human_review: needsReview,\n    hold_reason: needsReview ? (post.hold_reason||('low_score_'+req.score)) : (post.hold_reason||null),\n    ...(visual_failed ? { last_error:('image gen '+res.status) } : {}),\n  });\n  // Visual QC (GPT-4o vision) — fire-and-forget so it never blocks the 42s deadline.\n  // The route writes visual_score + visual_issues back to calendar_posts itself.\n  // Only run for successfully generated image posts (not video, not failed).\n  if (!visual_failed && !req.isVideo && storage_url) {\n    const vqcBody = JSON.stringify({ flow_id:'N8N-V01', brand_id:post.brand_id, payload:{\n      image_url: storage_url, post_id: post.post_id,\n      chain_id: post.chain_id || undefined,\n      visual_brief_en: post.image_prompt_en || undefined,\n      content_type: post.content_type || undefined,\n      occasion_flags: Array.isArray(post.occasion_flags) ? post.occasion_flags : undefined,\n    }});\n    // AWAITED — not fire-and-forget. After visual-qc scores the image, we re-call\n    // confidence-gate with the real visual score so the composite is fully computed\n    // (Visual 35% + Caption 30% + Brand 20% + Occasion 15%). Without this re-call,\n    // A01-generated posts always show a partial composite (visual excluded) in admin QA.\n    let vqcResult = null;\n    try {\n      vqcResult = await http({ method:'POST', url: API_HOST+'/api/agents/cco/visual-qc',\n        headers:{'Content-Type':'application/json','x-n8n-signature':sign(vqcBody),\n                 'x-n8n-request-id':crypto.randomUUID(),'x-n8n-timestamp':new Date().toISOString()},\n        body: vqcBody, timeout: 30000 });\n    } catch(_) {}\n    // Re-call confidence-gate with the visual result so it can compute the full 4-pillar\n    // composite and write flags.pillars.visual. Only if visual-qc returned a score.\n    const vqcScore = vqcResult && vqcResult.body && (vqcResult.body.visual_score ?? vqcResult.body.result?.visual_score);\n    if (typeof vqcScore === 'number') {\n      try {\n        const ccoResultForPost = [{\n          post_id: post.post_id,\n          score: typeof post.cco_score === 'number' ? post.cco_score : 0,\n          brave_route_flag: post.brave_route_flag || false,\n          negpat_flag: post.negpat_flag || 'NONE',\n          cultural_flag: post.cultural_flag || false,\n          dialect_flag: post.dialect_flag || false,\n          issues: Array.isArray(post.cco_issues) ? post.cco_issues : [],\n        }];\n        const cgBody = JSON.stringify({\n          flow_id: 'N8N-V01',\n          brand_id: post.brand_id,\n          payload: {\n            request_type: 'calendar_scheduled',\n            trigger_payload: {},\n            cco_results: ccoResultForPost,\n            visual_qc_results: [{\n              post_id: post.post_id,\n              visual_score: vqcScore,\n              visual_issues: (vqcResult.body.visual_issues || vqcResult.body.result?.visual_issues || []),\n              violations: (vqcResult.body.violations || vqcResult.body.result?.violations || []),\n            }],\n            occasion_flags: Array.isArray(post.occasion_flags) ? post.occasion_flags : [],\n          }\n        });\n        await http({ method:'POST', url: API_HOST+'/api/agents/ceo/confidence-gate',\n          headers:{'Content-Type':'application/json','x-n8n-signature':sign(cgBody),\n                   'x-n8n-request-id':crypto.randomUUID(),'x-n8n-timestamp':new Date().toISOString()},\n          body: cgBody, timeout: 20000 }).catch(()=>{});\n      } catch(_) {}\n    }\n  }\n  // QA queue row for flagged-but-generated posts.\n  if (!visual_failed && needsReview) {\n    await http({ method:'POST', url: SUPABASE_URL+'/rest/v1/qa_review_queue',\n      headers:{ apikey:SERVICE_KEY, Authorization:'Bearer '+SERVICE_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },\n      body: JSON.stringify({ brand_id:post.brand_id, post_id:post.post_id, caption_ar:post.caption_ar||null,\n        storage_url, cco_score:req.score,\n        trigger_reason: req.route==='HOLD' ? (post.hold_reason||('low_score_'+req.score)) : 'watermark_review',\n        held_reason: req.route==='HOLD' ? (post.hold_reason||('low_score_'+req.score)) : null,\n        flags:{ route:req.route, negpat_flag:post.negpat_flag||'NONE', brave_route_flag:post.brave_route_flag||false,\n                held_detail: post.human_gate_detail||null, human_gate_triggers: post.human_gate_triggers||[] },\n        status:'pending' }), json:true, timeout:15000 });\n  }\n  return { post_id:post.post_id, kind:'image', action: visual_failed?'failed':'clean', storage_url };\n}\n\n// ── bounded-concurrency pool over all claimed posts ──\nconst posts = ($input.all()||[]).map(i=>i.json).filter(p=>p && p.post_id);\nif (posts.length === 0) return [{ json:{ generated:0 } }];\nconst results = [];\nlet cursor = 0;\nconst START = Date.now();\nconst DEADLINE_MS = 42000; // stop launching NEW calls at 42s. Budget: 42s + 38s HTTP timeout\n                           // + ~2s for the patch-back loop = 82s worst-case IF a call is mid-flight\n                           // at deadline. But since we set HTTP timeout=38s, any call started before\n                           // t=42s finishes (or errors) by t=80s. The deadline guard runs, patches all\n                           // un-started posts back to pending_visual, node exits clean at ~44s.\n                           // The reaper (STALE_MINUTES=4) also catches any post claimed but not patched\n                           // back within 4 min, providing a second safety net.\nconst released = [];\nasync function worker(){\n  while(cursor<posts.length){\n    if (Date.now() - START > DEADLINE_MS) {\n      while (cursor < posts.length) { const j=cursor++; const p=posts[j]; released.push(p.post_id);\n        try { await patch(p.post_id, { status:'pending_visual', claimed_at: null }); } catch(_){} }\n      return;\n    }\n    const idx=cursor++;\n    try{ results[idx]=await processOne(posts[idx]); }\n    catch(e){\n      // Unexpected throw from processOne (not an HTTP error — those return {ok:false}).\n      // Patch back to pending_visual so the reaper + next cron tick picks it up.\n      const p=posts[idx];\n      results[idx]={ post_id:p.post_id, action:'error', error:(e&&e.message) };\n      try { await patch(p.post_id, { status:'pending_visual', claimed_at:null, last_error:'worker_throw:'+(e&&e.message||'unknown') }); } catch(_){}\n    }\n  }\n}\nawait Promise.all(Array.from({length: Math.min(CONCURRENCY, posts.length)}, worker));\n\nconst clean = results.filter(r=>r&&r.action==='clean').length;\nconst video = results.filter(r=>r&&r.kind==='video').length;\nconst failed = results.filter(r=>r&&(r.action==='failed'||r.action==='error')).length;\nreturn [{ json:{ generated: posts.length, clean, video_submitted: video, failed, released: released.length, results } }];\n"
+      },
+      "id": "daa8e0ae-7483-4135-a111-21c7f3e92013",
+      "name": "Parallel Generate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        37888,
+        26880
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "loop-more-pending-0001",
+              "leftValue": "={{ $json.generated }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a821c96b-755e-45b5-9be7-15e6f16e2aa6",
+      "name": "More Pending?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        38016,
+        26880
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── RECONCILE VISUALS (self-heal for posts stuck failed_visual/visual_processing) ──\n// For any post whose deterministic Storage asset EXISTS but DB says failed/processing,\n// finalize it as clean. Independent of any n8n pairing. Safety net before claiming new.\nconst SUPABASE_URL='https://redzmrlzhxkkpgcokgvl.supabase.co'; const SERVICE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo';\nconst BUCKET=SUPABASE_URL+'/storage/v1/object/public/post-images/clients/'; const LIMIT=60;\nconst sget=async(u)=>{ try{const r=await this.helpers.httpRequest({method:'GET',url:u,returnFullResponse:true,json:false,timeout:12000});const c=r&&(r.statusCode||r.status);return c>=200&&c<300;}catch(_){return false;} };\nconst patch=async(id,f)=>{ try{await this.helpers.httpRequest({method:'PATCH',url:SUPABASE_URL+'/rest/v1/calendar_posts?post_id=eq.'+id,headers:{apikey:SERVICE_KEY,Authorization:'Bearer '+SERVICE_KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:f,json:true,timeout:15000});return true;}catch(_){return false;} };\nlet rows=[];\ntry{ rows=await this.helpers.httpRequest({method:'GET',url:SUPABASE_URL+'/rest/v1/calendar_posts?status=in.(failed_visual,visual_processing)&select=post_id,brand_id,posting_time,format,route_decision,cco_score,hold_reason&order=updated_at.asc&limit='+LIMIT,headers:{apikey:SERVICE_KEY,Authorization:'Bearer '+SERVICE_KEY},json:true,timeout:20000}); }catch(_){ rows=[]; }\nif(!Array.isArray(rows)||rows.length===0) return [{json:{reconciled:0}}];\nlet recovered=0;\nfor(const p of rows){\n  if(!p.brand_id||!p.post_id) continue;\n  const month=(p.posting_time||'').substring(0,7)||'2026-06';\n  const base=BUCKET+p.brand_id+'/calendars/'+month+'/'+p.post_id;\n  const isVideo=p.format==='video';\n  const route=(p.route_decision||(typeof p.cco_score==='number'?'clean':'hold')).toUpperCase();\n  const needsReview=route==='HOLD'||route==='WATERMARK';\n  const score=(typeof p.cco_score==='number')?p.cco_score:null;\n  let url=null,fmt='image';\n  if(isVideo && await sget(base+'.mp4')){ url=base+'.mp4'; fmt='video'; }\n  if(!url){ if(await sget(base+'-clean.jpg')) url=base+'-clean.jpg'; else if(await sget(base+'.jpg')) url=base+'.jpg'; }\n  if(!url) continue;\n  await patch(p.post_id,{ storage_url:url, status:'clean', format:fmt, format_tier:fmt, media_type:fmt,\n    ...(fmt==='video'?{video_status:'completed'}:{}), visual_failed:false, claimed_at:null, last_error:null,\n    cco_score:score, confidence_score:score, route_decision:route.toLowerCase(),\n    requires_human_review:needsReview, hold_reason: needsReview?(p.hold_reason||('low_score_'+score)):(p.hold_reason||null) });\n  recovered++;\n}\nreturn [{json:{reconciled:recovered,scanned:rows.length}}];\n"
+      },
+      "id": "42708319-a421-44ce-bef6-24e12cf5d048",
+      "name": "Reconcile Visuals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        37248,
+        26880
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 1,
+              "unit": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "70c4fd92-2465-4803-9a0b-481c88bfef50",
+      "name": "Cron: Worker Tick (1 min)1",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        36752,
+        27072
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Worker: Reap Stale Claims — uses n8n's built-in HTTP helper (no global fetch, inline secrets).\nconst SUPABASE_URL = 'https://redzmrlzhxkkpgcokgvl.supabase.co';\nconst SERVICE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo';\nconst STALE_MINUTES = 4;  // MUST exceed a full claim-all drain (≈50 posts ÷ 5 concurrent\n                           // × ~25s ≈ 15-20 min). If set too low (was 5), the reaper would\n                           // un-claim posts THIS run is still actively generating → the next\n                           // cron tick re-claims them → double-generation / wasted cost.\n                           // 30 min safely covers a 3-month drain yet still recovers a run\n                           // that genuinely died (n8n crash, timeout).\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST',\n    url: SUPABASE_URL + '/rest/v1/rpc/reap_stale_visual_claims',\n    headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY, 'Content-Type': 'application/json' },\n    body: { p_stale_minutes: STALE_MINUTES }, json: true, timeout: 20000,\n  });\n} catch (e) {} // best-effort; never block the tick\nreturn [{ json: { reaped_tick: true } }];\n"
+      },
+      "id": "ca47f528-5e35-4f0a-98ce-9644f6ffcad9",
+      "name": "Reap Stale Claims1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        37024,
+        26896
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Worker: Claim Batch (atomic) — built-in HTTP helper.\nconst SUPABASE_URL = 'https://redzmrlzhxkkpgcokgvl.supabase.co';\nconst SERVICE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo';\n// CLAIM-ALL-THEN-BATCH: grab the WHOLE pending queue in one go (up to BATCH), then\n// 'Loop Over Items' (batchSize 5) processes them 5-at-a-time INTERNALLY within this\n// single run — looping until every claimed post is done. This means ONE trigger\n// drains the entire calendar; you no longer re-trigger per 5. Atomic claim_pending_visual\n// prevents two runs grabbing the same post, so no data loss even if cron overlaps.\nconst BATCH = 10;  // claim the full calendar at once (3 months ≈ 50-60 posts << 200).\n                    // The internal Loop Over Items still paces generation 5 concurrently.\nlet claimed;\ntry {\n  claimed = await this.helpers.httpRequest({\n    method: 'POST',\n    url: SUPABASE_URL + '/rest/v1/rpc/claim_pending_visual',\n    headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY, 'Content-Type': 'application/json' },\n    body: { p_limit: BATCH }, json: true, timeout: 20000,\n  });\n} catch (e) { claimed = []; }\nconst rows = Array.isArray(claimed) ? claimed : [];\n// LOOP SENTINEL: never return [] — an empty output stops the chain, so the\n// 'More Pending?' IF and Completion Sweep would never run. The sentinel item\n// flows through Parallel Generate (filtered out, generated:0) → IF false →\n// Completion Sweep. This is what lets ONE trigger drain the whole queue.\nif (rows.length === 0) return [{ json: { queue_empty: true } }];\nreturn rows.map(r => ({ json: r }));\n"
+      },
+      "id": "cc173c32-af8e-49ef-b20b-f7b6e2f7f3e8",
+      "name": "Claim Batch1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        37664,
+        26880
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Worker: Sweep Video-Processing (close the async-video loop) — built-in HTTP helper.\n// Video renders async (Flux keyframe → Kling/Seedance i2v, 2-5 min). When n8n's\n// Execute-Workflow drops the long-running return payload, Apply parks the post as\n// 'video_processing'. NOTHING else re-checks those — they'd be stuck forever. This\n// node runs every tick and, for each video_processing post:\n//   1) HEAD-check the deterministic .mp4 path → if present, finalize as clean video.\n//   2) else if within the POLL budget → WAIT one more tick (bump tick counter). We do\n//      NOT regenerate — the original Kling/Seedance render is still producing the .mp4;\n//      re-submitting would double-bill and start a fresh job that also times out.\n//   3) else (poll budget elapsed) → FALLBACK to the keyframe still ({post_id}-kf.jpg)\n//      that was uploaded when the render started, so the post is never blank. Only if\n//      the keyframe is ALSO missing do we do ONE clean regenerate, then failed_visual.\n// A post is NEVER left blank, stuck, or needlessly re-rendered.\nconst SUPABASE_URL = 'https://redzmrlzhxkkpgcokgvl.supabase.co';\nconst SERVICE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo';\nconst MAX_VIDEO_POLL_TICKS = 8;  // ~8 cron ticks (~8 min) of POLLING the in-flight render\n                                 // before giving up. Kling/Seedance i2v finish in 2-5 min,\n                                 // so this comfortably covers a normal render without\n                                 // regenerating. We poll, we do NOT re-submit.\nconst BUCKET = SUPABASE_URL + '/storage/v1/object/public/post-images/clients/';\n\nconst sget = async (url) => {\n  try { const r = await this.helpers.httpRequest({ method:'GET', url, returnFullResponse:true, json:false, timeout:15000 }); const c = r && (r.statusCode||r.status); return c>=200&&c<300; } catch(_) { return false; }\n};\nconst patch = async (post_id, fields) => {\n  try { await this.helpers.httpRequest({ method:'PATCH', url: SUPABASE_URL+'/rest/v1/calendar_posts?post_id=eq.'+post_id, headers:{ apikey:SERVICE_KEY, Authorization:'Bearer '+SERVICE_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' }, body:{ ...fields }, json:true, timeout:15000 }); } catch(_) {}\n};\n\n// Pull posts parked in video_processing (limit to keep the tick bounded).\nlet rows = [];\ntry {\n  rows = await this.helpers.httpRequest({\n    method:'GET',\n    url: SUPABASE_URL + '/rest/v1/calendar_posts?status=eq.video_processing&select=post_id,brand_id,posting_time,generation_attempt,cco_score,route_decision,hold_reason&order=updated_at.asc&limit=10',\n    headers:{ apikey:SERVICE_KEY, Authorization:'Bearer '+SERVICE_KEY }, json:true, timeout:20000,\n  });\n} catch(_) { rows = []; }\nif (!Array.isArray(rows) || rows.length === 0) return [{ json: { swept: 0 } }];\n\n// generation_attempt is used here as a TICK COUNTER (~1 tick/min), NOT a regen count.\n// We POLL the same in-flight render; we do NOT regenerate (the first Kling/Seedance\n// job is still producing the .mp4 at the deterministic path — regenerating would burn\n// cost, start a fresh 5-min job that also times out, and almost never yield a video).\nconst out = [];\nfor (const p of rows) {\n  const month = (p.posting_time || '').substring(0,7) || '2026-06';\n  const base  = BUCKET + p.brand_id + '/calendars/' + month + '/' + p.post_id;\n  const ticks = Number(p.generation_attempt) || 0;\n  const route = (p.route_decision || 'clean').toUpperCase();\n  const needsReview = route === 'HOLD' || route === 'WATERMARK';\n\n  // 1) Did the .mp4 land? → finalize as clean video. (The in-flight render finished.)\n  if (await sget(base + '.mp4')) {\n    await patch(p.post_id, { storage_url: base+'.mp4', status:'clean', format:'video', format_tier:'video', media_type:'video', video_status:'completed', visual_failed:false, claimed_at:null, requires_human_review: needsReview, last_error:null });\n    out.push({ json: { post_id:p.post_id, action:'recovered_video' } }); continue;\n  }\n  // 2) Still rendering & within the POLL budget → just wait one more tick. Bump the\n  //    tick counter; do NOT touch status (stays video_processing) and do NOT regenerate.\n  if (ticks < MAX_VIDEO_POLL_TICKS) {\n    await patch(p.post_id, { generation_attempt: ticks + 1, video_status:'processing' });\n    out.push({ json: { post_id:p.post_id, action:'still_rendering', tick: ticks + 1 } }); continue;\n  }\n  // 3) Budget elapsed (render genuinely stuck/failed) → FALLBACK to the keyframe still\n  //    so the post is never blank. The keyframe was uploaded at the start of the render.\n  if (await sget(base + '-kf.jpg')) {\n    await patch(p.post_id, { storage_url: base+'-kf.jpg', status:'clean', format:'image', format_tier:'image', media_type:'image', video_status:'failed', visual_failed:false, claimed_at:null, requires_human_review:true, hold_reason: p.hold_reason || 'video_fell_back_to_image', last_error:'video_render_timed_out_after_'+ticks+'_min' });\n    out.push({ json: { post_id:p.post_id, action:'fallback_keyframe' } }); continue;\n  }\n  // 3b) No keyframe either → ONE clean regenerate as a last resort (covers the rare case\n  //     where even the keyframe upload failed), then mark failed_visual if that recurs.\n  if (ticks < MAX_VIDEO_POLL_TICKS + 1) {\n    await patch(p.post_id, { status:'pending_visual', generation_attempt: ticks + 1, video_status:'processing', claimed_at:null });\n    out.push({ json: { post_id:p.post_id, action:'regenerate_no_keyframe', tick: ticks + 1 } }); continue;\n  }\n  await patch(p.post_id, { status:'failed_visual', video_status:'failed', visual_failed:true, claimed_at:null, requires_human_review:true, last_error:'video_and_keyframe_both_missing' });\n  out.push({ json: { post_id:p.post_id, action:'failed_visual' } });\n}\nreturn out.length ? out : [{ json: { swept: rows.length } }];\n"
+      },
+      "id": "0984b581-3619-4740-bc41-74cde1e3b321",
+      "name": "Sweep Video Processing1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        37456,
+        26880
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Worker: Completion Sweep (Notification Engine, Case C aware) — built-in HTTP helper.\nconst crypto = require('crypto');\nconst SUPABASE_URL  = 'https://redzmrlzhxkkpgcokgvl.supabase.co';\nconst SERVICE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo';\nconst SECRET        = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst API_BASE      = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\nconst ADMIN_WEBHOOK = 'https://ogzstudios.app.n8n.cloud/webhook-test/anomaly-alert';\n\nconst call = async (opts) => {\n  try {\n    const res = await this.helpers.httpRequest({ ...opts, json: true, returnFullResponse: true });\n    return { ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, body: res.body };\n  } catch (e) { return { ok:false, status:(e&&e.statusCode)||0, body:{error:e.message} }; }\n};\nconst sign = (s) => crypto.createHmac('sha256', SECRET).update(s).digest('hex');\nconst setState = async (calendar_id, state) => {\n  await call({\n    method: 'PATCH',\n    url: SUPABASE_URL + '/rest/v1/calendars?calendar_id=eq.' + calendar_id + '&notify_state=eq.none',\n    headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY,\n               'Content-Type':'application/json', Prefer:'return=minimal' },\n    body: { notify_state: state }, timeout: 15000,\n  });\n};\n\nconst ready = await call({\n  method: 'POST', url: SUPABASE_URL + '/rest/v1/rpc/calendars_ready_for_email',\n  headers: { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY, 'Content-Type': 'application/json' },\n  body: {}, timeout: 20000,\n});\nconst cals = Array.isArray(ready.body) ? ready.body : [];\nif (cals.length === 0) return [];\n\nconst out = [];\nfor (const c of cals) {\n  const total    = Number(c.total_posts)    || 0;\n  const blocked  = Number(c.blocked_posts)  || 0;\n  const approved = Number(c.approved_posts) || 0;\n\n  if (approved === 0) {\n    const payload = {\n      anomaly_id: crypto.randomUUID(), anomaly_type: 'calendar_all_blocked',\n      severity: 'warning', source_flow: 'N8N-V01-Worker', brand_id: c.brand_id,\n      message: 'Calendar fully blocked — all ' + total + ' posts hard_blocked/failed; client NOT emailed.',\n      details: { calendar_id: c.calendar_id, total_posts: total, blocked_posts: blocked },\n      timestamp: new Date().toISOString(),\n    };\n    const sbody = JSON.stringify(payload);\n    const resp = await call({\n      method: 'POST', url: ADMIN_WEBHOOK,\n      headers: { 'content-type':'application/json', 'x-n8n-signature': sign(sbody),\n                 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() },\n      body: payload, timeout: 20000,\n    });\n    if (resp.ok) await setState(c.calendar_id, 'admin_alerted');\n    out.push({ json: { calendar_id: c.calendar_id, brand_id: c.brand_id,\n      total_posts: total, approved_posts: approved, blocked_posts: blocked,\n      action: 'admin_alert', notify_ok: resp.ok } });\n    continue;\n  }\n\n  const nbody = JSON.stringify({ calendar_id: c.calendar_id, type: 'generated' });\n  const resp = await call({\n    method: 'POST', url: API_BASE + '/api/calendar/notify',\n    headers: { 'content-type':'application/json', 'x-n8n-signature': sign(nbody),\n               'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': new Date().toISOString() },\n    body: { calendar_id: c.calendar_id, type: 'generated' }, timeout: 30000,\n  });\n  if (resp.ok) await setState(c.calendar_id, 'client_emailed');\n  out.push({ json: { calendar_id: c.calendar_id, brand_id: c.brand_id,\n    total_posts: total, approved_posts: approved, blocked_posts: blocked,\n    action: 'client_email', notify_ok: resp.ok,\n    notify_result: (resp.body && resp.body.result) || resp.body || null } });\n}\nreturn out;\n"
+      },
+      "id": "efa362e6-dd37-4f2f-8f5b-4178768f51b4",
+      "name": "Completion Sweep1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        38256,
+        26880
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "openclaw-run-worker",
+        "options": {}
+      },
+      "id": "a05a1ac4-143c-4796-88f1-2e564cd2a230",
+      "name": "Webhook: run-worker (manual)1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        36736,
+        26832
+      ],
+      "webhookId": "openclaw-run-worker-manual"
+    }
+  ],
+  "connections": {
+    "Parallel Generate": {
+      "main": [
+        [
+          {
+            "node": "More Pending?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "More Pending?": {
+      "main": [
+        [
+          {
+            "node": "Claim Batch1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Completion Sweep1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile Visuals": {
+      "main": [
+        [
+          {
+            "node": "Sweep Video Processing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron: Worker Tick (1 min)1": {
+      "main": [
+        [
+          {
+            "node": "Reap Stale Claims1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reap Stale Claims1": {
+      "main": [
+        [
+          {
+            "node": "Reconcile Visuals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Batch1": {
+      "main": [
+        [
+          {
+            "node": "Parallel Generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sweep Video Processing1": {
+      "main": [
+        [
+          {
+            "node": "Claim Batch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: run-worker (manual)1": {
+      "main": [
+        [
+          {
+            "node": "Reap Stale Claims1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bffa1653da7ca4a85edadda52cdbd0237713917d77d290c02ed1648550f98b48"
+  }
+}

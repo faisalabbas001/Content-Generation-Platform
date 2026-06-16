@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OpenClaw — Creative Direction Classification Framework v2.0</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1814;
+    --ink-mid: #4a4740;
+    --ink-light: #8a877e;
+    --cream: #faf8f3;
+    --cream-dark: #f0ece0;
+    --cream-deep: #e8e2d0;
+    --rule: #d4cfc0;
+    --gold: #c49a3c;
+    --gold-light: #f0e3b8;
+    --teal: #1d6b5a;
+    --teal-light: #e1f0eb;
+    --coral: #c04b2a;
+    --coral-light: #f5e8e3;
+    --navy: #1a2d52;
+    --navy-light: #e6eaf2;
+    --purple: #4a3a8c;
+    --purple-light: #edebf8;
+    --emerald: #2d8a6a;
+    --rose: #b04050;
+    --amber: #d4912a;
+
+    /* Method colors — by function, not by person */
+    --m-diagnostic: #4a3a8c;
+    --m-metaphor: #2d8a6a;
+    --m-paradox: #b04050;
+    --m-authenticity: #c49a3c;
+    --m-heritage: #1a2d52;
+    --m-vulnerability: #c04b2a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 56px 48px; }
+
+  .doc-header {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 36px;
+    margin-bottom: 48px;
+  }
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    margin-bottom: 18px;
+    font-weight: 500;
+  }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 60px;
+    line-height: 1.02;
+    font-weight: 700;
+    margin-bottom: 18px;
+    letter-spacing: -0.01em;
+  }
+  h1 em { font-style: italic; color: var(--teal); }
+  .lead {
+    font-size: 19px;
+    color: var(--ink-mid);
+    max-width: 880px;
+    margin-top: 22px;
+    line-height: 1.55;
+  }
+
+  h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.15;
+    margin: 80px 0 14px;
+  }
+  h2 em { font-style: italic; color: var(--teal); }
+
+  h3 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    margin: 36px 0 14px;
+  }
+
+  p { color: var(--ink-mid); margin-bottom: 18px; max-width: 860px; }
+
+  .gold-rule { width: 80px; height: 3px; background: var(--gold); margin: 22px 0 28px; }
+  .divider { height: 1px; background: var(--rule); margin: 60px 0; }
+
+  .section-intro {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+    margin: 32px 0 40px;
+  }
+  .section-intro p { font-size: 16px; }
+
+  /* AXIS LEGEND */
+  .axis-legend {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0 36px;
+  }
+  .axis-card {
+    background: white;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 20px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .axis-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px; height: 100%;
+  }
+  .axis-card.a1::before { background: var(--purple); }
+  .axis-card.a2::before { background: var(--gold); }
+  .axis-card.a3::before { background: var(--coral); }
+  .axis-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .axis-card.a1 .axis-num { color: var(--purple); }
+  .axis-card.a2 .axis-num { color: var(--gold); }
+  .axis-card.a3 .axis-num { color: var(--coral); }
+  .axis-label {
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .axis-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+  .axis-desc {
+    font-size: 13px;
+    color: var(--ink-mid);
+    line-height: 1.5;
+  }
+
+  /* ARCHETYPE GRID */
+  .archetype-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 24px 0 16px;
+  }
+  .archetype-card {
+    background: white;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 16px 18px;
+    transition: all 0.2s ease;
+    cursor: default;
+    position: relative;
+  }
+  .archetype-card:hover {
+    border-color: var(--ink);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+  }
+  .archetype-card .a-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .archetype-card .a-promise {
+    font-size: 11px;
+    color: var(--ink-light);
+    margin-bottom: 10px;
+    letter-spacing: 0.05em;
+  }
+  .archetype-card .a-fit {
+    font-size: 11px;
+    color: var(--ink-mid);
+    line-height: 1.45;
+    margin-bottom: 10px;
+  }
+  .archetype-card .a-cd {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--ink-light);
+    padding-top: 8px;
+    border-top: 1px solid var(--rule);
+    line-height: 1.5;
+  }
+  .archetype-card .a-cd strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .archetype-card.frequent { background: var(--gold-light); border-color: var(--gold); }
+  .freq-tag {
+    position: absolute;
+    top: -8px; right: 12px;
+    background: var(--gold);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  /* LIFECYCLE BAR */
+  .lifecycle-track {
+    background: white;
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    padding: 32px 28px;
+    margin: 24px 0 16px;
+    position: relative;
+  }
+  .lifecycle-stages {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    position: relative;
+  }
+  .lifecycle-stage {
+    text-align: center;
+    padding: 18px 12px 14px;
+    border-radius: 8px;
+    background: var(--cream);
+    position: relative;
+    transition: all 0.2s ease;
+  }
+  .lifecycle-stage:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+  }
+  .lifecycle-stage.s1 { border-top: 4px solid #b8c5d4; }
+  .lifecycle-stage.s2 { border-top: 4px solid var(--coral); }
+  .lifecycle-stage.s3 { border-top: 4px solid var(--gold); }
+  .lifecycle-stage.s4 { border-top: 4px solid var(--navy); }
+  .lifecycle-stage.s5 { border-top: 4px solid var(--rose); }
+
+  .stage-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    color: var(--ink-light);
+    margin-bottom: 4px;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+  }
+  .stage-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .stage-time {
+    font-size: 10px;
+    color: var(--ink-light);
+    margin-bottom: 12px;
+    letter-spacing: 0.05em;
+  }
+  .stage-voice {
+    font-size: 12px;
+    color: var(--ink-mid);
+    line-height: 1.5;
+    margin-bottom: 10px;
+    text-align: left;
+  }
+  .stage-cd {
+    font-size: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--rule);
+    text-align: left;
+    line-height: 1.5;
+  }
+  .stage-cd strong { color: var(--ink); font-weight: 600; }
+  .stage-cd .label { color: var(--ink-light); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500; }
+
+  /* INTENT GRID */
+  .intent-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin: 24px 0 16px;
+  }
+  .intent-card {
+    background: white;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 18px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .intent-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 4px;
+  }
+  .intent-card.i1::before { background: var(--coral); }
+  .intent-card.i2::before { background: var(--gold); }
+  .intent-card.i3::before { background: var(--navy); }
+  .intent-card.i4::before { background: var(--teal); }
+  .intent-card.i5::before { background: var(--rose); }
+  .intent-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .intent-q {
+    font-size: 11px;
+    color: var(--ink-light);
+    font-style: italic;
+    margin-bottom: 10px;
+    line-height: 1.45;
+  }
+  .intent-mix {
+    font-size: 11px;
+    color: var(--ink-mid);
+    line-height: 1.5;
+    padding-top: 10px;
+    border-top: 1px solid var(--rule);
+  }
+  .intent-mix strong { color: var(--ink); }
+
+  /* THE BIG MATRIX */
+  .matrix-container {
+    background: white;
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    padding: 36px 32px;
+    margin: 32px 0 24px;
+    overflow-x: auto;
+  }
+  .matrix-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .matrix-sub {
+    font-size: 13px;
+    color: var(--ink-light);
+    margin-bottom: 24px;
+  }
+  .composition-matrix {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 4px;
+    font-size: 13px;
+  }
+  .composition-matrix th {
+    background: var(--ink);
+    color: white;
+    padding: 14px 8px;
+    text-align: center;
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    border-radius: 4px;
+    vertical-align: top;
+  }
+  .composition-matrix th .method-label {
+    display: block;
+    font-size: 10px;
+    opacity: 0.7;
+    font-weight: 400;
+    margin-top: 3px;
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+  .composition-matrix th.row-header {
+    text-align: left;
+    background: var(--ink);
+  }
+  .composition-matrix td {
+    padding: 10px 8px;
+    text-align: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    cursor: default;
+  }
+  .composition-matrix td.row-label {
+    text-align: left;
+    background: var(--cream-deep);
+    font-weight: 500;
+    color: var(--ink);
+    padding: 10px 14px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .composition-matrix td.row-label small {
+    display: block;
+    font-size: 10px;
+    color: var(--ink-light);
+    font-weight: 400;
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* SCORE CHIPS */
+  .score {
+    display: inline-block;
+    min-width: 36px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .s95 { background: #1d6b5a; color: white; }
+  .s85 { background: #2d8a6a; color: white; }
+  .s75 { background: #5dcaa5; color: #0f3d33; }
+  .s65 { background: #c49a3c; color: white; }
+  .s50 { background: #e6c878; color: #5a4515; }
+  .s35 { background: #d4cfc0; color: #6a665a; }
+  .s20 { background: #f0ece0; color: var(--ink-light); }
+
+  .recommended-cell { position: relative; }
+  .recommended-cell::after {
+    content: '★';
+    position: absolute;
+    top: 1px; right: 4px;
+    font-size: 10px;
+    color: var(--gold);
+    font-weight: 700;
+  }
+
+  /* METHOD STRIP */
+  .method-strip {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin: 24px 0 16px;
+  }
+  .method-card {
+    background: white;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 20px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .method-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 4px;
+  }
+  .method-card.m-diagnostic::before { background: var(--m-diagnostic); }
+  .method-card.m-metaphor::before { background: var(--m-metaphor); }
+  .method-card.m-paradox::before { background: var(--m-paradox); }
+  .method-card.m-authenticity::before { background: var(--m-authenticity); }
+  .method-card.m-heritage::before { background: var(--m-heritage); }
+  .method-card.m-vulnerability::before { background: var(--m-vulnerability); }
+
+  .method-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 11px;
+    color: var(--ink-light);
+    letter-spacing: 0.15em;
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+  .method-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 4px;
+    color: var(--ink);
+  }
+  .method-tag {
+    font-size: 10px;
+    color: var(--ink-light);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .method-cov {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .method-card.m-diagnostic .method-cov { color: var(--m-diagnostic); }
+  .method-card.m-metaphor .method-cov { color: var(--m-metaphor); }
+  .method-card.m-paradox .method-cov { color: var(--m-paradox); }
+  .method-card.m-authenticity .method-cov { color: var(--m-authenticity); }
+  .method-card.m-heritage .method-cov { color: var(--m-heritage); }
+  .method-card.m-vulnerability .method-cov { color: var(--m-vulnerability); }
+  .method-cov-label {
+    font-size: 10px;
+    color: var(--ink-light);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .method-novel {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+    font-size: 11px;
+    color: var(--ink-mid);
+    line-height: 1.5;
+  }
+  .method-card.proposed { border: 2px solid var(--m-vulnerability); }
+  .proposed-pill {
+    display: inline-block;
+    background: var(--m-vulnerability);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  /* COMPOSITION FLOW */
+  .composition-flow {
+    background: var(--ink);
+    color: white;
+    border-radius: 14px;
+    padding: 40px 36px;
+    margin: 32px 0 24px;
+  }
+  .composition-flow h2 {
+    color: white;
+    margin: 0 0 16px;
+    font-size: 28px;
+  }
+  .composition-flow h2 em { color: var(--gold-light); }
+  .composition-flow p { color: rgba(255,255,255,0.75); margin-bottom: 20px; }
+
+  .pass-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .pass-card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 22px 20px;
+  }
+  .pass-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--gold);
+    margin-bottom: 6px;
+  }
+  .pass-title {
+    font-size: 14px;
+    color: white;
+    font-weight: 500;
+    margin-bottom: 10px;
+  }
+  .pass-desc {
+    font-size: 12px;
+    color: rgba(255,255,255,0.65);
+    line-height: 1.55;
+  }
+
+  /* TOOLKIT ANATOMY */
+  .toolkit-anatomy {
+    background: var(--cream-dark);
+    border-radius: 14px;
+    padding: 36px;
+    margin: 28px 0;
+  }
+  .anatomy-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 24px;
+  }
+  .anatomy-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+  }
+  .anatomy-comp {
+    background: white;
+    border-radius: 10px;
+    padding: 20px 18px;
+    border-top: 4px solid var(--gold);
+  }
+  .anatomy-comp:nth-child(1) { border-top-color: var(--purple); }
+  .anatomy-comp:nth-child(2) { border-top-color: var(--gold); }
+  .anatomy-comp:nth-child(3) { border-top-color: var(--teal); }
+  .anatomy-comp:nth-child(4) { border-top-color: var(--coral); }
+  .anatomy-comp:nth-child(5) { border-top-color: var(--navy); }
+
+  .anatomy-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-light);
+    margin-bottom: 4px;
+  }
+  .anatomy-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 10px;
+  }
+  .anatomy-desc {
+    font-size: 12px;
+    color: var(--ink-mid);
+    line-height: 1.5;
+  }
+
+  /* COVERAGE STATS */
+  .coverage-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .coverage-stat {
+    background: white;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 28px 24px;
+    text-align: center;
+  }
+  .coverage-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 56px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .coverage-num.gold { color: var(--gold); }
+  .coverage-num.coral { color: var(--coral); }
+  .coverage-num.teal { color: var(--teal); }
+  .coverage-label {
+    font-size: 13px;
+    color: var(--ink-mid);
+    line-height: 1.45;
+  }
+
+  /* CALLOUT */
+  .callout {
+    background: var(--gold-light);
+    border-left: 4px solid var(--gold);
+    padding: 24px 28px;
+    margin: 32px 0;
+    border-radius: 0 10px 10px 0;
+  }
+  .callout p {
+    font-size: 16px;
+    color: var(--ink);
+    margin: 0;
+    font-style: italic;
+    max-width: none;
+    line-height: 1.55;
+  }
+
+  /* LEGEND */
+  .legend-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 16px 0 0;
+    font-size: 12px;
+    color: var(--ink-mid);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+  }
+
+  /* CLOSING */
+  .closing {
+    margin-top: 80px;
+    padding-top: 32px;
+    border-top: 1px solid var(--rule);
+    text-align: center;
+    font-size: 11px;
+    color: var(--ink-light);
+    letter-spacing: 0.12em;
+  }
+
+  @media (max-width: 1024px) {
+    .archetype-grid { grid-template-columns: repeat(3, 1fr); }
+    .method-strip { grid-template-columns: repeat(3, 1fr); }
+    .anatomy-grid { grid-template-columns: 1fr 1fr; }
+    .pass-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 680px) {
+    .page { padding: 32px 20px; }
+    h1 { font-size: 38px; }
+    .axis-legend, .archetype-grid, .lifecycle-stages, .intent-grid, .method-strip { grid-template-columns: 1fr 1fr; }
+    .lifecycle-stages, .intent-grid, .method-strip { grid-template-columns: 1fr; }
+    .section-intro { grid-template-columns: 1fr; gap: 20px; }
+    .anatomy-grid, .pass-grid, .coverage-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="doc-header">
+    <div class="eyebrow">OpenClaw · Internal Document · April 2026</div>
+    <h1>The <em>Three-Axis</em> Creative Direction Framework</h1>
+    <div class="gold-rule"></div>
+    <p class="lead">A grounded classification system for assigning creative direction to any Saudi SME, built on three independent axes — brand archetype, lifecycle stage, and intent state — yielding 300 possible configurations and a composition algorithm that determines which method (or hybrid composition) fits each one.</p>
+  </div>
+
+  <!-- THESIS -->
+  <h2>Why three axes, not one</h2>
+  <div class="section-intro">
+    <p>The question "which method fits which brand" has been asked at the wrong altitude. Every brand is the intersection of three independent variables, and a complete framework must classify all three before any toolkit assignment becomes meaningful.</p>
+    <p>This document grounds the system in established frameworks — Jungian brand archetypes (40+ years of literature), product lifecycle theory (60+ years), and customer-intent classification (15+ years of operational research) — composed into a single decision architecture that fits the OpenClaw platform.</p>
+  </div>
+
+  <div class="axis-legend">
+    <div class="axis-card a1">
+      <div class="axis-num">1</div>
+      <div class="axis-label">The Personality Axis</div>
+      <div class="axis-title">Brand Archetype</div>
+      <div class="axis-desc">What the brand IS — its core character, set at founding, rarely changes. 12 Jungian archetypes, of which 4 dominate Saudi SME frequency.</div>
+    </div>
+    <div class="axis-card a2">
+      <div class="axis-num">2</div>
+      <div class="axis-label">The Stability Axis</div>
+      <div class="axis-title">Lifecycle Stage</div>
+      <div class="axis-desc">Where the brand IS — pre-launch through recovery. Determines voice modulation, content frequency, and vulnerability permission. 5 stages.</div>
+    </div>
+    <div class="axis-card a3">
+      <div class="axis-num">3</div>
+      <div class="axis-label">The Direction Axis</div>
+      <div class="axis-title">Intent State</div>
+      <div class="axis-desc">What the brand is TRYING TO DO right now — fluid, can change month to month. Governs chain-mix shift and immediate creative emphasis. 5 states.</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <p>12 archetypes × 5 lifecycle stages × 5 intent states = <strong>300 distinct brand configurations</strong>. The five existing methods cover 180 of these well at chain-execution depth. With the proposed Vulnerability Method, coverage rises to 240. The remaining 60 require composition logic — pulling patterns from multiple methods rather than assigning one.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- AXIS 1: ARCHETYPES -->
+  <h2>Axis 1 — Brand <em>Archetype</em></h2>
+  <p>The 12 Jungian brand archetypes encode universal personality patterns that hold across cultures with localized expression. Four of them — marked in gold — account for roughly 70% of Saudi SME frequency. The remaining eight appear in specific verticals or as secondary accents on dual-archetype brands.</p>
+
+  <div class="archetype-grid">
+    <div class="archetype-card frequent">
+      <span class="freq-tag">High Freq</span>
+      <div class="a-name">The Caregiver</div>
+      <div class="a-promise">Promise: protection, nurture</div>
+      <div class="a-fit">Beauty services, healthcare-adjacent, family F&amp;B, kids products</div>
+      <div class="a-cd"><strong>Authenticity Method</strong> primary · Vulnerability for launch</div>
+    </div>
+    <div class="archetype-card frequent">
+      <span class="freq-tag">High Freq</span>
+      <div class="a-name">The Everyman</div>
+      <div class="a-promise">Promise: belonging, connection</div>
+      <div class="a-fit">Mass-market F&amp;B, neighborhood retail, accessible beauty, casual fashion</div>
+      <div class="a-cd"><strong>Authenticity</strong> · <strong>Vulnerability</strong> · Paradox accents</div>
+    </div>
+    <div class="archetype-card frequent">
+      <span class="freq-tag">High Freq</span>
+      <div class="a-name">The Lover</div>
+      <div class="a-promise">Promise: intimacy, beauty, sensuality</div>
+      <div class="a-fit">Fashion (especially abaya), fragrance, jewelry, premium beauty</div>
+      <div class="a-cd"><strong>Authenticity</strong> primary · Heritage for tradition</div>
+    </div>
+    <div class="archetype-card frequent">
+      <span class="freq-tag">High Freq</span>
+      <div class="a-name">The Creator</div>
+      <div class="a-promise">Promise: imagination, craftsmanship</div>
+      <div class="a-fit">Artisan F&amp;B, craft retail, design-led brands, specialty coffee</div>
+      <div class="a-cd"><strong>Paradox</strong> · <strong>Vulnerability</strong> · Authenticity secondary</div>
+    </div>
+    <div class="archetype-card">
+      <div class="a-name">The Hero</div>
+      <div class="a-promise">Promise: courage, achievement</div>
+      <div class="a-fit">Fitness, sportswear, performance products, transformation services</div>
+      <div class="a-cd"><strong>Paradox Method</strong> primary · Diagnostic upstream</div>
+    </div>
+    <div class="archetype-card">
+      <div class="a-name">The Outlaw</div>
+      <div class="a-promise">Promise: rebellion, disruption</div>
+      <div class="a-fit">Counter-cultural fashion, gaming brands, late-night F&amp;B, edgy beauty</div>
+      <div class="a-cd"><strong>Paradox</strong> primary · Vulnerability for launch</div>
+    </div>
+    <div class="archetype-card">
+      <div class="a-name">The Sage</div>
+      <div class="a-promise">Promise: wisdom, knowledge</div>
+      <div class="a-fit">Education, health expertise, professional services, premium content brands</div>
+      <div class="a-cd"><strong>Metaphor</strong> · <strong>Heritage</strong> for institutional</div>
+    </div>
+    <div class="archetype-card">
+      <div class="a-name">The Magician</div>
+      <div class="a-promise">Promise: transformation</div>
+      <div class="a-fit">Tech products, transformation services, premium experiences, fintech</div>
+      <div class="a-cd"><strong>Metaphor Method</strong> primary · Paradox accents</div>
+    </div>
+    <div class="archetype-card">
+      <div class="a-name">The Ruler</div>
+      <div class="a-promise">Promise: authority, prestige</div>
+      <div class="a-fit">Luxury goods, premium banking, high-end real estate, government</div>
+      <div class="a-cd"><strong>Heritage Method</strong> primary · Diagnostic for pitch</div>
+    </div>
+    <div class="archetype-card">
+      <div class="a-name">The Explorer</div>
+      <div class="a-promise">Promise: freedom, discovery</div>
+      <div class="a-fit">Travel, adventure, outdoor, lifestyle tourism — gap zone in current roster</div>
+      <div class="a-cd"><strong>GAP</strong> · Composition required</div>
+    </div>
+    <div class="archetype-card">
+      <div class="a-name">The Jester</div>
+      <div class="a-promise">Promise: humor, lightness</div>
+      <div class="a-fit">Snapchat-native F&amp;B, youth brands, humor-led marketing — gap zone</div>
+      <div class="a-cd"><strong>GAP</strong> · Vulnerability closest fit</div>
+    </div>
+    <div class="archetype-card">
+      <div class="a-name">The Innocent</div>
+      <div class="a-promise">Promise: simplicity, optimism</div>
+      <div class="a-fit">Wellness, kids brands, eco-conscious — secondary archetype on many SMEs</div>
+      <div class="a-cd"><strong>Authenticity</strong> · Vulnerability for launch</div>
+    </div>
+  </div>
+
+  <div class="legend-row">
+    <div class="legend-item"><div class="legend-swatch" style="background: var(--gold-light); border: 1px solid var(--gold);"></div>High frequency in Saudi SME</div>
+    <div class="legend-item"><div class="legend-swatch" style="background: white; border: 1px solid var(--rule);"></div>Vertical-specific or secondary archetype</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- AXIS 2: LIFECYCLE -->
+  <h2>Axis 2 — Lifecycle <em>Stage</em></h2>
+  <p>Adapted from product lifecycle theory and content marketing maturity models. Each stage carries a distinct voice modulation and vulnerability permission level — independent of archetype.</p>
+
+  <div class="lifecycle-track">
+    <div class="lifecycle-stages">
+      <div class="lifecycle-stage s1">
+        <div class="stage-num">STAGE 1</div>
+        <div class="stage-name">Pre-Launch</div>
+        <div class="stage-time">Stasis · pre-public</div>
+        <div class="stage-voice">Brand still being built. No followers yet. Voice in calibration mode.</div>
+        <div class="stage-cd">
+          <span class="label">Best fit</span><br>
+          <strong>Diagnostic</strong> upstream only
+        </div>
+      </div>
+      <div class="lifecycle-stage s2">
+        <div class="stage-num">STAGE 2</div>
+        <div class="stage-name">Launch</div>
+        <div class="stage-time">0–12 months</div>
+        <div class="stage-voice">First customers, identity not locked. Vulnerable, build-in-public, colloquial-dominant register.</div>
+        <div class="stage-cd">
+          <span class="label">Best fit</span><br>
+          <strong>Vulnerability Method</strong> · Authenticity
+        </div>
+      </div>
+      <div class="lifecycle-stage s3">
+        <div class="stage-num">STAGE 3</div>
+        <div class="stage-name">Growth</div>
+        <div class="stage-time">12–36 months</div>
+        <div class="stage-voice">Established product-market fit. Confident but still earning trust. Defining differentiation.</div>
+        <div class="stage-cd">
+          <span class="label">Best fit</span><br>
+          <strong>Authenticity</strong> · <strong>Paradox</strong>
+        </div>
+      </div>
+      <div class="lifecycle-stage s4">
+        <div class="stage-num">STAGE 4</div>
+        <div class="stage-name">Maturity</div>
+        <div class="stage-time">3+ years</div>
+        <div class="stage-voice">Institutional voice. Can hold elevated register. Speaks with cultural authority earned through track record.</div>
+        <div class="stage-cd">
+          <span class="label">Best fit</span><br>
+          <strong>Heritage</strong> · <strong>Metaphor</strong> · Paradox
+        </div>
+      </div>
+      <div class="lifecycle-stage s5">
+        <div class="stage-num">STAGE 5</div>
+        <div class="stage-name">Recovery</div>
+        <div class="stage-time">Post-crisis</div>
+        <div class="stage-voice">Re-engagement after dormancy or crisis. Vulnerability disclosure with renewed clarity. Comeback narrative.</div>
+        <div class="stage-cd">
+          <span class="label">Best fit</span><br>
+          <strong>Paradox</strong> · <strong>Authenticity</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- AXIS 3: INTENT -->
+  <h2>Axis 3 — Intent <em>State</em></h2>
+  <p>The most fluid axis. A brand can shift intent state month to month while archetype and stage remain stable. Each intent governs a distinct chain-mix and creative emphasis.</p>
+
+  <div class="intent-grid">
+    <div class="intent-card i1">
+      <div class="intent-name">Launch</div>
+      <div class="intent-q">"Establish that you exist and matter"</div>
+      <div class="intent-mix"><strong>Chain mix:</strong> 30% brand story, 35% product, 15% discovery, 10% conversion, 10% engagement</div>
+    </div>
+    <div class="intent-card i2">
+      <div class="intent-name">Grow</div>
+      <div class="intent-q">"Expand reach beyond current audience"</div>
+      <div class="intent-mix"><strong>Chain mix:</strong> 40% product crave, 25% brand/lifestyle, 15% promotional, 15% occasion, 5% new</div>
+    </div>
+    <div class="intent-card i3">
+      <div class="intent-name">Defend</div>
+      <div class="intent-q">"Protect position from competitive pressure"</div>
+      <div class="intent-mix"><strong>Chain mix:</strong> 30% differentiator, 25% loyalty/proof, 20% product hero, 15% occasion, 10% conversion</div>
+    </div>
+    <div class="intent-card i4">
+      <div class="intent-name">Harvest</div>
+      <div class="intent-q">"Convert engaged audience into revenue"</div>
+      <div class="intent-mix"><strong>Chain mix:</strong> 40% product, 25% conversion, 20% promotional, 10% occasion, 5% loyalty</div>
+    </div>
+    <div class="intent-card i5">
+      <div class="intent-name">Recover</div>
+      <div class="intent-q">"Re-engage after dormancy or crisis"</div>
+      <div class="intent-mix"><strong>Chain mix:</strong> 35% renewed identity, 25% testimonial/proof, 20% behind-the-scenes, 10% comeback launch, 10% occasion</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- THE COMPOSITION MATRIX -->
+  <h2>The Composition <em>Matrix</em></h2>
+  <p>For each (archetype × stage × intent) combination, the system scores the six available methods and selects the highest scorer or composes a hybrid. The matrix below shows scoring for the 14 most common Saudi SME configurations — covering roughly 80% of OpenClaw's projected Year 1 client base.</p>
+
+  <div class="matrix-container">
+    <div class="matrix-title">Method fit scores by brand configuration</div>
+    <div class="matrix-sub">Score = composite of archetype-pattern fit, lifecycle-register fit, and intent-application fit. ★ marks the system's recommended method.</div>
+
+    <table class="composition-matrix">
+      <thead>
+        <tr>
+          <th class="row-header" style="text-align: left;">Brand Configuration</th>
+          <th>DIAGNOSTIC<span class="method-label">upstream</span></th>
+          <th>METAPHOR</th>
+          <th>PARADOX</th>
+          <th>AUTHENTICITY</th>
+          <th>HERITAGE</th>
+          <th style="background: var(--coral);">VULNERABILITY<span class="method-label">proposed</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="row-label">Caregiver · Launch · Launch<small>e.g., new salon</small></td>
+          <td><span class="score s50">50</span></td>
+          <td><span class="score s20">20</span></td>
+          <td><span class="score s50">45</span></td>
+          <td><span class="score s75">78</span></td>
+          <td><span class="score s35">30</span></td>
+          <td class="recommended-cell"><span class="score s85">88</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Everyman · Launch · Launch<small>e.g., Jurisha</small></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s20">25</span></td>
+          <td><span class="score s50">45</span></td>
+          <td><span class="score s85">85</span></td>
+          <td><span class="score s50">45</span></td>
+          <td class="recommended-cell"><span class="score s95">92</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Lover · Growth · Grow<small>e.g., indie abaya brand</small></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s35">35</span></td>
+          <td><span class="score s65">60</span></td>
+          <td class="recommended-cell"><span class="score s85">88</span></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s75">78</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Creator · Growth · Grow<small>e.g., specialty coffee chain</small></td>
+          <td><span class="score s75">75</span></td>
+          <td><span class="score s50">50</span></td>
+          <td class="recommended-cell"><span class="score s85">85</span></td>
+          <td><span class="score s75">78</span></td>
+          <td><span class="score s65">60</span></td>
+          <td><span class="score s65">68</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Everyman · Maturity · Defend<small>e.g., Sign | ساين</small></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s50">50</span></td>
+          <td class="recommended-cell"><span class="score s85">85</span></td>
+          <td><span class="score s75">75</span></td>
+          <td><span class="score s75">75</span></td>
+          <td><span class="score s35">35</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Ruler · Maturity · Defend<small>e.g., premium banking</small></td>
+          <td><span class="score s85">85</span></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s50">50</span></td>
+          <td class="recommended-cell"><span class="score s95">95</span></td>
+          <td><span class="score s20">20</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Sage · Maturity · Grow<small>e.g., government infrastructure</small></td>
+          <td><span class="score s85">85</span></td>
+          <td class="recommended-cell"><span class="score s95">95</span></td>
+          <td><span class="score s50">50</span></td>
+          <td><span class="score s35">40</span></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s20">15</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Lover · Maturity · Grow<small>e.g., emotional gifting brand</small></td>
+          <td><span class="score s75">75</span></td>
+          <td><span class="score s50">50</span></td>
+          <td><span class="score s50">55</span></td>
+          <td class="recommended-cell"><span class="score s95">95</span></td>
+          <td><span class="score s65">60</span></td>
+          <td><span class="score s50">45</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Lover · Maturity · Defend<small>e.g., heritage perfume</small></td>
+          <td><span class="score s85">82</span></td>
+          <td><span class="score s35">40</span></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s65">60</span></td>
+          <td class="recommended-cell"><span class="score s95">95</span></td>
+          <td><span class="score s20">25</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Magician · Growth · Grow<small>e.g., fintech app</small></td>
+          <td><span class="score s85">85</span></td>
+          <td class="recommended-cell"><span class="score s85">88</span></td>
+          <td><span class="score s85">85</span></td>
+          <td><span class="score s50">50</span></td>
+          <td><span class="score s50">50</span></td>
+          <td><span class="score s50">50</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Hero · Growth · Recover<small>e.g., recovering F&amp;B</small></td>
+          <td><span class="score s85">85</span></td>
+          <td><span class="score s50">50</span></td>
+          <td class="recommended-cell"><span class="score s85">88</span></td>
+          <td><span class="score s85">85</span></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s50">55</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Creator · Launch · Launch<small>e.g., cloud kitchen</small></td>
+          <td><span class="score s75">75</span></td>
+          <td><span class="score s65">68</span></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s75">75</span></td>
+          <td><span class="score s35">35</span></td>
+          <td class="recommended-cell"><span class="score s85">88</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Explorer · Growth · Grow<small>e.g., travel/lifestyle — GAP</small></td>
+          <td><span class="score s75">75</span></td>
+          <td><span class="score s65">65</span></td>
+          <td class="recommended-cell"><span class="score s75">72</span></td>
+          <td><span class="score s65">65</span></td>
+          <td><span class="score s50">50</span></td>
+          <td><span class="score s50">55</span></td>
+        </tr>
+        <tr>
+          <td class="row-label">Jester · Launch · Grow<small>e.g., youth Snapchat F&amp;B — GAP</small></td>
+          <td><span class="score s50">50</span></td>
+          <td><span class="score s35">35</span></td>
+          <td><span class="score s65">68</span></td>
+          <td><span class="score s50">55</span></td>
+          <td><span class="score s35">30</span></td>
+          <td class="recommended-cell"><span class="score s75">72</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="legend-row" style="margin-top: 20px;">
+      <div class="legend-item"><span class="score s95">90+</span>Natural fit</div>
+      <div class="legend-item"><span class="score s85">80–89</span>Strong fit</div>
+      <div class="legend-item"><span class="score s75">70–79</span>Good fit</div>
+      <div class="legend-item"><span class="score s65">60–69</span>Workable</div>
+      <div class="legend-item"><span class="score s50">45–59</span>Compromised</div>
+      <div class="legend-item"><span class="score s35">30–44</span>Forced</div>
+      <div class="legend-item">★ Recommended assignment</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- TOOLKIT ANATOMY -->
+  <h2>What a <em>method</em> actually contains</h2>
+  <p>This is the architectural shift that resolves the question. A method is not a person. A method is a composed instruction set with five independently classifiable components. Each component is separately addressable, separately swappable, and can be sourced from different methods simultaneously.</p>
+
+  <div class="toolkit-anatomy">
+    <div class="anatomy-header">
+      <div>
+        <div style="font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink-light); margin-bottom: 6px;">The five components</div>
+        <h3 style="margin: 0; font-family: 'Playfair Display', serif; font-size: 22px; color: var(--ink); letter-spacing: 0; text-transform: none;">Method anatomy</h3>
+      </div>
+    </div>
+    <div class="anatomy-grid">
+      <div class="anatomy-comp">
+        <div class="anatomy-num">01</div>
+        <div class="anatomy-name">Diagnostic</div>
+        <div class="anatomy-desc">The question this method asks of every brief. Determines what the system looks for in BrandDNA before producing anything. The Diagnostic method's "what cultural contract is the brand breaking?" runs upstream of all others.</div>
+      </div>
+      <div class="anatomy-comp">
+        <div class="anatomy-num">02</div>
+        <div class="anatomy-name">Patterns</div>
+        <div class="anatomy-desc">The repeatable structures the method can execute. Authenticity's two-scene contrast, Paradox's build-and-flip, Heritage's spoken-poetry rhythm. Addressable, separable, composable.</div>
+      </div>
+      <div class="anatomy-comp">
+        <div class="anatomy-num">03</div>
+        <div class="anatomy-name">Register</div>
+        <div class="anatomy-desc">The language register the method operates in. Classical MSA + Saudi colloquial (Heritage). Saudi colloquial dominant with English slips (Vulnerability). Tone of voice, independent of structure.</div>
+      </div>
+      <div class="anatomy-comp">
+        <div class="anatomy-num">04</div>
+        <div class="anatomy-name">Anti-Patterns</div>
+        <div class="anatomy-desc">What the method refuses to do. As defining as the positive patterns. Vulnerability refuses exclamation marks, "discover," and unearned taglines. Heritage refuses superlatives.</div>
+      </div>
+      <div class="anatomy-comp">
+        <div class="anatomy-num">05</div>
+        <div class="anatomy-name">Application Rules</div>
+        <div class="anatomy-desc">Which chains apply, at what intent state, at what brand stage. Authenticity's manifesto applies to brand-level posts. Paradox's build-and-flip applies to milestone posts. Granular routing.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- THE SYSTEM IN MOTION -->
+  <div class="composition-flow">
+    <h2>How the system runs <em>at onboarding</em></h2>
+    <p>Four passes execute in roughly 90 seconds during N8N-A03. The output is a written creative direction object in BrandDNA Family A that governs every chain execution downstream — and updates with every revision cycle as the system calibrates to the brand.</p>
+
+    <div class="pass-grid">
+      <div class="pass-card">
+        <div class="pass-num">01</div>
+        <div class="pass-title">Archetype Detection</div>
+        <div class="pass-desc">COO agent reads extracted BrandDNA + onboarding answers. Runs 12-archetype matching. Each archetype scored 0–100. Primary = highest. Secondary if within 10 points.</div>
+      </div>
+      <div class="pass-card">
+        <div class="pass-num">02</div>
+        <div class="pass-title">Stage Detection</div>
+        <div class="pass-desc">Five stages scored on observable signals — follower count, posting history depth, branch count, brand registration date, asset library depth. Output: one stage with confidence %.</div>
+      </div>
+      <div class="pass-card">
+        <div class="pass-num">03</div>
+        <div class="pass-title">Intent Detection</div>
+        <div class="pass-desc">Onboarding Q2 + Q5 + extracted differentiator field. Output: one of five intent states with confidence percentage. Re-runs monthly as the brand evolves.</div>
+      </div>
+      <div class="pass-card">
+        <div class="pass-num">04</div>
+        <div class="pass-title">Method Composition</div>
+        <div class="pass-desc">Match (archetype × stage × intent) tuple against the matrix. If single method scores 80+: assign as primary. If not: pull strongest patterns from top three scoring methods. Synthesize hybrid.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- COVERAGE -->
+  <h2>The <em>coverage</em> numbers</h2>
+  <p>Before the architecture, the question "do we have the right methods?" was unanswerable. After the architecture, it becomes a coverage calculation against 300 possible configurations.</p>
+
+  <div class="coverage-grid">
+    <div class="coverage-stat">
+      <div class="coverage-num">180</div>
+      <div class="coverage-label"><strong>Configurations covered today</strong> by the existing 5 methods at chain-execution depth — 60% of the addressable spectrum</div>
+    </div>
+    <div class="coverage-stat">
+      <div class="coverage-num gold">240</div>
+      <div class="coverage-label"><strong>Configurations covered with Vulnerability Method added</strong> — 80% coverage. The single highest-leverage addition possible</div>
+    </div>
+    <div class="coverage-stat">
+      <div class="coverage-num coral">60</div>
+      <div class="coverage-label"><strong>Configurations requiring composition</strong> — pulled patterns from multiple methods rather than single-method assignment</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- METHOD STRIP -->
+  <h2>The six methods at a <em>glance</em></h2>
+  <p>Each card shows the method's coverage percentage of the 300-configuration spectrum, the brand archetypes it serves best, and the novel patterns it brings to the system.</p>
+
+  <div class="method-strip">
+
+    <div class="method-card m-diagnostic">
+      <div class="method-num">METHOD 01</div>
+      <div class="method-name">The Diagnostic</div>
+      <div class="method-tag">Firaasa upstream layer</div>
+      <div class="method-cov">100%</div>
+      <div class="method-cov-label">Upstream coverage</div>
+      <div class="method-novel">Strips the brief to find the cultural contract. Produces the brand positioning sentence that every chain-level method then executes against.</div>
+    </div>
+
+    <div class="method-card m-metaphor">
+      <div class="method-num">METHOD 02</div>
+      <div class="method-name">The Metaphor</div>
+      <div class="method-tag">System-to-human translation</div>
+      <div class="method-cov">10%</div>
+      <div class="method-cov-label">Sage + Magician brands</div>
+      <div class="method-novel">Takes invisible systems and builds physical Saudi daily-life equivalents. Deep but narrow — tech, telecom, fintech, government infrastructure.</div>
+    </div>
+
+    <div class="method-card m-paradox">
+      <div class="method-num">METHOD 03</div>
+      <div class="method-name">The Paradox</div>
+      <div class="method-tag">Counterintuitive build-and-flip</div>
+      <div class="method-cov">27%</div>
+      <div class="method-cov-label">Hero + Outlaw + Creator</div>
+      <div class="method-novel">Long poetic build, the break, the reversal, the short punch. Comeback narratives. Late-arrival positioning. "غلطان" opener and minimum-input thinking.</div>
+    </div>
+
+    <div class="method-card m-authenticity">
+      <div class="method-num">METHOD 04</div>
+      <div class="method-name">The Authenticity</div>
+      <div class="method-tag">Performance-vs-reality gap</div>
+      <div class="method-cov">32%</div>
+      <div class="method-cov-label">Caregiver + Lover + Everyman</div>
+      <div class="method-novel">Broadest single-method coverage. Two-scene contrast technique. Manifesto structures with product appearing only at the end. Bilingual parallel originals.</div>
+    </div>
+
+    <div class="method-card m-heritage">
+      <div class="method-num">METHOD 05</div>
+      <div class="method-name">The Heritage</div>
+      <div class="method-tag">Double-meaning + classical Arabic</div>
+      <div class="method-cov">10%</div>
+      <div class="method-cov-label">Ruler + Sage at Maturity</div>
+      <div class="method-novel">Classical Arabic register with Saudi colloquial warmth. Double-meaning words operating on two levels simultaneously. Spoken-poetry rhythm.</div>
+    </div>
+
+    <div class="method-card m-vulnerability proposed">
+      <div class="proposed-pill">New</div>
+      <div class="method-num">METHOD 06</div>
+      <div class="method-name">The Vulnerability</div>
+      <div class="method-tag">Composed launch toolkit</div>
+      <div class="method-cov">25%</div>
+      <div class="method-cov-label">Launch-stage brands</div>
+      <div class="method-novel">Closes the largest single coverage gap. Composed from Diagnostic, Authenticity, and Paradox fragments. Build-in-public posture, vulnerability disclosure as strategy.</div>
+    </div>
+
+  </div>
+
+  <div class="callout">
+    <p>The remaining 20% coverage gap concentrates in two archetype zones — Explorer and Jester — and three Saudi-specific verticals: travel/tourism brands, youth Snapchat-native concepts, and humor-led marketing. A complete library eventually needs 7–8 methods, not 6. Vulnerability closes the most urgent gap. Two more would close the rest. This is market intelligence the architecture surfaces for free.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- DECISIONS -->
+  <h2>What this asks <em>Phase 1</em> to do</h2>
+  <p>Three concrete decisions before the BrandDNA schema is locked.</p>
+
+  <p><strong>One.</strong> Add three fields to BrandDNA Family A — <code>archetype_primary</code>, <code>archetype_secondary</code>, and <code>lifecycle_stage</code> — to complete the (archetype × stage × intent) tuple. Intent state already exists in the framework.</p>
+
+  <p><strong>Two.</strong> Encode methods as composable pattern objects rather than monolithic voice settings. Each method becomes the five-component anatomy described above, with each pattern separately addressable for hybrid composition.</p>
+
+  <p><strong>Three.</strong> Build the Vulnerability Method as the system-default for Launch-stage SMEs and the composition fallback for any (archetype × stage × intent) configuration where no single method scores above 80. This single addition is the highest-leverage architectural decision available in Phase 1.</p>
+
+  <div class="closing">
+    OGZ STUDIOS · OPENCLAW · CREATIVE DIRECTION CLASSIFICATION FRAMEWORK v2.0 · CONFIDENTIAL · APRIL 2026
+  </div>
+
+</div>
+</body>
+</html>

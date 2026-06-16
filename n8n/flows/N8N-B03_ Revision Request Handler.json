@@ -1,0 +1,1730 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "revision-request",
+        "responseMode": "responseNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "0405fc8f-1f0f-4ca7-b116-9367185d41c2",
+      "name": "Webhook: Revision Request1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        26624,
+        12480
+      ],
+      "webhookId": "ed4dd87f-6da7-410a-92f1-3d16975074b5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.body;\nif (!payload.brand_id || !payload.post_id) throw new Error('brand_id and post_id are required');\nif (!payload.revision_reason || payload.revision_reason.trim().length < 5) throw new Error('revision_reason must be at least 5 characters');\nreturn {\n  brand_id: payload.brand_id,\n  post_id: payload.post_id,\n  revision_reason: payload.revision_reason,\n  revision_type: payload.revision_type || 'caption',\n  special_instructions: payload.special_instructions || '',\n  target: payload.target === 'admin' ? 'admin' : 'user',\n  image_model: payload.image_model || 'auto',\n  created_by: payload.created_by || null,\n  request_id: payload.request_id || null,\n  prompt_override: payload.prompt_override || null,\n  requested_at: new Date().toISOString(),\n  flow_id: 'N8N-B03'\n};"
+      },
+      "id": "d7fcdb20-1af9-4811-b5a0-be3b4bb03ef5",
+      "name": "Validate Revision Request1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        26816,
+        12480
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "usage_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-B03"
+            },
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "b03_trigger"
+            },
+            {
+              "fieldId": "duration_ms",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "cost_usd",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "started"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify({ post_id: $json.post_id, revision_reason: $json.revision_reason }) }}"
+            }
+          ]
+        }
+      },
+      "id": "4c24aa65-c79a-4ec0-a55e-739174045137",
+      "name": "Supabase: Log Usage1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        26816,
+        12624
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "win7iHopUx2pLts8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "calendar_posts",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "post_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Revision Request1').first().json.post_id }}"
+            }
+          ]
+        }
+      },
+      "id": "2ecfab00-3541-4c37-a5bb-d55b3051c22a",
+      "name": "Supabase: Fetch Post Details1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        27024,
+        12480
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "win7iHopUx2pLts8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const post = $input.first().json;\nconst target = $('Validate Revision Request1').first().json.target;\nconst revisionCount = post.revision_count || 0;\nif (target !== 'admin' && revisionCount >= 3) throw new Error(`MAX_REVISIONS_EXCEEDED: Post revised ${revisionCount} times. Max 3.`);\n\n// Expose post fields needed downstream — matching what A01 builds before\n// calling confidence-gate so the composite score uses the same inputs.\nconst occasionFlags = Array.isArray(post.occasion_flags) ? post.occasion_flags : [];\nconst evidenceBundleStates = (post.evidence_bundle_states && typeof post.evidence_bundle_states === 'object')\n  ? post.evidence_bundle_states : {};\n\nreturn {\n  ...post,\n  revision_count: revisionCount,\n  new_revision_number: revisionCount + 1,\n  can_revise: true,\n  occasion_flags: occasionFlags,\n  evidence_bundle_states: evidenceBundleStates,\n};"
+      },
+      "id": "ec0ea23c-48bb-4d10-8747-891e0ee95c50",
+      "name": "Check Revision Count1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        27216,
+        12480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "brand_profiles",
+        "limit": 1,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "brand_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Revision Request1').first().json.brand_id }}"
+            }
+          ]
+        }
+      },
+      "id": "dce93198-52e4-4a2f-90f4-4348f8117ff6",
+      "name": "Supabase: Fetch Brand Profile1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        27216,
+        12624
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "win7iHopUx2pLts8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "on_demand_requests",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "post_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Revision Request1').first().json.post_id }}"
+            }
+          ]
+        }
+      },
+      "id": "9816c0d7-4655-4061-a369-f20ef610bd10",
+      "name": "Supabase: Fetch OnDemand Request1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        27424,
+        12624
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "win7iHopUx2pLts8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst validate = $('Validate Revision Request1').first().json;\nconst checkCount = $('Check Revision Count1').first().json;\nconst bodyObj = {\n  flow_id: 'N8N-B03',\n  brand_id: validate.brand_id,\n  payload: {\n    request_type: 'revision',\n    trigger_payload: {\n      post_id: validate.post_id,\n      revision_reason: validate.revision_reason,\n      revision_number: checkCount.new_revision_number,\n      max_revisions: 3,\n      original_caption: checkCount.caption_ar,\n      original_score: checkCount.confidence_score || 75\n    }\n  }\n};\nconst bodyStr = JSON.stringify(bodyObj);\nconst secret = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst ts = new Date().toISOString();\nconst rid = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');\nreturn { signedBody: bodyStr, sig, rid, ts };"
+      },
+      "id": "067033f1-de84-4581-9beb-e791100dab25",
+      "name": "Sign: CEO Classify1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        27424,
+        12480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://unwieldable-mavis-unbacked.ngrok-free.dev/api/agents/ceo/classify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.sig }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.rid }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.ts }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.signedBody }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "35f6e94b-48c9-428a-8830-5954812f8d77",
+      "name": "HTTP: CEO Scope Revision1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        27616,
+        12432
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "approved-check",
+              "leftValue": "={{ $json.result.decision.human_gate_required }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "admin-bypass",
+              "leftValue": "={{ $('Validate Revision Request1').first().json.target }}",
+              "rightValue": "admin",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "df393d57-aecf-418a-9a4c-5648c7af63ce",
+      "name": "IF: CEO Approved?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        27824,
+        12480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst validate = $('Validate Revision Request1').first().json;\nconst ceoResult = $('HTTP: CEO Scope Revision1').first().json;\nconst brand = $('Supabase: Fetch Brand Profile1').first().json;\nconst checkCount = $('Check Revision Count1').first().json;\nconst bodyObj = {\n  flow_id: 'N8N-B03',\n  brand_id: validate.brand_id,\n  payload: {\n    confidence_mode: ceoResult.result?.decision?.confidence_mode || 'Standard',\n    occasion_flags: ['none'],\n    platform_spec: brand.primary_channel || 'Instagram',\n    content_mix: { [checkCount.content_type || 'offer']: 1 },\n    post_count: 1,\n    brand: brand || {},\n    negative_patterns: []\n  }\n};\nconst bodyStr = JSON.stringify(bodyObj);\nconst secret = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst ts = new Date().toISOString();\nconst rid = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');\nreturn { signedBody: bodyStr, sig, rid, ts };"
+      },
+      "id": "33f94256-cd5a-4894-8db7-cc074fb0ae43",
+      "name": "Sign: COO Re-Brief1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28016,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://unwieldable-mavis-unbacked.ngrok-free.dev/api/agents/coo/compile-caption-context",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.sig }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.rid }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.ts }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.signedBody }}",
+        "options": {
+          "timeout": 45000
+        }
+      },
+      "id": "e95685f9-8f40-4774-830a-43040c60addd",
+      "name": "HTTP: COO Re-Brief1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        28224,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst validate = $('Validate Revision Request1').first().json;\nconst checkCount = $('Check Revision Count1').first().json;\nconst cooResult = $('HTTP: COO Re-Brief1').first().json;\n\nconst captionContext = cooResult.result?.caption_context || '';\nif (!captionContext) throw new Error('COO caption_context missing — cannot call DeepSeek');\n\n// DeepSeek contract: post_count MUST equal schedule_dates.length, and the model\n// returns posts=[] (the \"0 posts\" 502) when schedule_dates is empty. Build one\n// schedule entry from the post's posting_time — same shape as N8N-A02's\n// Prepare DeepSeek node. Falls back to now() if posting_time is missing/invalid.\nlet rawPostingTime = checkCount.posting_time || '';\nlet dateObj = new Date(rawPostingTime);\nif (isNaN(dateObj.getTime())) { dateObj = new Date(); rawPostingTime = dateObj.toISOString(); }\nconst scheduleDate = dateObj.toISOString().slice(0, 10);\nconst month = scheduleDate.slice(0, 7);\nconst hourMatch = String(rawPostingTime).match(/T(\\d{2}):/);\nconst scheduleHour = hourMatch ? parseInt(hourMatch[1], 10) : dateObj.getUTCHours();\nconst schedule_dates = [{ date: scheduleDate, posting_time: rawPostingTime, hour: scheduleHour }];\n\nconst bodyObj = {\n  flow_id: 'N8N-B03',\n  brand_id: validate.brand_id,\n  payload: {\n    month: month,\n    caption_context: captionContext,\n    post_count: 1,\n    schedule_dates: schedule_dates,\n    start_date: scheduleDate,\n    intended_format: (checkCount.media_type === 'video') ? 'video' : 'image',\n    watermark_required: cooResult.result?.watermark_flag || false\n  }\n};\nconst bodyStr = JSON.stringify(bodyObj);\nconst secret = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst ts = new Date().toISOString();\nconst rid = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');\nreturn { signedBody: bodyStr, sig, rid, ts };"
+      },
+      "id": "c2270c5b-499c-47a7-bfbf-d288955f53cb",
+      "name": "Sign: DeepSeek1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28416,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://unwieldable-mavis-unbacked.ngrok-free.dev/api/agents/deepseek/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.sig }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.rid }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.ts }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.signedBody }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "0096750a-0389-43ce-85c4-afc86238f296",
+      "name": "HTTP: DeepSeek Revised Caption1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        28624,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst validate = $('Validate Revision Request1').first().json;\nconst cooResult = $('HTTP: COO Re-Brief1').first().json;\nconst deepseekResult = $('HTTP: DeepSeek Revised Caption1').first().json;\nconst post = deepseekResult.result?.posts?.[0] || {};\nconst bodyObj = {\n  flow_id: 'N8N-B03',\n  brand_id: validate.brand_id,\n  payload: {\n    caption_context_excerpt: (cooResult.result?.caption_context || '').substring(0, 500),\n    posts: [{\n      post_id: validate.post_id,\n      caption_ar: post.caption_ar || '',\n      content_type: post.content_type || 'offer',\n      hashtags: post.hashtags || [],\n      posting_time: post.posting_time || ''\n    }]\n  }\n};\nconst bodyStr = JSON.stringify(bodyObj);\nconst secret = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst ts = new Date().toISOString();\nconst rid = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');\nreturn { signedBody: bodyStr, sig, rid, ts };"
+      },
+      "id": "93760f7f-036c-45e8-8f9d-5c9f2e466c78",
+      "name": "Sign: CCO QC1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28816,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://unwieldable-mavis-unbacked.ngrok-free.dev/api/agents/cco/qc",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.sig }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.rid }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.ts }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.signedBody }}",
+        "options": {
+          "timeout": 45000
+        }
+      },
+      "id": "76070290-793b-47af-8e96-302306feb4e9",
+      "name": "HTTP: CCO Revised QC1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        29024,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst validate   = $('Validate Revision Request1').first().json;\nconst ccoResult  = $('HTTP: CCO Revised QC1').first().json;\nconst checkCount = $('Check Revision Count1').first().json;\n\n// Check Visual Score1 only runs when the visual QC branch executes.\n// Safely read it — if the node didn't run, treat as no visual data.\nlet visualCheck = null;\ntry { visualCheck = $('Check Visual Score1').first().json; } catch(_) {}\n\nconst visualQcResults = (visualCheck && visualCheck.visual_score !== null && visualCheck.visual_score !== undefined) ? [{\n  post_id:       validate.post_id,\n  visual_score:  visualCheck.visual_score,\n  visual_issues: visualCheck.visual_issues || [],\n  violations:    visualCheck.violations    || [],\n}] : [];\n\nconst bodyObj = {\n  flow_id:  'N8N-B03',\n  brand_id: validate.brand_id,\n  payload: {\n    request_type:    'revision',\n    trigger_payload: {},\n    cco_results: ccoResult.result || [],\n    visual_qc_results:       visualQcResults,\n    evidence_bundle_states:  checkCount.evidence_bundle_states || {},\n    occasion_flags:          checkCount.occasion_flags || [],\n  }\n};\nconst bodyStr = JSON.stringify(bodyObj);\nconst secret = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst ts  = new Date().toISOString();\nconst rid = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');\nreturn { signedBody: bodyStr, sig, rid, ts };"
+      },
+      "id": "50a9845d-3e6a-4142-9aff-47556c8b50a1",
+      "name": "Sign: CEO Gate1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29216,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://unwieldable-mavis-unbacked.ngrok-free.dev/api/agents/ceo/confidence-gate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.sig }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.rid }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.ts }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.signedBody }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "33c6f7b7-3e14-4fc8-a21c-ee6ad9b94f30",
+      "name": "HTTP: CEO Revision Gate1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        29424,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "gate-clean",
+              "leftValue": "={{ $json.result.decision.human_gate_required }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "admin-bypass",
+              "leftValue": "={{ $('Validate Revision Request1').first().json.target }}",
+              "rightValue": "admin",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "0cd86382-0143-453f-b251-9d9e0d38817a",
+      "name": "IF: Gate Passed?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        29616,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the /api/image/generate payload for B03 image regeneration.\n// Hard Rule #3: NO Arabic in prompt_en.\nconst ARABIC_RE = /[؀-ۿ]/;\n\nconst validate     = $('Validate Revision Request1').first().json;\nconst revisedCaption = $('HTTP: DeepSeek Revised Caption1').first().json.result.posts[0];\nconst brandData    = $('Supabase: Fetch Brand Profile1').first().json;\nconst originalPost = $('Check Revision Count1').first().json;\n\n// on_demand_requests row — may be absent for A01 monthly-batch posts.\nlet onDemandReq = null;\ntry {\n  const items = $('Supabase: Fetch OnDemand Request1').all();\n  if (items.length > 0 && items[0].json && items[0].json.request_id) {\n    onDemandReq = items[0].json;\n  }\n} catch (e) { onDemandReq = null; }\n\n// CEO-selected chain_id (if available from scope revision).\nlet chainId = null;\ntry {\n  const ceoResult = $('HTTP: CEO Scope Revision1').first().json;\n  chainId = ceoResult?.result?.decision?.selected_chain || null;\n} catch (e) { chainId = null; }\n\n// Prompt source priority:\n//   1. admin prompt_override.hero_concept\n//   2. on_demand_requests.hero_concept + style_descriptor\n//   3. DeepSeek revised visual_brief_en\n//   4. Generic brand fallback\nlet promptEn = '';\n\nconst override = validate.prompt_override || null;\nif (override && override.special_instructions && !ARABIC_RE.test(override.special_instructions)) {\n  promptEn = override.special_instructions.trim();\n}\nif (!promptEn && override && override.hero_concept) {\n  const parts = [override.hero_concept];\n  if (override.style_descriptor) parts.push(override.style_descriptor);\n  const ov = parts.join('. ').trim();\n  if (ov && !ARABIC_RE.test(ov)) promptEn = ov;\n}\nif (!promptEn && onDemandReq && onDemandReq.hero_concept) {\n  const parts = [onDemandReq.hero_concept];\n  if (onDemandReq.style_descriptor) parts.push(onDemandReq.style_descriptor);\n  promptEn = parts.join('. ').trim();\n}\nif (!promptEn) {\n  promptEn = (revisedCaption.visual_brief_en || '').trim();\n}\nif (!promptEn || ARABIC_RE.test(promptEn)) {\n  promptEn = `${brandData.brand_name_en || 'brand'} product photo, clean background, natural lighting`;\n}\n\nconst primaryColorHex = (onDemandReq && Array.isArray(onDemandReq.color_palette) && onDemandReq.color_palette.length > 0)\n  ? onDemandReq.color_palette[0]\n  : (brandData.primary_color_hex || '#000000');\n\nconst validObjectives = ['awareness', 'engagement', 'conversion', 'cultural', 'trust'];\nconst objective = (onDemandReq && validObjectives.includes(onDemandReq.objective))\n  ? onDemandReq.objective\n  : (revisedCaption.content_type === 'offer' ? 'conversion' : 'awareness');\n\nconst validChannels = ['Instagram', 'Snapchat', 'TikTok', 'Twitter'];\nconst channel = (onDemandReq && validChannels.includes(onDemandReq.platform))\n  ? onDemandReq.platform\n  : (brandData.primary_channel || 'Instagram');\n\nconst validDialects = ['Najdi', 'Hejazi', 'Gulf', 'MSA_formal', 'MSA_accessible', 'Mixed'];\nconst dialect = validDialects.includes(brandData.arabic_dialect) ? brandData.arabic_dialect : 'MSA_accessible';\n\n// month — derive from posting_time or use current month as fallback.\nlet month = '';\ntry {\n  month = (originalPost.posting_time || '').slice(0, 7);\n} catch(e) {}\nif (!month || !/^\\d{4}-\\d{2}$/.test(month)) {\n  const now = new Date();\n  month = now.toISOString().slice(0, 7);\n}\n\nreturn {\n  brand_id:         validate.brand_id,\n  post_id:          originalPost.post_id,\n  prompt_en:        promptEn,\n  brand_name_ar:    brandData.brand_name_ar || '',\n  headline_ar:      (revisedCaption.caption_ar || '').slice(0, 50),\n  dialect:          dialect,\n  channel:          channel,\n  objective:        objective,\n  confidence_flag:  'clean',\n  first_ever_post:  false,\n  cost_constraint:  'standard',\n  palette_hex:      primaryColorHex ? [primaryColorHex] : [],\n  month:            month,\n  score:            originalPost.cco_score ?? null,\n  revision_count:   originalPost.new_revision_number || 1,\n  chain_id:         chainId,\n  image_model:      validate.image_model || 'auto',\n  expected_media_type: (originalPost.media_type === 'video' || originalPost.format_tier === 'video') ? 'video' : 'image',\n};"
+      },
+      "id": "6f8e2a0a-c55f-478c-a82b-de5ea934624c",
+      "name": "Prepare Visual for Revision1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29824,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const visualResult = $('HTTP: Image Generate1').first().json;\nconst revisedCaption = $('HTTP: DeepSeek Revised Caption1').first().json.result.posts[0];\nconst visualCheck    = $('Check Visual Score1').first().json;\nconst gateResult     = $('HTTP: CEO Revision Gate1').first().json;\nconst gateDecision   = gateResult.result?.decision;\nconst originalPost   = $('Check Revision Count1').first().json;\nconst revision       = $('Validate Revision Request1').first().json;\n\n// Use composite confidence score from the gate's post_scores array — this is\n// the full 4-pillar score (Visual 35% + Caption 30% + Brand 20% + Occasion 15%).\n// Falls back to cco_score only if gate didn't return post_scores (degraded mode).\nconst ccoEval = $('HTTP: CCO Revised QC1').first().json.result?.[0];\nconst postScore = Array.isArray(gateResult.result?.post_scores)\n  ? gateResult.result.post_scores.find(p => p.post_id === revision.post_id) || gateResult.result.post_scores[0]\n  : null;\n\n// CEO gate returns scores as integer basis-points (×100) — divide to get 0-100.\nconst rawScore = postScore?.confidence_score ?? ccoEval?.score ?? 7500;\nconst confidenceScore = rawScore > 100 ? rawScore / 100 : rawScore;\nconst routeDecision   = postScore?.route ?? (gateDecision?.confidence_mode !== 'Standard' ? 'watermark' : 'clean');\nconst watermarkRequired = routeDecision === 'watermark' || routeDecision === 'hold';\n\nconst newStorageUrl =\n  visualResult.result?.storage_url ||\n  visualResult.storage_url || '';\nif (!newStorageUrl) {\n  throw new Error('Visual generation returned empty storage_url — aborting post update');\n}\nconst newCleanStorageUrl =\n  visualResult.result?.clean_storage_url ||\n  visualResult.clean_storage_url || null;\nconst oldStorageUrl      = originalPost.storage_url || null;\nconst oldCleanStorageUrl = originalPost.clean_storage_url || null;\nconst finalCleanStorageUrl = newCleanStorageUrl || oldCleanStorageUrl;\n\nlet existingHistory = [];\nconst raw = originalPost.revision_history;\nif (Array.isArray(raw)) {\n  existingHistory = raw;\n} else if (typeof raw === 'string' && raw.length > 0) {\n  try { const p = JSON.parse(raw); if (Array.isArray(p)) existingHistory = p; } catch {}\n}\n\nreturn {\n  brand_id:          revision.brand_id,\n  post_id:           originalPost.post_id,\n  caption_ar:        revisedCaption.caption_ar,\n  storage_url:       newStorageUrl,\n  clean_storage_url: finalCleanStorageUrl,\n  content_type:      revisedCaption.content_type || originalPost.content_type,\n  hashtags:          revisedCaption.hashtags || originalPost.hashtags || [],\n  confidence_score:  confidenceScore,\n  watermark:         watermarkRequired,\n  route_decision:    routeDecision,\n  // Client regen: set pending so the client still approves it from their calendar.\n  // Admin path never reaches this node (goes to admin_regenerations insert instead).\n  status:            'pending',\n  visual_score:      visualCheck?.visual_score ?? null,\n  visual_issues:     visualCheck?.visual_issues ?? [],\n  image_prompt_en:   visualResult.result?.image_prompt_en || visualResult.image_prompt_en || null,\n  revision_count:    originalPost.new_revision_number,\n  revision_history: [\n    ...existingHistory,\n    {\n      revision_number:    originalPost.new_revision_number,\n      reason:             revision.revision_reason,\n      old_caption:        originalPost.caption_ar,\n      new_caption:        revisedCaption.caption_ar,\n      old_image_url:      oldStorageUrl,\n      old_clean_image_url:oldCleanStorageUrl,\n      new_image_url:      newStorageUrl,\n      new_clean_image_url:newCleanStorageUrl,\n      confidence_score:   confidenceScore,\n      visual_score:       visualCheck?.visual_score ?? null,\n      route:              routeDecision,\n      revised_at:         new Date().toISOString()\n    }\n  ],\n  updated_at: new Date().toISOString()\n};"
+      },
+      "id": "c669aabb-3e30-40bb-9de0-aacb5d310567",
+      "name": "Prepare Post Update1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        31232,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "calendar_posts",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "post_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.post_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "caption_ar",
+              "fieldValue": "={{ $json.caption_ar }}"
+            },
+            {
+              "fieldId": "storage_url",
+              "fieldValue": "={{ $json.storage_url }}"
+            },
+            {
+              "fieldId": "clean_storage_url",
+              "fieldValue": "={{ $json.clean_storage_url }}"
+            },
+            {
+              "fieldId": "content_type",
+              "fieldValue": "={{ $json.content_type }}"
+            },
+            {
+              "fieldId": "hashtags",
+              "fieldValue": "={{ ($json.hashtags && $json.hashtags.length) ? '{\"' + $json.hashtags.join('\",\"') + '\"}' : '{}' }}"
+            },
+            {
+              "fieldId": "confidence_score",
+              "fieldValue": "={{ $json.confidence_score }}"
+            },
+            {
+              "fieldId": "watermark",
+              "fieldValue": "={{ $json.watermark }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "revision_count",
+              "fieldValue": "={{ $json.revision_count }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $json.updated_at }}"
+            },
+            {
+              "fieldId": "revision_history",
+              "fieldValue": "={{ $json.revision_history }}"
+            },
+            {
+              "fieldId": "visual_score",
+              "fieldValue": "={{ $json.visual_score }}"
+            },
+            {
+              "fieldId": "visual_issues",
+              "fieldValue": "={{ $json.visual_issues }}"
+            },
+            {
+              "fieldId": "image_prompt_en",
+              "fieldValue": "={{ $json.image_prompt_en }}"
+            },
+            {
+              "fieldId": "route_decision",
+              "fieldValue": "={{ $json.route_decision }}"
+            }
+          ]
+        }
+      },
+      "id": "59c81295-0d1c-4a7f-a431-96b723e7dd4a",
+      "name": "Supabase: Update Post1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        31424,
+        12368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "win7iHopUx2pLts8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  brand_id: $('Validate Revision Request1').first().json.brand_id,\n  flow_id: 'N8N-B03',\n  request_type: 'revision',\n  pipeline_assigned: 'revision_pipeline',\n  agents_dispatch: { ceo: true, coo: true, cco: true, deepseek: true, visual: true },\n  constraints_applied: { revision_number: $('Check Revision Count1').first().json.new_revision_number, max_revisions: 3 },\n  confidence_mode: $('HTTP: CEO Revision Gate1').first().json.result?.decision?.confidence_mode || 'Standard',\n  outcome: 'revision_complete',\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "79faa67d-85f6-4ce8-898b-1064a5faa56f",
+      "name": "Prepare Routing Decision1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        31632,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "routing_decisions",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "={{ $json.flow_id }}"
+            },
+            {
+              "fieldId": "request_type",
+              "fieldValue": "={{ $json.request_type }}"
+            },
+            {
+              "fieldId": "pipeline_assigned",
+              "fieldValue": "={{ $json.pipeline_assigned }}"
+            },
+            {
+              "fieldId": "agents_dispatched",
+              "fieldValue": "={{ JSON.stringify($json.agents_dispatch) }}"
+            },
+            {
+              "fieldId": "constraints_applied",
+              "fieldValue": "={{ JSON.stringify($json.constraints_applied) }}"
+            },
+            {
+              "fieldId": "confidence_mode",
+              "fieldValue": "={{ $json.confidence_mode }}"
+            },
+            {
+              "fieldId": "outcome",
+              "fieldValue": "={{ $json.outcome }}"
+            },
+            {
+              "fieldId": "timestamp",
+              "fieldValue": "={{ $json.timestamp }}"
+            }
+          ]
+        }
+      },
+      "id": "6c90d68f-db68-4975-9e2b-49deb8d093b2",
+      "name": "Supabase: Insert Routing Decision1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        31824,
+        12368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "win7iHopUx2pLts8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, post_id: $('Validate Revision Request1').first().json.post_id, new_caption: $('Prepare Post Update1').first().json.caption_ar, new_storage_url: $('Prepare Post Update1').first().json.storage_url, revision_number: $('Check Revision Count1').first().json.new_revision_number, status: $('Prepare Post Update1').first().json.status, message: 'Post revised successfully' }) }}",
+        "options": {}
+      },
+      "id": "c0f8e7a1-f842-4b45-b681-9df8aa1cdfe0",
+      "name": "Return Success1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        32032,
+        12368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const revision = $('Validate Revision Request1').first().json;\nconst ceoResponse = $input.first().json;\nreturn {\n  brand_id: revision.brand_id,\n  post_id: revision.post_id,\n  rejection_reason: ceoResponse.result?.decision?.human_gate_reasons?.join(', ') || 'CEO human gate required — manual review needed',\n  flow_id: 'N8N-B03',\n  status: 'rejected',\n  created_at: new Date().toISOString()\n};"
+      },
+      "id": "49ea7d45-8d30-401e-aece-76826651df1d",
+      "name": "Prepare Rejection Log1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28016,
+        12672
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: $('Prepare Rejection Log1').first().json.rejection_reason, post_id: $('Prepare Rejection Log1').first().json.post_id, status: 'rejected' }) }}",
+        "options": {}
+      },
+      "id": "471fc3c5-a635-49b1-b51e-2d12d6ee9be6",
+      "name": "Return Rejection1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        28224,
+        12672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const revisedCaption = $('HTTP: DeepSeek Revised Caption1').first().json.result.posts[0];\nconst gateResult     = $('HTTP: CEO Revision Gate1').first().json;\nconst gateDecision   = gateResult.result?.decision;\nconst revision       = $('Validate Revision Request1').first().json;\nconst visualCheck    = $('Check Visual Score1').first().json;\nconst ccoEval        = $('HTTP: CCO Revised QC1').first().json.result?.[0];\nconst visualResult   = $('Sign: Visual QC1').first().json;\n\n// Use the real composite score (same logic as Prepare Post Update).\nconst postScore = Array.isArray(gateResult.result?.post_scores)\n  ? gateResult.result.post_scores.find(p => p.post_id === revision.post_id) || gateResult.result.post_scores[0]\n  : null;\nconst confidenceScore = postScore?.confidence_score ?? ccoEval?.score ?? 50;\n\nconst holdReason = 'Human override triggered: ' + ((gateDecision?.human_gate_reasons || []).join(', ') || 'confidence gate triggered');\n\nreturn [{\n  json: {\n    brand_id:       revision.brand_id,\n    post_id:        revision.post_id,\n    caption_ar:     revisedCaption.caption_ar,\n    storage_url:    visualResult.newStorageUrl || null,\n    cco_score:      ccoEval?.score ?? null,\n    confidence_score: confidenceScore,\n    visual_score:   visualCheck?.visual_score ?? null,\n    visual_issues:  visualCheck?.visual_issues ?? [],\n    flags: {\n      flow_id:     'N8N-B03',\n      route:       'HOLD',\n      negpat_flag: ccoEval?.negpat_flag || 'NONE',\n      cultural_flag: ccoEval?.cultural_flag || false,\n      issues:      ccoEval?.issues || [],\n      pillars:     postScore?.pillars ?? null,\n    },\n    trigger_reason: holdReason,\n    status:         'pending'\n  }\n}];"
+      },
+      "id": "12b39870-44a7-48ba-aeb1-de57688a234f",
+      "name": "Prepare QA Entry1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29824,
+        12672
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "qa_review_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "post_id",
+              "fieldValue": "={{ $json.post_id }}"
+            },
+            {
+              "fieldId": "caption_ar",
+              "fieldValue": "={{ $json.caption_ar }}"
+            },
+            {
+              "fieldId": "cco_score",
+              "fieldValue": "={{ $json.cco_score }}"
+            },
+            {
+              "fieldId": "flags",
+              "fieldValue": "={{ $json.flags }}"
+            },
+            {
+              "fieldId": "trigger_reason",
+              "fieldValue": "={{ $json.trigger_reason }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            }
+          ]
+        }
+      },
+      "id": "bdaf77b2-9a37-4624-9fa8-0da5116ff3df",
+      "name": "Supabase: Insert QA Queue1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        30016,
+        12672
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "win7iHopUx2pLts8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, status: 'held', message: 'Revised post requires admin review', post_id: $('Prepare QA Entry1').first().json.post_id }) }}",
+        "options": {}
+      },
+      "id": "7baecfaf-ee78-47e1-9329-f2694f6e92a3",
+      "name": "Return Held Status1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        31232,
+        12672
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "7d0519fc-29ee-4741-a67f-ec5527f0cb9e",
+      "name": "On Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        26624,
+        12880
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst SECRET = 'test-webhook-123';\nconst e = $json;\n\nlet brand_id = null;\ntry { brand_id = $('Validate Revision Request1').first().json.brand_id ?? null; } catch (_) {}\n\nconst makeUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n  const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\n\nconst body = JSON.stringify({\n  anomaly_id:   makeUUID(),\n  anomaly_type: 'revision_request_failed',\n  severity:     'error',\n  source_flow:  'N8N-B03',\n  brand_id,\n  message:      e.execution?.error?.message || 'B03 revision request flow failed',\n  details: {\n    failed_node:  e.execution?.lastNodeExecuted ?? null,\n    error_name:   e.execution?.error?.name      ?? null,\n    execution_id: e.execution?.id               ?? null,\n  },\n  timestamp: new Date().toISOString(),\n});\n\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  _body: body,\n  _headers: {\n    'content-type':     'application/json',\n    'x-n8n-signature':  sig,\n    'x-n8n-request-id': `${$execution.id}-err-b03`,\n    'x-n8n-timestamp':  new Date().toISOString(),\n  },\n};"
+      },
+      "id": "f975c87d-004d-4b52-91bf-3790276fdb71",
+      "name": "Build S03 alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        26816,
+        12880
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogzstudios.app.n8n.cloud/webhook-test/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "fcd00db5-7bcf-4fb2-8a73-bc41c779be0c",
+      "name": "POST · S03 anomaly-alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        27008,
+        12880
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "adm-cond-1",
+              "leftValue": "={{ $('Validate Revision Request1').first().json.target }}",
+              "rightValue": "admin",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1a772d00-9d4e-402f-b7b6-40db68b4c344",
+      "name": "IF: Admin Target?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        31328,
+        12576
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "admin_regenerations",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "post_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Post Update1').first().json.post_id }}"
+            }
+          ]
+        }
+      },
+      "id": "1228c4e8-d08d-4d2f-85e5-e8bb316cfb1a",
+      "name": "Supabase: Fetch Admin Regen Count1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        31520,
+        12576
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "win7iHopUx2pLts8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const update = $('Prepare Post Update1').first().json;\nconst validate = $('Validate Revision Request1').first().json;\nconst post = $('Check Revision Count1').first().json;\n\n// Next admin draft version for this post (independent of user revision_count).\nlet maxVersion = 0;\ntry {\n  for (const it of $('Supabase: Fetch Admin Regen Count1').all()) {\n    const v = it.json && it.json.version ? Number(it.json.version) : 0;\n    if (v > maxVersion) maxVersion = v;\n  }\n} catch (e) { maxVersion = 0; }\n\nreturn {\n  post_id: update.post_id,\n  request_id: validate.request_id,\n  brand_id: validate.brand_id,\n  version: maxVersion + 1,\n  media_type: post.media_type || 'image',\n  storage_url: update.storage_url,\n  clean_storage_url: update.clean_storage_url,\n  caption_ar: update.caption_ar,\n  hashtags: update.hashtags || [],\n  confidence_score: update.confidence_score,\n  watermark: update.watermark,\n  prompt_override: validate.prompt_override ? JSON.stringify(validate.prompt_override) : null,\n  image_model: validate.image_model || 'auto',\n  status: 'draft',\n  visual_score: $('Check Visual Score1').first().json?.visual_score ?? null,\n  visual_issues: $('Check Visual Score1').first().json?.visual_issues ?? [],\n  created_by: validate.created_by\n};"
+      },
+      "id": "54a08868-a197-4485-9adf-9f76be8725d2",
+      "name": "Prepare Admin Regen Insert1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        31696,
+        12576
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "admin_regenerations",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "post_id",
+              "fieldValue": "={{ $json.post_id }}"
+            },
+            {
+              "fieldId": "request_id",
+              "fieldValue": "={{ $json.request_id }}"
+            },
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "version",
+              "fieldValue": "={{ $json.version }}"
+            },
+            {
+              "fieldId": "media_type",
+              "fieldValue": "={{ $json.media_type }}"
+            },
+            {
+              "fieldId": "storage_url",
+              "fieldValue": "={{ $json.storage_url }}"
+            },
+            {
+              "fieldId": "clean_storage_url",
+              "fieldValue": "={{ $json.clean_storage_url }}"
+            },
+            {
+              "fieldId": "caption_ar",
+              "fieldValue": "={{ $json.caption_ar }}"
+            },
+            {
+              "fieldId": "hashtags",
+              "fieldValue": "={{ ($json.hashtags && $json.hashtags.length) ? '{\"' + ($json.hashtags || []).join('\",\"') + '\"}' : '{}' }}"
+            },
+            {
+              "fieldId": "confidence_score",
+              "fieldValue": "={{ $json.confidence_score }}"
+            },
+            {
+              "fieldId": "watermark",
+              "fieldValue": "={{ $json.watermark }}"
+            },
+            {
+              "fieldId": "prompt_override",
+              "fieldValue": "={{ $json.prompt_override }}"
+            },
+            {
+              "fieldId": "image_model",
+              "fieldValue": "={{ $json.image_model }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "created_by",
+              "fieldValue": "={{ $json.created_by }}"
+            },
+            {
+              "fieldId": "visual_score",
+              "fieldValue": "={{ $('Check Visual Score1').first().json.visual_score }}"
+            },
+            {
+              "fieldId": "visual_issues",
+              "fieldValue": "={{ JSON.stringify($('Check Visual Score1').first().json.visual_issues || []) }}"
+            }
+          ]
+        }
+      },
+      "id": "1f3e78ea-0ab8-4a32-ab04-536604919496",
+      "name": "Supabase: Insert Admin Regeneration1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        31888,
+        12576
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "win7iHopUx2pLts8",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, target: 'admin', regen_id: $json.regen_id, version: $('Prepare Admin Regen Insert1').first().json.version, message: 'Admin draft created' }) }}",
+        "options": {}
+      },
+      "id": "cca3ed15-c567-402c-9696-f89f744367de",
+      "name": "Return Admin Draft1",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        32064,
+        12576
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst validate = $('Validate Revision Request1').first().json;\nconst checkCount = $('Check Revision Count1').first().json;\nconst brandProfile = $('Supabase: Fetch Brand Profile1').first().json;\nconst visualResult = $input.first().json;\n\nconst newUrl =\n  visualResult.result?.storage_url ||\n  visualResult.storage_url || '';\n\n// visual_brief_en = the actual English prompt that fal.ai rendered.\n// V01 sub-workflow returns image_prompt_en (stored on calendar_posts).\n// Using this gives GPT-4o the ground truth to score chain fidelity against,\n// instead of guessing from a chain description. Matches A01/V01 path exactly.\nconst visualBriefEn =\n  visualResult.result?.image_prompt_en ||\n  visualResult.image_prompt_en ||\n  checkCount.image_prompt_en ||\n  null;\n\nconst bodyObj = {\n  flow_id: 'N8N-B03',\n  brand_id: validate.brand_id,\n  payload: {\n    image_url: newUrl,\n    post_id: validate.post_id,\n    visual_brief_en: visualBriefEn,\n    chain_id: checkCount.chain_id || null,\n    style_register: brandProfile.style_register || undefined,\n    color_palette: (Array.isArray(brandProfile.color_palette) && brandProfile.color_palette.length > 0) ? brandProfile.color_palette : (brandProfile.primary_color_hex ? [brandProfile.primary_color_hex] : undefined),\n    occasion_flags: checkCount.occasion_flags || [],\n    content_type: checkCount.content_type || null,\n    channel: checkCount.channel || undefined,\n    religious_sensitivity: brandProfile.religious_sensitivity || 'Medium'\n  }\n};\nconst bodyStr = JSON.stringify(bodyObj);\nconst secret = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst ts = new Date().toISOString();\nconst rid = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');\nreturn { signedBody: bodyStr, sig, rid, ts, newStorageUrl: newUrl };"
+      },
+      "name": "Sign: Visual QC1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        30192,
+        12144
+      ],
+      "id": "ed53f844-9080-4a57-8b1c-653fd916f01f"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://unwieldable-mavis-unbacked.ngrok-free.dev/api/agents/cco/visual-qc",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.sig }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.rid }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.ts }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.signedBody }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "HTTP: Visual QC1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        30640,
+        12080
+      ],
+      "id": "7d99a3f6-3f59-453e-99a4-671f72317440"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Visual QC results from GPT-4o vision.\n// Hard block = visual_score 0 → Saudi cultural violation. Mandatory hold on ALL paths.\n// Low score  = visual_score < 50 → below doc §9.6 HOLD threshold → admin review on user path.\n// Admin path ALWAYS proceeds to draft lane — admin decides after seeing the score.\nconst qcResult = $input.first().json;\nconst target = $('Validate Revision Request1').first().json.target;\nconst isAdminPath = target === 'admin';\nconst qcData = qcResult?.result ?? qcResult;\nconst visualScore = qcData?.visual_score ?? null;\nconst visualIssues = qcData?.visual_issues ?? [];\nconst violations   = qcData?.violations ?? [];\n\nconst isHardBlock  = visualScore === 0 || violations.length > 0;\n\n// Doc §9.6: score < 50 = HOLD threshold (same as confidence-gate THRESHOLD_WATERMARK).\nconst isBelowThreshold = visualScore !== null && visualScore < 50;\n\n// Admin drafts always proceed regardless of score — admin reviews visually.\n// User path: hold on hard block or below-threshold visual.\nconst needsAdminReview = !isAdminPath && (isHardBlock || isBelowThreshold);\n\nreturn {\n  visual_score: visualScore,\n  visual_issues: visualIssues,\n  violations: violations,\n  is_hard_block: isHardBlock,\n  needs_admin_review: needsAdminReview,\n  review_reason: isHardBlock\n    ? `Saudi cultural hard block in regenerated image (score=0, violations: ${violations.join(', ') || 'detected'}).`\n    : isBelowThreshold && !isAdminPath\n    ? `Regenerated image scored ${visualScore}/100 — below the 50-point quality threshold. Admin review required before publishing.`\n    : null,\n};"
+      },
+      "name": "Check Visual Score1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        30624,
+        12368
+      ],
+      "id": "7c8444f4-246b-446f-bfd2-c41ec7ad79ee"
+    },
+    {
+      "parameters": {
+        "conditions": [
+          {
+            "id": "visual-ok",
+            "leftValue": "={{ $json.needs_admin_review }}",
+            "rightValue": false,
+            "operator": {
+              "type": "boolean",
+              "operation": "equals"
+            }
+          }
+        ],
+        "options": {}
+      },
+      "name": "IF: Visual OK?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        30816,
+        12368
+      ],
+      "id": "ccfdc7d0-1b46-4d4d-8749-f8e1bc1dc2ea"
+    },
+    {
+      "parameters": {
+        "jsCode": "const validate = $('Validate Revision Request1').first().json;\nconst visualCheck = $('Check Visual Score1').first().json;\nconst visualResult = $('Sign: Visual QC1').first().json;\nconst revisedCaption = $('HTTP: DeepSeek Revised Caption1').first().json.result.posts[0];\nreturn [{\n  json: {\n    brand_id: validate.brand_id,\n    post_id: validate.post_id,\n    caption_ar: revisedCaption?.caption_ar ?? '',\n    storage_url: visualResult.newStorageUrl,\n    cco_score: visualCheck.visual_score ?? 0,\n    flags: {\n      flow_id: 'N8N-B03',\n      route: 'HOLD',\n      visual_score: visualCheck.visual_score,\n      visual_issues: visualCheck.visual_issues\n    },\n    trigger_reason: visualCheck.review_reason || 'Regenerated image requires admin review.',\n    status: 'pending'\n  }\n}];"
+      },
+      "name": "Prepare Visual QA Entry1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        31024,
+        12672
+      ],
+      "id": "95916a96-ba76-4f33-922c-3a8faf497cb3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst post = $input.first().json;\nconst NGROK = 'https://unwieldable-mavis-unbacked.ngrok-free.dev';\n\nconst bodyObj = {\n  flow_id:  'N8N-B03',\n  brand_id: post.brand_id,\n  post_id:  post.post_id,\n  payload: {\n    prompt_en:           post.prompt_en,\n    brand_name_ar:       post.brand_name_ar,\n    headline_ar:         post.headline_ar,\n    dialect:             post.dialect,\n    channel:             post.channel,\n    objective:           post.objective,\n    confidence_flag:     post.confidence_flag,\n    first_ever_post:     post.first_ever_post,\n    cost_constraint:     post.cost_constraint,\n    palette_hex:         post.palette_hex,\n    month:               post.month,\n    score:               post.score,\n    revision_count:      post.revision_count,\n    chain_id:            post.chain_id || null,\n    expected_media_type: post.expected_media_type || 'image',\n  }\n};\nconst bodyStr = JSON.stringify(bodyObj);\nconst secret = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst ts  = new Date().toISOString();\nconst rid = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', secret).update(bodyStr).digest('hex');\nreturn { signedBody: bodyStr, sig, rid, ts, url: NGROK + '/api/image/generate' };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        30032,
+        12368
+      ],
+      "id": "520152f2-c1ed-4e3d-8aca-abcd35148ab8",
+      "name": "Sign: Image Generate1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json.sig }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json.rid }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json.ts }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.signedBody }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "f2751ffe-8c2c-4d16-9026-6ce043624924",
+      "name": "HTTP: Image Generate1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        30496,
+        12080
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: Revision Request1": {
+      "main": [
+        [
+          {
+            "node": "Validate Revision Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Revision Request1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Log Usage1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Log Usage1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Fetch Post Details1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch Post Details1": {
+      "main": [
+        [
+          {
+            "node": "Check Revision Count1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Revision Count1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Fetch Brand Profile1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch Brand Profile1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Fetch OnDemand Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch OnDemand Request1": {
+      "main": [
+        [
+          {
+            "node": "Sign: CEO Classify1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign: CEO Classify1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: CEO Scope Revision1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: CEO Scope Revision1": {
+      "main": [
+        [
+          {
+            "node": "IF: CEO Approved?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: CEO Approved?1": {
+      "main": [
+        [
+          {
+            "node": "Sign: COO Re-Brief1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Rejection Log1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign: COO Re-Brief1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: COO Re-Brief1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: COO Re-Brief1": {
+      "main": [
+        [
+          {
+            "node": "Sign: DeepSeek1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign: DeepSeek1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: DeepSeek Revised Caption1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: DeepSeek Revised Caption1": {
+      "main": [
+        [
+          {
+            "node": "Sign: CCO QC1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign: CCO QC1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: CCO Revised QC1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: CCO Revised QC1": {
+      "main": [
+        [
+          {
+            "node": "Sign: CEO Gate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign: CEO Gate1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: CEO Revision Gate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: CEO Revision Gate1": {
+      "main": [
+        [
+          {
+            "node": "IF: Gate Passed?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Gate Passed?1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Visual for Revision1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare QA Entry1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Visual for Revision1": {
+      "main": [
+        [
+          {
+            "node": "Sign: Image Generate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Post Update1": {
+      "main": [
+        [
+          {
+            "node": "IF: Admin Target?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Update Post1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Routing Decision1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Routing Decision1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert Routing Decision1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert Routing Decision1": {
+      "main": [
+        [
+          {
+            "node": "Return Success1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Rejection Log1": {
+      "main": [
+        [
+          {
+            "node": "Return Rejection1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare QA Entry1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert QA Queue1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert QA Queue1": {
+      "main": [
+        [
+          {
+            "node": "Return Held Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On Error": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build S03 alert": {
+      "main": [
+        [
+          {
+            "node": "POST · S03 anomaly-alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Admin Target?1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Fetch Admin Regen Count1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: Update Post1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch Admin Regen Count1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Admin Regen Insert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Admin Regen Insert1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert Admin Regeneration1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert Admin Regeneration1": {
+      "main": [
+        [
+          {
+            "node": "Return Admin Draft1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign: Visual QC1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Visual QC1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Visual QC1": {
+      "main": [
+        [
+          {
+            "node": "Check Visual Score1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Visual Score1": {
+      "main": [
+        [
+          {
+            "node": "IF: Visual OK?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Visual OK?1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Post Update1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Visual QA Entry1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Visual QA Entry1": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert QA Queue1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign: Image Generate1": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Image Generate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Image Generate1": {
+      "main": [
+        [
+          {
+            "node": "Sign: Visual QC1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bffa1653da7ca4a85edadda52cdbd0237713917d77d290c02ed1648550f98b48"
+  }
+}

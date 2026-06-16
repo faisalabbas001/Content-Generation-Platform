@@ -1,0 +1,1109 @@
+{
+  "info": {
+    "_postman_id": "8a3f5b1c-9e2d-4a6f-b8c0-1e7d9a3b5f2c",
+    "name": "OGz Studios — Full API Collection",
+    "description": "Complete Postman collection for every API route in the OGz Studios platform.\n\n## Quick start\n\n1. Import this file: **File → Import → Upload Files** (or drag-drop).\n2. Import the environment: `openclaw.postman_environment.json` (in the same folder).\n3. Activate the environment (top-right dropdown → **OGz Studios — Local**).\n4. Set `webhook_secret` in the environment (paste the value of `N8N_WEBHOOK_SECRET` from `.env.local`).\n5. Start the dev server: `pnpm --filter web dev`.\n6. Click any request and hit **Send**.\n\n## What's auto-handled\n\nThe collection-level pre-request script signs every request that has a body with HMAC-SHA256 — you don't have to compute headers yourself. It also auto-generates a fresh `x-n8n-request-id` and `x-n8n-timestamp` per call.\n\n## Folder structure\n\n- **00 — Health** — sanity checks (no auth)\n- **01 — Negative tests** — security boundary checks (should FAIL)\n- **02 — CEO** — classify + confidence-gate (with all 7 request_types and confidence modes)\n- **03 — COO** — build-branddna, compile-caption-context, score-confidence\n- **04 — CCO** — qc with happy path and edge cases\n- **05 — DeepSeek** — generate (8 / 20 / 1 / Ramadan / watermarked)\n- **06 — Memory Controller** — drain queue scenarios\n- **07 — n8n status callbacks** — every event_type variant\n- **08 — Stubs (501)** — Stripe, Correction (placeholders)\n- **09 — Admin Copilot** — management / tech / production / unknown\n- **10 — Admin Auth** — login / logout (cookie-based, no HMAC)\n\n## Reference docs\n\n- `docs/api/agents-and-memory.md` — request/response shapes\n- `docs/n8n-integration.md` — HMAC recipe + flow walkthroughs\n- `docs/db/database-guide.md` — what gets written where",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// ════════════════════════════════════════════════════════════════",
+          "// OGz Studios — collection-level pre-request signing script.",
+          "// ",
+          "// Adds HMAC-SHA256 signature + UUID request_id + ISO timestamp to every",
+          "// request that has a JSON body. Skips requests tagged with `noSign`",
+          "// (negative tests, admin auth, OAuth callback).",
+          "// ",
+          "// Reads `webhook_secret` from the active environment.",
+          "// ════════════════════════════════════════════════════════════════",
+          "",
+          "const url = pm.request.url.toString()",
+          "const skipSigning = pm.request.getHeaders({ enabled: true })['x-skip-sign'] === 'true' ||",
+          "                    /\\/api\\/(admin|auth)\\//.test(url)",
+          "",
+          "if (skipSigning) {",
+          "    return",
+          "}",
+          "",
+          "const secret = pm.environment.get('webhook_secret') || pm.collectionVariables.get('webhook_secret')",
+          "if (!secret) {",
+          "    console.warn('webhook_secret is empty — set it in the environment variables before sending signed requests')",
+          "    return",
+          "}",
+          "",
+          "// Generate fresh nonce + timestamp",
+          "const ts = new Date().toISOString()",
+          "const reqId = (function uuidv4() {",
+          "    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {",
+          "        const r = Math.random() * 16 | 0",
+          "        const v = c === 'x' ? r : (r & 0x3 | 0x8)",
+          "        return v.toString(16)",
+          "    })",
+          "})()",
+          "",
+          "// Optional override for replay-test / drift-test scenarios.",
+          "const tsOverride = pm.variables.get('overrideTimestamp')",
+          "const reqIdOverride = pm.variables.get('overrideRequestId')",
+          "const sigOverride = pm.variables.get('overrideSignature')",
+          "",
+          "const finalTs = tsOverride || ts",
+          "const finalReqId = reqIdOverride || reqId",
+          "",
+          "// Compute HMAC over the raw body bytes",
+          "let body = ''",
+          "if (pm.request.body && pm.request.body.raw) {",
+          "    // Resolve {{variables}} inside the body before signing — Postman would",
+          "    // otherwise sign the un-substituted string and the server would reject.",
+          "    body = pm.variables.replaceIn(pm.request.body.raw)",
+          "    // Update the request body with the resolved version so what we sign",
+          "    // matches what we send.",
+          "    pm.request.body.raw = body",
+          "}",
+          "",
+          "const CryptoJS = require('crypto-js')",
+          "const computedSig = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex)",
+          "const finalSig = sigOverride || computedSig",
+          "",
+          "pm.request.headers.upsert({ key: 'content-type',     value: 'application/json' })",
+          "pm.request.headers.upsert({ key: 'x-n8n-signature',  value: finalSig })",
+          "pm.request.headers.upsert({ key: 'x-n8n-request-id', value: finalReqId })",
+          "pm.request.headers.upsert({ key: 'x-n8n-timestamp',  value: finalTs })",
+          "",
+          "// Optional idempotency key — set the local var `idempotencyKey` to use it.",
+          "const idempKey = pm.variables.get('idempotencyKey')",
+          "if (idempKey) {",
+          "    pm.request.headers.upsert({ key: 'x-n8n-idempotency-key', value: idempKey })",
+          "}",
+          "",
+          "// Clean up overrides so they don't leak into the next request.",
+          "pm.variables.unset('overrideTimestamp')",
+          "pm.variables.unset('overrideRequestId')",
+          "pm.variables.unset('overrideSignature')",
+          "pm.variables.unset('idempotencyKey')",
+          "",
+          "console.log(`[sign] ${pm.request.method} ${pm.request.url.toString()} ts=${finalTs} sig=${finalSig.slice(0,12)}…`)"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Common assertions every request inherits.",
+          "pm.test('response is JSON', () => {",
+          "    pm.response.to.have.header('content-type')",
+          "    pm.expect(pm.response.headers.get('content-type')).to.include('application/json')",
+          "})",
+          "",
+          "// Surface any error envelope in a readable assertion message.",
+          "if (pm.response.code >= 400) {",
+          "    try {",
+          "        const body = pm.response.json()",
+          "        if (body && body.error) {",
+          "            console.log(`[server] ${pm.response.code} ${body.error}: ${body.message || ''}`)",
+          "        }",
+          "    } catch {}",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 — Health",
+      "description": "Sanity checks. No HMAC signing.",
+      "item": [
+        {
+          "name": "GET / (marketing home)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "x-skip-sign", "value": "true" }],
+            "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200))"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 — Negative tests (security)",
+      "description": "These requests are CRAFTED to fail. Use them to verify the auth layer rejects bad requests with the right status codes.",
+      "item": [
+        {
+          "name": "401 — no signature header",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-skip-sign", "value": "true" },
+              { "key": "content-type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"flow_id\":\"test\",\"brand_id\":null,\"payload\":{\"request_type\":\"calendar_ondemand\",\"trigger_payload\":{}}}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('401 missing_headers', () => pm.response.to.have.status(401))",
+                  "pm.test('error code is missing_headers', () => pm.expect(pm.response.json().error).to.eql('missing_headers'))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 — bad signature",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.variables.set('overrideSignature', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef')"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('401 bad_signature', () => pm.response.to.have.status(401))",
+                  "pm.test('error code is bad_signature', () => pm.expect(pm.response.json().error).to.eql('bad_signature'))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\"flow_id\":\"test\",\"brand_id\":null,\"payload\":{\"request_type\":\"calendar_ondemand\",\"trigger_payload\":{}}}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "401 — timestamp drift > 5 min",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Force a timestamp 6 minutes in the past.",
+                  "pm.variables.set('overrideTimestamp', new Date(Date.now() - 6 * 60 * 1000).toISOString())"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('401 timestamp_drift', () => pm.response.to.have.status(401))",
+                  "pm.test('error is timestamp_drift', () => pm.expect(pm.response.json().error).to.eql('timestamp_drift'))"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\"flow_id\":\"test\",\"brand_id\":null,\"payload\":{\"request_type\":\"calendar_ondemand\",\"trigger_payload\":{}}}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "400 — invalid JSON body",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "this is not json {{{" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 invalid_json', () => pm.response.to.have.status(400))",
+                  "pm.test('error code is invalid_json', () => pm.expect(pm.response.json().error).to.eql('invalid_json'))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "400 — schema validation fails",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\"not_a_real_field\":true}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 invalid_input', () => pm.response.to.have.status(400))",
+                  "pm.test('issues array present', () => pm.expect(pm.response.json().issues).to.be.an('array'))"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "409 — replay (duplicate request_id)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Use a fixed request_id so the second send is detected as a replay.",
+                  "pm.variables.set('overrideRequestId', 'ffffffff-ffff-4fff-bfff-ffffffffffff')"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// First send: should be 400 (invalid_input). Send a SECOND time → 409.",
+                  "pm.test('expect 400 on first send OR 409 on second', () => {",
+                  "    pm.expect([400, 409]).to.include(pm.response.code)",
+                  "})",
+                  "if (pm.response.code === 409) {",
+                  "    pm.test('error is replay_detected', () => pm.expect(pm.response.json().error).to.eql('replay_detected'))",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\"not_a_real_field\":true}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — CEO",
+      "description": "POST /api/agents/ceo/classify and /api/agents/ceo/confidence-gate. The CEO is called FIRST in every n8n flow (Hard Rule #1).",
+      "item": [
+        {
+          "name": "classify · 1. calendar_scheduled (Sunday batch, Standard mode)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('returns decision + memory', () => { pm.expect(j.result.decision).to.exist; pm.expect(j.result.memory).to.exist })",
+            "pm.test('confidence_mode is set', () => pm.expect(j.result.decision.confidence_mode).to.be.oneOf(['Standard','Cautious','Minimal','Blocked']))",
+            "pm.test('agents_to_dispatch is an array', () => pm.expect(j.result.decision.agents_to_dispatch).to.be.an('array'))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_scheduled\",\n    \"trigger_payload\": { \"month\": \"2026-05\", \"shard\": 0 },\n    \"evidence_bundle_states\": {\n      \"arabic_dialect\": \"inferred_high\",\n      \"brand_differentiator\": \"explicitly_confirmed\",\n      \"price_position\": \"explicitly_confirmed\",\n      \"primary_channel\": \"explicitly_confirmed\",\n      \"ramadan_relevance\": \"inferred_high\",\n      \"primary_audience.gender\": \"inferred_medium\",\n      \"primary_kpi_type\": \"explicitly_confirmed\",\n      \"religious_sensitivity\": \"inferred_medium\",\n      \"tone_anti_attribute_ids\": \"explicitly_confirmed\",\n      \"bilingual_ratio\": \"explicitly_confirmed\"\n    },\n    \"occasion_flags\": [\"none\"],\n    \"current_month_spend_usd\": 5.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 2. calendar_ondemand (single post)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A02\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_ondemand\",\n    \"trigger_payload\": { \"source\": \"client_click\" },\n    \"evidence_bundle_states\": {\n      \"arabic_dialect\": \"inferred_high\",\n      \"brand_differentiator\": \"explicitly_confirmed\",\n      \"price_position\": \"explicitly_confirmed\",\n      \"primary_channel\": \"explicitly_confirmed\",\n      \"ramadan_relevance\": \"inferred_high\",\n      \"primary_audience.gender\": \"inferred_medium\",\n      \"primary_kpi_type\": \"explicitly_confirmed\",\n      \"religious_sensitivity\": \"inferred_medium\",\n      \"tone_anti_attribute_ids\": \"explicitly_confirmed\",\n      \"bilingual_ratio\": \"explicitly_confirmed\"\n    },\n    \"occasion_flags\": [\"none\"],\n    \"current_month_spend_usd\": 5.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 3. onboarding_new (brand_id can be null)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A03\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"onboarding_new\",\n    \"trigger_payload\": {\n      \"slug\": \"najd-restaurant-d8f1\",\n      \"form_completed_at\": \"2026-04-29T10:00:00Z\"\n    },\n    \"occasion_flags\": [\"none\"],\n    \"current_month_spend_usd\": 0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 4. revision request",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-B03\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"revision\",\n    \"trigger_payload\": {\n      \"post_id\": \"post_007\",\n      \"revision_count\": 1,\n      \"revision_reason\": \"tone too formal — make it warmer\"\n    },\n    \"evidence_bundle_states\": {\n      \"arabic_dialect\": \"inferred_high\",\n      \"brand_differentiator\": \"explicitly_confirmed\",\n      \"price_position\": \"explicitly_confirmed\",\n      \"primary_channel\": \"explicitly_confirmed\",\n      \"ramadan_relevance\": \"inferred_high\",\n      \"primary_audience.gender\": \"inferred_medium\",\n      \"primary_kpi_type\": \"explicitly_confirmed\",\n      \"religious_sensitivity\": \"inferred_medium\",\n      \"tone_anti_attribute_ids\": \"explicitly_confirmed\",\n      \"bilingual_ratio\": \"explicitly_confirmed\"\n    },\n    \"occasion_flags\": [\"none\"],\n    \"current_month_spend_usd\": 12.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 5. brand_correction",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A04\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"brand_correction\",\n    \"trigger_payload\": {\n      \"field_path\": \"BrandProfile.formality_level\",\n      \"old_value\": \"semi_formal\",\n      \"new_value\": \"casual\",\n      \"reasoning\": \"Client says we are casual not semi_formal\"\n    },\n    \"current_month_spend_usd\": 8.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 6. anomaly_alert (system-level, brand_id null)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-S03\",\n  \"brand_id\": null,\n  \"payload\": {\n    \"request_type\": \"anomaly_alert\",\n    \"trigger_payload\": {\n      \"anomaly_type\": \"weavy_api_unavailable\",\n      \"recent_failure_rate\": 0.18\n    },\n    \"current_month_spend_usd\": 0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 7. upgrade_signal",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A05\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"upgrade_signal\",\n    \"trigger_payload\": {\n      \"total_calendars_generated\": 3,\n      \"completeness_score\": 78,\n      \"engagement_above_baseline\": true\n    },\n    \"current_month_spend_usd\": 4.0,\n    \"monthly_ceiling_usd\": 5.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 8. Cautious mode (one inferred_low)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('mode is Cautious or Minimal', () => pm.expect(j.result.decision.confidence_mode).to.be.oneOf(['Cautious','Minimal']))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A02\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_ondemand\",\n    \"trigger_payload\": {},\n    \"evidence_bundle_states\": {\n      \"arabic_dialect\": \"inferred_high\",\n      \"brand_differentiator\": \"inferred_low\",\n      \"price_position\": \"explicitly_confirmed\",\n      \"primary_channel\": \"explicitly_confirmed\",\n      \"ramadan_relevance\": \"inferred_high\",\n      \"primary_audience.gender\": \"inferred_medium\",\n      \"primary_kpi_type\": \"explicitly_confirmed\",\n      \"religious_sensitivity\": \"inferred_medium\",\n      \"tone_anti_attribute_ids\": \"explicitly_confirmed\",\n      \"bilingual_ratio\": \"explicitly_confirmed\"\n    },\n    \"occasion_flags\": [\"none\"],\n    \"current_month_spend_usd\": 5.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 9. Minimal mode (multiple inferred_low + dialect)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A02\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_ondemand\",\n    \"trigger_payload\": {},\n    \"evidence_bundle_states\": {\n      \"arabic_dialect\": \"inferred_low\",\n      \"brand_differentiator\": \"inferred_low\",\n      \"price_position\": \"inferred_low\",\n      \"primary_channel\": \"explicitly_confirmed\",\n      \"ramadan_relevance\": \"inferred_high\",\n      \"primary_audience.gender\": \"inferred_medium\",\n      \"primary_kpi_type\": \"inferred_medium\",\n      \"religious_sensitivity\": \"inferred_medium\",\n      \"tone_anti_attribute_ids\": \"inferred_low\",\n      \"bilingual_ratio\": \"explicitly_confirmed\"\n    },\n    \"occasion_flags\": [\"none\"],\n    \"current_month_spend_usd\": 5.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 10. Blocked mode (dialect missing)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('mode is Blocked', () => pm.expect(j.result.decision.confidence_mode).to.eql('Blocked'))",
+            "pm.test('human_gate_required is true', () => pm.expect(j.result.decision.human_gate_required).to.eql(true))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A02\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_ondemand\",\n    \"trigger_payload\": {},\n    \"evidence_bundle_states\": {\n      \"brand_differentiator\": \"explicitly_confirmed\",\n      \"price_position\": \"explicitly_confirmed\",\n      \"primary_channel\": \"explicitly_confirmed\",\n      \"ramadan_relevance\": \"inferred_high\",\n      \"primary_audience.gender\": \"inferred_medium\",\n      \"primary_kpi_type\": \"explicitly_confirmed\",\n      \"religious_sensitivity\": \"inferred_medium\",\n      \"tone_anti_attribute_ids\": \"explicitly_confirmed\",\n      \"bilingual_ratio\": \"explicitly_confirmed\"\n    },\n    \"occasion_flags\": [\"none\"],\n    \"current_month_spend_usd\": 5.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 11. cost approaching (70-89%)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A02\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_ondemand\",\n    \"trigger_payload\": {},\n    \"current_month_spend_usd\": 38.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 12. cost critical (90-99%)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A02\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_ondemand\",\n    \"trigger_payload\": {},\n    \"current_month_spend_usd\": 47.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 13. cost breached (≥100%)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('cost_status is breached', () => pm.expect(j.result.decision.cost_status).to.eql('breached'))",
+            "pm.test('human_gate_required is true', () => pm.expect(j.result.decision.human_gate_required).to.eql(true))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A02\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_ondemand\",\n    \"trigger_payload\": {},\n    \"current_month_spend_usd\": 52.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "classify · 14. Ramadan occasion active",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_scheduled\",\n    \"trigger_payload\": { \"month\": \"2027-03\" },\n    \"occasion_flags\": [\"ramadan_2027\"],\n    \"current_month_spend_usd\": 5.0,\n    \"monthly_ceiling_usd\": 50.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/classify", "host": ["{{base_url}}"], "path": ["api","agents","ceo","classify"] }
+          }
+        },
+        {
+          "name": "confidence-gate · 1. all clean (high scores)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('returns decision', () => pm.expect(j.result.decision).to.exist)"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_scheduled\",\n    \"trigger_payload\": { \"month\": \"2026-05\" },\n    \"cco_results\": [\n      { \"post_id\": \"p1\", \"score\": 91, \"brave_route_flag\": false, \"negpat_flag\": \"NONE\" },\n      { \"post_id\": \"p2\", \"score\": 88, \"brave_route_flag\": false, \"negpat_flag\": \"NONE\" },\n      { \"post_id\": \"p3\", \"score\": 85, \"brave_route_flag\": false, \"negpat_flag\": \"NONE\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/confidence-gate", "host": ["{{base_url}}"], "path": ["api","agents","ceo","confidence-gate"] }
+          }
+        },
+        {
+          "name": "confidence-gate · 2. mixed (clean + watermark + hold)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_scheduled\",\n    \"trigger_payload\": {},\n    \"cco_results\": [\n      { \"post_id\": \"p1\", \"score\": 91, \"brave_route_flag\": false, \"negpat_flag\": \"NONE\" },\n      { \"post_id\": \"p2\", \"score\": 63, \"brave_route_flag\": false, \"negpat_flag\": \"SOFT_WARN\" },\n      { \"post_id\": \"p3\", \"score\": 42, \"brave_route_flag\": false, \"negpat_flag\": \"STRONG_WARN\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/confidence-gate", "host": ["{{base_url}}"], "path": ["api","agents","ceo","confidence-gate"] }
+          }
+        },
+        {
+          "name": "confidence-gate · 3. brave_route triggered (override #2)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('human_gate_required is true', () => pm.expect(j.result.decision.human_gate_required).to.eql(true))",
+            "pm.test('reasons include brave_route_flagged', () => pm.expect(j.result.decision.human_gate_reasons).to.include('brave_route_flagged'))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_scheduled\",\n    \"trigger_payload\": {},\n    \"cco_results\": [\n      { \"post_id\": \"p1\", \"score\": 88, \"brave_route_flag\": true, \"negpat_flag\": \"NONE\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/confidence-gate", "host": ["{{base_url}}"], "path": ["api","agents","ceo","confidence-gate"] }
+          }
+        },
+        {
+          "name": "confidence-gate · 4. HARD_BLOCK negpat (override #11)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('human_gate_required is true', () => pm.expect(j.result.decision.human_gate_required).to.eql(true))",
+            "pm.test('reasons include hard_block_negative_pattern', () => pm.expect(j.result.decision.human_gate_reasons).to.include('hard_block_negative_pattern'))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_scheduled\",\n    \"trigger_payload\": {},\n    \"cco_results\": [\n      { \"post_id\": \"p1\", \"score\": 80, \"brave_route_flag\": false, \"negpat_flag\": \"HARD_BLOCK\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/confidence-gate", "host": ["{{base_url}}"], "path": ["api","agents","ceo","confidence-gate"] }
+          }
+        },
+        {
+          "name": "confidence-gate · 5. CCO low confidence (override #10)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('reasons include cco_low_confidence', () => pm.expect(j.result.decision.human_gate_reasons).to.include('cco_low_confidence'))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"calendar_scheduled\",\n    \"trigger_payload\": {},\n    \"cco_results\": [\n      { \"post_id\": \"p1\", \"score\": 42, \"brave_route_flag\": false, \"negpat_flag\": \"NONE\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/confidence-gate", "host": ["{{base_url}}"], "path": ["api","agents","ceo","confidence-gate"] }
+          }
+        },
+        {
+          "name": "confidence-gate · 6. revision flow (request_type=revision)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-B03\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"request_type\": \"revision\",\n    \"trigger_payload\": { \"post_id\": \"p1\", \"revision_count\": 1 },\n    \"cco_results\": [\n      { \"post_id\": \"p1\", \"score\": 84, \"brave_route_flag\": false, \"negpat_flag\": \"NONE\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/ceo/confidence-gate", "host": ["{{base_url}}"], "path": ["api","agents","ceo","confidence-gate"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — COO",
+      "description": "POST /api/agents/coo/{build-branddna,compile-caption-context,score-confidence}. The COO is called multiple times per flow.",
+      "item": [
+        {
+          "name": "build-branddna · 1. full extraction (form + IG + website + Places)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('returns 10 field_nominations', () => pm.expect(j.result.field_nominations).to.have.lengthOf(10))",
+            "pm.test('completeness_score 0-100', () => { pm.expect(j.result.completeness_score).to.be.at.least(0); pm.expect(j.result.completeness_score).to.be.at.most(100) })",
+            "pm.test('dialect_confirmed boolean', () => pm.expect(j.result.dialect_confirmed).to.be.a('boolean'))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A03\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"form_answers\": {\n      \"brand_name_ar\": \"مطعم نجد\",\n      \"brand_name_en\": \"Najd Restaurant\",\n      \"sector\": \"F&B\",\n      \"city_primary\": \"Riyadh\",\n      \"arabic_dialect\": \"Najdi\",\n      \"price_position\": \"mid_market\",\n      \"brand_differentiator\": \"authentic Najdi home-style cooking served by Saudi family staff\",\n      \"formality_level\": \"casual\",\n      \"humor_tolerance\": \"light\",\n      \"religious_sensitivity\": \"Medium\",\n      \"bilingual_ratio\": \"arabic_primary\",\n      \"primary_channel\": \"Instagram\",\n      \"primary_kpi_type\": \"engagement\",\n      \"tone_anti_attribute_ids\": [\"aggressive\", \"western_casual\"]\n    },\n    \"instagram_extraction\": {\n      \"handle\": \"najdrestaurant\",\n      \"followers\": 12450,\n      \"post_count_30d\": 18,\n      \"captions_sample\": [\"بيت نجد يجمعكم الليلة\", \"تذوّقوا الجلسة الأصيلة\"],\n      \"engagement_rate\": 0.038\n    },\n    \"website_extraction\": {\n      \"url\": \"https://najdrestaurant.sa\",\n      \"title\": \"مطعم نجد\",\n      \"meta_description\": \"Authentic Najdi cuisine in Riyadh\",\n      \"primary_text\": \"Welcome to Najd Restaurant\"\n    },\n    \"google_business_extraction\": {\n      \"place_id\": \"ChIJ1234example\",\n      \"rating\": 4.6,\n      \"review_count\": 312,\n      \"category\": \"Restaurant\"\n    }\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/build-branddna", "host": ["{{base_url}}"], "path": ["api","agents","coo","build-branddna"] }
+          }
+        },
+        {
+          "name": "build-branddna · 2. form-only (no scrapers)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A03\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"form_answers\": {\n      \"brand_name_ar\": \"محل صفاء\",\n      \"sector\": \"Retail\",\n      \"city_primary\": \"Jeddah\",\n      \"arabic_dialect\": \"Hejazi\",\n      \"price_position\": \"premium\",\n      \"brand_differentiator\": \"hand-picked Saudi-designed home accessories\",\n      \"formality_level\": \"semi_formal\",\n      \"religious_sensitivity\": \"Medium\",\n      \"bilingual_ratio\": \"balanced\",\n      \"primary_channel\": \"Instagram\",\n      \"tone_anti_attribute_ids\": [\"aggressive\"]\n    }\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/build-branddna", "host": ["{{base_url}}"], "path": ["api","agents","coo","build-branddna"] }
+          }
+        },
+        {
+          "name": "build-branddna · 3. Healthcare sector (high sensitivity)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A03\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"form_answers\": {\n      \"brand_name_ar\": \"عيادة الشفاء\",\n      \"sector\": \"Healthcare\",\n      \"city_primary\": \"Riyadh\",\n      \"arabic_dialect\": \"MSA_formal\",\n      \"price_position\": \"premium\",\n      \"brand_differentiator\": \"family medical centre with female-led clinic\",\n      \"formality_level\": \"formal\",\n      \"religious_sensitivity\": \"High\",\n      \"bilingual_ratio\": \"arabic_primary\",\n      \"primary_channel\": \"Twitter\",\n      \"tone_anti_attribute_ids\": [\"aggressive\", \"casual_humor\"]\n    }\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/build-branddna", "host": ["{{base_url}}"], "path": ["api","agents","coo","build-branddna"] }
+          }
+        },
+        {
+          "name": "build-branddna · 4. Hejazi dialect with mixed bilingual",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A03\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"form_answers\": {\n      \"brand_name_ar\": \"بيوتي أوسيس\",\n      \"sector\": \"Beauty_Wellness\",\n      \"city_primary\": \"Dammam\",\n      \"arabic_dialect\": \"Gulf\",\n      \"price_position\": \"premium\",\n      \"brand_differentiator\": \"organic skincare made for Saudi climate\",\n      \"formality_level\": \"casual\",\n      \"humor_tolerance\": \"moderate\",\n      \"religious_sensitivity\": \"Low\",\n      \"bilingual_ratio\": \"balanced\",\n      \"primary_channel\": \"Instagram\",\n      \"tone_anti_attribute_ids\": [\"flashy\"]\n    }\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/build-branddna", "host": ["{{base_url}}"], "path": ["api","agents","coo","build-branddna"] }
+          }
+        },
+        {
+          "name": "build-branddna · 5. minimal form (lots of inferred_low expected)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A03\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"form_answers\": {\n      \"brand_name_ar\": \"اسم مؤقت\",\n      \"sector\": \"Other\",\n      \"city_primary\": \"Riyadh\"\n    }\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/build-branddna", "host": ["{{base_url}}"], "path": ["api","agents","coo","build-branddna"] }
+          }
+        },
+        {
+          "name": "compile-caption-context · 1. Standard mode 20 posts",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('token_count 400-1500', () => { pm.expect(j.result.token_count).to.be.at.least(400); pm.expect(j.result.token_count).to.be.at.most(1500) })",
+            "pm.test('layers_included is array', () => pm.expect(j.result.layers_included).to.be.an('array'))",
+            "pm.test('caption_context non-empty', () => pm.expect(j.result.caption_context.length).to.be.greaterThan(0))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"confidence_mode\": \"Standard\",\n    \"occasion_flags\": [\"none\"],\n    \"platform_spec\": \"Instagram 1080x1080, bottom-third safe zone, caption ≤220 chars\",\n    \"content_mix\": { \"emotional\": 0.4, \"lifestyle\": 0.35, \"offer\": 0.25 },\n    \"post_count\": 20,\n    \"brand\": {\n      \"brand_name_ar\": \"مطعم نجد\",\n      \"brand_name_en\": \"Najd Restaurant\",\n      \"sector\": \"F&B\",\n      \"subsector\": \"casual_dining\",\n      \"city_primary\": \"Riyadh\",\n      \"arabic_dialect\": \"Najdi\",\n      \"price_position\": \"mid_market\",\n      \"formality_level\": \"casual\",\n      \"humor_tolerance\": \"light\",\n      \"religious_sensitivity\": \"Medium\",\n      \"bilingual_ratio\": \"arabic_primary\",\n      \"tone_attribute_ids\": [\"warm\", \"family_focused\", \"proud_saudi\"],\n      \"tone_anti_attribute_ids\": [\"aggressive\", \"western_casual\"],\n      \"brand_differentiator\": \"authentic Najdi home-style cooking\"\n    },\n    \"negative_patterns\": [\n      { \"text\": \"استمتع بالعروض\", \"severity\": \"SOFT_WARN\" }\n    ],\n    \"cost_constraint\": \"normal\"\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/compile-caption-context", "host": ["{{base_url}}"], "path": ["api","agents","coo","compile-caption-context"] }
+          }
+        },
+        {
+          "name": "compile-caption-context · 2. Cautious mode (watermark)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('watermark_flag is true', () => pm.expect(j.result.watermark_flag).to.eql(true))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"confidence_mode\": \"Cautious\",\n    \"occasion_flags\": [\"none\"],\n    \"platform_spec\": \"Instagram 1080x1080\",\n    \"content_mix\": { \"emotional\": 0.4, \"lifestyle\": 0.35, \"offer\": 0.25 },\n    \"post_count\": 20,\n    \"brand\": {\n      \"brand_name_ar\": \"مطعم نجد\",\n      \"sector\": \"F&B\",\n      \"city_primary\": \"Riyadh\",\n      \"arabic_dialect\": \"Najdi\",\n      \"formality_level\": \"casual\",\n      \"religious_sensitivity\": \"Medium\",\n      \"bilingual_ratio\": \"arabic_primary\",\n      \"tone_attribute_ids\": [\"warm\"],\n      \"tone_anti_attribute_ids\": [\"aggressive\"],\n      \"brand_differentiator\": \"authentic Najdi cooking\"\n    }\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/compile-caption-context", "host": ["{{base_url}}"], "path": ["api","agents","coo","compile-caption-context"] }
+          }
+        },
+        {
+          "name": "compile-caption-context · 3. Minimal mode 8 posts (free tier)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"confidence_mode\": \"Minimal\",\n    \"occasion_flags\": [\"none\"],\n    \"platform_spec\": \"Instagram 1080x1080\",\n    \"content_mix\": { \"emotional\": 0.5, \"lifestyle\": 0.35, \"offer\": 0.15 },\n    \"post_count\": 8,\n    \"brand\": {\n      \"brand_name_ar\": \"محل تجريبي\",\n      \"sector\": \"Retail\",\n      \"arabic_dialect\": \"MSA_accessible\",\n      \"formality_level\": \"semi_formal\",\n      \"religious_sensitivity\": \"Medium\",\n      \"bilingual_ratio\": \"balanced\",\n      \"tone_attribute_ids\": [\"calm\"],\n      \"tone_anti_attribute_ids\": [\"aggressive\"],\n      \"brand_differentiator\": \"home decor\"\n    }\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/compile-caption-context", "host": ["{{base_url}}"], "path": ["api","agents","coo","compile-caption-context"] }
+          }
+        },
+        {
+          "name": "compile-caption-context · 4. Ramadan occasion active",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"confidence_mode\": \"Standard\",\n    \"occasion_flags\": [\"ramadan_2027\"],\n    \"platform_spec\": \"Instagram 1080x1080\",\n    \"content_mix\": { \"emotional\": 0.55, \"lifestyle\": 0.30, \"offer\": 0.15 },\n    \"post_count\": 20,\n    \"brand\": {\n      \"brand_name_ar\": \"مطعم نجد\",\n      \"sector\": \"F&B\",\n      \"city_primary\": \"Riyadh\",\n      \"arabic_dialect\": \"Najdi\",\n      \"formality_level\": \"casual\",\n      \"religious_sensitivity\": \"Medium\",\n      \"bilingual_ratio\": \"arabic_primary\",\n      \"tone_attribute_ids\": [\"warm\", \"family_focused\"],\n      \"tone_anti_attribute_ids\": [\"aggressive\"],\n      \"brand_differentiator\": \"authentic Najdi cooking\"\n    }\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/compile-caption-context", "host": ["{{base_url}}"], "path": ["api","agents","coo","compile-caption-context"] }
+          }
+        },
+        {
+          "name": "compile-caption-context · 5. cost critical (reduced context)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"confidence_mode\": \"Standard\",\n    \"occasion_flags\": [\"none\"],\n    \"platform_spec\": \"Instagram 1080x1080\",\n    \"content_mix\": { \"emotional\": 0.4, \"lifestyle\": 0.35, \"offer\": 0.25 },\n    \"post_count\": 20,\n    \"brand\": {\n      \"brand_name_ar\": \"مطعم نجد\",\n      \"sector\": \"F&B\",\n      \"arabic_dialect\": \"Najdi\",\n      \"formality_level\": \"casual\",\n      \"religious_sensitivity\": \"Medium\",\n      \"bilingual_ratio\": \"arabic_primary\",\n      \"tone_attribute_ids\": [\"warm\"],\n      \"tone_anti_attribute_ids\": [\"aggressive\"],\n      \"brand_differentiator\": \"authentic Najdi cooking\"\n    },\n    \"cost_constraint\": \"critical\"\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/compile-caption-context", "host": ["{{base_url}}"], "path": ["api","agents","coo","compile-caption-context"] }
+          }
+        },
+        {
+          "name": "score-confidence · 1. all clean (high scores)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('post_scores returned', () => pm.expect(j.result.post_scores).to.be.an('array'))",
+            "pm.test('every score 0-100', () => j.result.post_scores.forEach(p => { pm.expect(p.confidence_score).to.be.at.least(0); pm.expect(p.confidence_score).to.be.at.most(100) }))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"field_confidence_floor\": 0.95,\n    \"occasion_flags\": [\"none\"],\n    \"posts\": [\n      { \"post_id\": \"p1\", \"caption_ar\": \"بيت نجد يجمعكم الليلة\", \"cco_qc_score\": 0.91,\n        \"cco_flags\": { \"dialect_flag\": false, \"negpat_flag\": \"NONE\", \"cultural_flag\": false, \"brave_route_flag\": false } },\n      { \"post_id\": \"p2\", \"caption_ar\": \"قهوتنا الصباحية تنتظركم\", \"cco_qc_score\": 0.88,\n        \"cco_flags\": { \"dialect_flag\": false, \"negpat_flag\": \"NONE\", \"cultural_flag\": false, \"brave_route_flag\": false } }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/score-confidence", "host": ["{{base_url}}"], "path": ["api","agents","coo","score-confidence"] }
+          }
+        },
+        {
+          "name": "score-confidence · 2. HARD_BLOCK floors to 0",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"field_confidence_floor\": 0.9,\n    \"occasion_flags\": [\"none\"],\n    \"posts\": [\n      { \"post_id\": \"p1\", \"caption_ar\": \"...\", \"cco_qc_score\": 0.85,\n        \"cco_flags\": { \"dialect_flag\": false, \"negpat_flag\": \"HARD_BLOCK\", \"cultural_flag\": false, \"brave_route_flag\": false } }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/score-confidence", "host": ["{{base_url}}"], "path": ["api","agents","coo","score-confidence"] }
+          }
+        },
+        {
+          "name": "score-confidence · 3. low CCO score floor",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"field_confidence_floor\": 0.95,\n    \"occasion_flags\": [\"none\"],\n    \"posts\": [\n      { \"post_id\": \"p1\", \"caption_ar\": \"...\", \"cco_qc_score\": 0.42,\n        \"cco_flags\": { \"dialect_flag\": false, \"negpat_flag\": \"NONE\", \"cultural_flag\": false, \"brave_route_flag\": false } }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/score-confidence", "host": ["{{base_url}}"], "path": ["api","agents","coo","score-confidence"] }
+          }
+        },
+        {
+          "name": "score-confidence · 4. missing critical field (floor=0)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"field_confidence_floor\": 0.0,\n    \"occasion_flags\": [\"none\"],\n    \"posts\": [\n      { \"post_id\": \"p1\", \"caption_ar\": \"...\", \"cco_qc_score\": 0.91,\n        \"cco_flags\": { \"dialect_flag\": false, \"negpat_flag\": \"NONE\", \"cultural_flag\": false, \"brave_route_flag\": false } }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/score-confidence", "host": ["{{base_url}}"], "path": ["api","agents","coo","score-confidence"] }
+          }
+        },
+        {
+          "name": "score-confidence · 5. occasion mismatch (cultural_flag)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"field_confidence_floor\": 0.9,\n    \"occasion_flags\": [\"ramadan_2027\"],\n    \"posts\": [\n      { \"post_id\": \"p1\", \"caption_ar\": \"...\", \"cco_qc_score\": 0.82,\n        \"cco_flags\": { \"dialect_flag\": false, \"negpat_flag\": \"NONE\", \"cultural_flag\": true, \"brave_route_flag\": false } }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/coo/score-confidence", "host": ["{{base_url}}"], "path": ["api","agents","coo","score-confidence"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 — CCO (Arabic QC)",
+      "description": "POST /api/agents/cco/qc — top-level returns a JSON ARRAY of evaluations.",
+      "item": [
+        {
+          "name": "qc · 1. clean caption (high score expected)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('result is an array', () => pm.expect(j.result).to.be.an('array'))",
+            "pm.test('every entry has score 0-100', () => j.result.forEach(e => { pm.expect(e.score).to.be.at.least(0); pm.expect(e.score).to.be.at.most(100) }))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"caption_context_excerpt\": \"Brand: Najd Restaurant — F&B casual dining in Riyadh. Dialect: Najdi. Tone: warm, family-focused, proud Saudi.\",\n    \"posts\": [\n      { \"post_id\": \"p1\", \"caption_ar\": \"بيت نجد يجمعكم الليلة على قهوة سعودية وتمر — تعالوا تذوّقوا الجلسة الأصيلة.\", \"content_type\": \"lifestyle\", \"posting_time\": \"19:30\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/cco/qc", "host": ["{{base_url}}"], "path": ["api","agents","cco","qc"] }
+          }
+        },
+        {
+          "name": "qc · 2. translation smell (should flag)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('low score expected', () => pm.expect(j.result[0].score).to.be.below(70))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"caption_context_excerpt\": \"Brand: Najd Restaurant — Najdi dialect. Avoid translation smell, English marketing clichés.\",\n    \"posts\": [\n      { \"post_id\": \"smell_001\", \"caption_ar\": \"استمتع بخصوماتنا الحصرية المحدودة! اكتشف سحر النكهات.\", \"content_type\": \"offer\", \"posting_time\": \"20:00\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/cco/qc", "host": ["{{base_url}}"], "path": ["api","agents","cco","qc"] }
+          }
+        },
+        {
+          "name": "qc · 3. wrong dialect (Najdi brand with Hejazi caption)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"caption_context_excerpt\": \"Brand: Najd Restaurant — Najdi dialect ONLY. Avoid Hejazi or Egyptian markers.\",\n    \"posts\": [\n      { \"post_id\": \"dialect_001\", \"caption_ar\": \"إيوه يا حبايبي تعالوا تشوفوا المكان كيفه\", \"content_type\": \"engagement\", \"posting_time\": \"19:00\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/cco/qc", "host": ["{{base_url}}"], "path": ["api","agents","cco","qc"] }
+          }
+        },
+        {
+          "name": "qc · 4. brave route (creative risk)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"caption_context_excerpt\": \"Brand: F&B Najdi. Tone: warm, family_focused. Avoid: edgy, ironic.\",\n    \"posts\": [\n      { \"post_id\": \"brave_001\", \"caption_ar\": \"فطورنا اليوم… أحلى من أي رومانس عربي تشوفه على نتفلكس!\", \"content_type\": \"awareness\", \"posting_time\": \"08:30\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/cco/qc", "host": ["{{base_url}}"], "path": ["api","agents","cco","qc"] }
+          }
+        },
+        {
+          "name": "qc · 5. HARD_BLOCK pattern (price claim in restricted sector)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"caption_context_excerpt\": \"Brand: Healthcare. Religious sensitivity HIGH. Never make health claims, never imply guaranteed outcomes.\",\n    \"posts\": [\n      { \"post_id\": \"hardblock_001\", \"caption_ar\": \"شفاء مضمون ١٠٠٪ في أسبوع واحد فقط — جربوا اليوم!\", \"content_type\": \"offer\", \"posting_time\": \"10:00\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/cco/qc", "host": ["{{base_url}}"], "path": ["api","agents","cco","qc"] }
+          }
+        },
+        {
+          "name": "qc · 6. batch of 5 mixed posts",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('5 evaluations returned', () => pm.expect(j.result).to.have.lengthOf(5))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"caption_context_excerpt\": \"Brand: Najd Restaurant — Najdi dialect, warm tone.\",\n    \"posts\": [\n      { \"post_id\": \"b1\", \"caption_ar\": \"بيت نجد يجمعكم الليلة\", \"content_type\": \"lifestyle\", \"posting_time\": \"19:30\" },\n      { \"post_id\": \"b2\", \"caption_ar\": \"قهوتنا الصباحية تنتظركم\", \"content_type\": \"awareness\", \"posting_time\": \"08:00\" },\n      { \"post_id\": \"b3\", \"caption_ar\": \"استمتع بخصوماتنا الحصرية\", \"content_type\": \"offer\", \"posting_time\": \"20:00\" },\n      { \"post_id\": \"b4\", \"caption_ar\": \"رمضان كريم من بيت نجد\", \"content_type\": \"emotional\", \"posting_time\": \"17:30\" },\n      { \"post_id\": \"b5\", \"caption_ar\": \"تعالوا اليوم، الجلسة عامرة\", \"content_type\": \"engagement\", \"posting_time\": \"21:00\" }\n    ]\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/cco/qc", "host": ["{{base_url}}"], "path": ["api","agents","cco","qc"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 — DeepSeek",
+      "description": "POST /api/agents/deepseek/generate — generates exactly post_count Arabic captions.",
+      "item": [
+        {
+          "name": "generate · 1. 8 posts (free tier)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('exactly 8 posts', () => pm.expect(j.result.posts).to.have.lengthOf(8))",
+            "pm.test('every post has caption_ar', () => j.result.posts.forEach(p => pm.expect(p.caption_ar).to.be.a('string').and.have.length.greaterThan(0)))",
+            "pm.test('every visual_brief_en is English-only (Hard Rule #3)', () => j.result.posts.forEach(p => pm.expect(p.visual_brief_en).to.match(/^[\\x00-\\x7F]+$/)))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"month\": \"2026-05\",\n    \"post_count\": 8,\n    \"caption_context\": \"Brand: مطعم نجد / Najd Restaurant — F&B casual dining, Riyadh. Dialect: Najdi. Tone: warm, family-focused, proud Saudi. Avoid translation smell, English marketing clichés. Content mix: 40% emotional, 35% lifestyle, 25% offer. Platform: Instagram 1080x1080, caption ≤220 chars. Bilingual ratio: arabic_primary.\",\n    \"watermark_required\": false\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/deepseek/generate", "host": ["{{base_url}}"], "path": ["api","agents","deepseek","generate"] }
+          }
+        },
+        {
+          "name": "generate · 2. 20 posts (paid tier)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('exactly 20 posts', () => pm.expect(j.result.posts).to.have.lengthOf(20))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"month\": \"2026-05\",\n    \"post_count\": 20,\n    \"caption_context\": \"Brand: مطعم نجد — F&B Najdi. Tone: warm, family-focused. Mix: 40/35/25.\",\n    \"watermark_required\": false\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/deepseek/generate", "host": ["{{base_url}}"], "path": ["api","agents","deepseek","generate"] }
+          }
+        },
+        {
+          "name": "generate · 3. 1 post (on-demand)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A02\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"month\": \"2026-05\",\n    \"post_count\": 1,\n    \"caption_context\": \"Brand: مطعم نجد. Today's topic: weekend family dinner promotion.\",\n    \"watermark_required\": false\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/deepseek/generate", "host": ["{{base_url}}"], "path": ["api","agents","deepseek","generate"] }
+          }
+        },
+        {
+          "name": "generate · 4. Ramadan occasion context",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"month\": \"2027-03\",\n    \"post_count\": 8,\n    \"caption_context\": \"Brand: مطعم نجد — F&B Najdi. Active occasion: Ramadan. Mix shifts to 55% emotional / 30% lifestyle / 15% offer. Tone: hospitality, family gatherings, generosity.\",\n    \"occasion_context\": { \"name\": \"Ramadan\", \"lead_weeks\": 2, \"priority\": \"Critical\" },\n    \"watermark_required\": false\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/deepseek/generate", "host": ["{{base_url}}"], "path": ["api","agents","deepseek","generate"] }
+          }
+        },
+        {
+          "name": "generate · 5. watermark required (Cautious mode)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('every post is watermarked', () => j.result.posts.forEach(p => pm.expect(p.watermark_required).to.eql(true)))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"month\": \"2026-05\",\n    \"post_count\": 3,\n    \"caption_context\": \"WATERMARK_REQUIRED. Brand: محل تجريبي — Cautious mode, conservative tone. MSA-accessible.\",\n    \"watermark_required\": true\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/agents/deepseek/generate", "host": ["{{base_url}}"], "path": ["api","agents","deepseek","generate"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 — Memory Controller",
+      "description": "POST /api/memory/process — drains pending memory_controller_queue rows. Idempotent + safe to call repeatedly.",
+      "item": [
+        {
+          "name": "process · 1. drain default (batch=50)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "const j = pm.response.json()",
+            "pm.test('result has total/written/rejected', () => { pm.expect(j.result.total).to.be.a('number'); pm.expect(j.result.written).to.be.a('number'); pm.expect(j.result.rejected).to.be.a('number') })"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"manual_postman\"\n}" },
+            "url": { "raw": "{{base_url}}/api/memory/process", "host": ["{{base_url}}"], "path": ["api","memory","process"] }
+          }
+        },
+        {
+          "name": "process · 2. small batch (10) — fast end-of-flow drain",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A02\",\n  \"batch_size\": 10\n}" },
+            "url": { "raw": "{{base_url}}/api/memory/process", "host": ["{{base_url}}"], "path": ["api","memory","process"] }
+          }
+        },
+        {
+          "name": "process · 3. monthly maintenance sweep (batch=500)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-D02\",\n  \"batch_size\": 500\n}" },
+            "url": { "raw": "{{base_url}}/api/memory/process", "host": ["{{base_url}}"], "path": ["api","memory","process"] }
+          }
+        },
+        {
+          "name": "process · 4. end of N8N-A01 batch",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"flow_id\": \"N8N-A01\",\n  \"batch_size\": 200\n}" },
+            "url": { "raw": "{{base_url}}/api/memory/process", "host": ["{{base_url}}"], "path": ["api","memory","process"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 — n8n status callbacks (/api/webhooks/n8n)",
+      "description": "Every event_type variant n8n flows might send. Body shape is loose — only event_type + flow_id are required.",
+      "item": [
+        {
+          "name": "callback · 1. onboarding_complete",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "pm.test('returns ok:true', () => pm.expect(pm.response.json().ok).to.eql(true))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"event_type\": \"onboarding_complete\",\n  \"flow_id\": \"N8N-A03\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"completeness_score\": 82,\n    \"dialect_confirmed\": true,\n    \"duration_ms\": 287000\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/webhooks/n8n", "host": ["{{base_url}}"], "path": ["api","webhooks","n8n"] }
+          }
+        },
+        {
+          "name": "callback · 2. brand_complete (per-brand)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"event_type\": \"brand_complete\",\n  \"flow_id\": \"N8N-A01\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"calendar_id\": \"f3a8d92c-1234-...\",\n    \"posts_clean\": 14,\n    \"posts_watermark\": 4,\n    \"posts_held\": 2,\n    \"cost_usd\": 0.34\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/webhooks/n8n", "host": ["{{base_url}}"], "path": ["api","webhooks","n8n"] }
+          }
+        },
+        {
+          "name": "callback · 3. batch_complete (whole shard)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"event_type\": \"batch_complete\",\n  \"flow_id\": \"N8N-A01\",\n  \"payload\": {\n    \"brands_processed\": 60,\n    \"total_posts\": 1080,\n    \"total_cost_usd\": 18.42,\n    \"duration_ms\": 7340000\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/webhooks/n8n", "host": ["{{base_url}}"], "path": ["api","webhooks","n8n"] }
+          }
+        },
+        {
+          "name": "callback · 4. anomaly (from N8N-S03)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"event_type\": \"anomaly\",\n  \"flow_id\": \"N8N-S03\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"source_flow\": \"N8N-A01\",\n    \"anomaly_type\": \"deepseek_call_failed\",\n    \"severity\": \"error\",\n    \"details\": { \"attempts\": 3, \"last_error\": \"timeout\" }\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/webhooks/n8n", "host": ["{{base_url}}"], "path": ["api","webhooks","n8n"] }
+          }
+        },
+        {
+          "name": "callback · 5. cost_alert (from N8N-S02)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"event_type\": \"cost_alert\",\n  \"flow_id\": \"N8N-S02\",\n  \"brand_id\": \"{{brand_id}}\",\n  \"payload\": {\n    \"pct\": 0.92,\n    \"ceiling\": 50.0,\n    \"spend\": 46.0\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/webhooks/n8n", "host": ["{{base_url}}"], "path": ["api","webhooks","n8n"] }
+          }
+        },
+        {
+          "name": "callback · 6. health_pulse (from N8N-S01)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"event_type\": \"health_pulse\",\n  \"flow_id\": \"N8N-S01\",\n  \"payload\": {\n    \"ceo_fails\": 0,\n    \"ds_fails\": 1,\n    \"avg_ms\": 4200\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/webhooks/n8n", "host": ["{{base_url}}"], "path": ["api","webhooks","n8n"] }
+          }
+        },
+        {
+          "name": "callback · 7. maintenance_complete (from N8N-D02)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"event_type\": \"maintenance_complete\",\n  \"flow_id\": \"N8N-D02\",\n  \"payload\": {\n    \"memory_drained\": 178,\n    \"stale_flagged\": 12\n  }\n}" },
+            "url": { "raw": "{{base_url}}/api/webhooks/n8n", "host": ["{{base_url}}"], "path": ["api","webhooks","n8n"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 — Stub routes (501)",
+      "description": "These routes are intentionally placeholders. Test that they return 501 with the correct sprint label.",
+      "item": [
+        {
+          "name": "stripe webhook (501 — sprint S6.05)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('501 not_implemented', () => pm.response.to.have.status(501))",
+            "pm.test('mentions sprint', () => pm.expect(pm.response.json().sprint).to.eql('S6.05'))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-skip-sign", "value": "true" }, { "key": "content-type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"type\":\"checkout.session.completed\"}" },
+            "url": { "raw": "{{base_url}}/api/webhooks/stripe", "host": ["{{base_url}}"], "path": ["api","webhooks","stripe"] }
+          }
+        },
+        {
+          "name": "correction webhook (501 — sprint S7.03)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('501 not_implemented', () => pm.response.to.have.status(501))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-skip-sign", "value": "true" }, { "key": "content-type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"brand_id\":\"{{brand_id}}\",\"field_path\":\"BrandProfile.formality_level\",\"new_value\":\"casual\"}" },
+            "url": { "raw": "{{base_url}}/api/webhooks/correction", "host": ["{{base_url}}"], "path": ["api","webhooks","correction"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 — Admin Copilot",
+      "description": "POST /api/copilot/[role]. Currently a placeholder until S7.06.",
+      "item": [
+        {
+          "name": "copilot · management",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "pm.test('role echoed', () => pm.expect(pm.response.json().role).to.eql('management'))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-skip-sign", "value": "true" }, { "key": "content-type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"message\":\"What's our cost trend this week?\",\"history\":[]}" },
+            "url": { "raw": "{{base_url}}/api/copilot/management", "host": ["{{base_url}}"], "path": ["api","copilot","management"] }
+          }
+        },
+        {
+          "name": "copilot · tech",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-skip-sign", "value": "true" }, { "key": "content-type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"message\":\"Any anomalies in the last hour?\",\"history\":[]}" },
+            "url": { "raw": "{{base_url}}/api/copilot/tech", "host": ["{{base_url}}"], "path": ["api","copilot","tech"] }
+          }
+        },
+        {
+          "name": "copilot · production",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-skip-sign", "value": "true" }, { "key": "content-type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"message\":\"Show held posts older than 24h.\",\"history\":[]}" },
+            "url": { "raw": "{{base_url}}/api/copilot/production", "host": ["{{base_url}}"], "path": ["api","copilot","production"] }
+          }
+        },
+        {
+          "name": "copilot · unknown role (400)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 unknown_role', () => pm.response.to.have.status(400))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-skip-sign", "value": "true" }, { "key": "content-type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"message\":\"hi\"}" },
+            "url": { "raw": "{{base_url}}/api/copilot/unknown", "host": ["{{base_url}}"], "path": ["api","copilot","unknown"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 — Admin Auth (cookie session, no HMAC)",
+      "description": "POST /api/admin/auth/login + /logout. Uses Supabase Auth — pass real admin credentials.",
+      "item": [
+        {
+          "name": "admin login · success path",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))",
+            "pm.test('cookies set', () => { pm.expect(pm.cookies.has('oc_admin_access')).to.be.true; pm.expect(pm.cookies.has('oc_admin_refresh')).to.be.true })"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-skip-sign", "value": "true" }, { "key": "content-type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}" },
+            "url": { "raw": "{{base_url}}/api/admin/auth/login", "host": ["{{base_url}}"], "path": ["api","admin","auth","login"] }
+          }
+        },
+        {
+          "name": "admin login · bad credentials (401)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 unauthorized', () => pm.response.to.have.status(401))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-skip-sign", "value": "true" }, { "key": "content-type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"nobody@example.com\",\n  \"password\": \"wrong\"\n}" },
+            "url": { "raw": "{{base_url}}/api/admin/auth/login", "host": ["{{base_url}}"], "path": ["api","admin","auth","login"] }
+          }
+        },
+        {
+          "name": "admin login · missing fields (400)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400 bad request', () => pm.response.to.have.status(400))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-skip-sign", "value": "true" }, { "key": "content-type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"\"\n}" },
+            "url": { "raw": "{{base_url}}/api/admin/auth/login", "host": ["{{base_url}}"], "path": ["api","admin","auth","login"] }
+          }
+        },
+        {
+          "name": "admin logout",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200))"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "x-skip-sign", "value": "true" }, { "key": "content-type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{base_url}}/api/admin/auth/logout", "host": ["{{base_url}}"], "path": ["api","admin","auth","logout"] }
+          }
+        }
+      ]
+    }
+  ]
+}

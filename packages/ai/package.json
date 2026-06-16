@@ -1,0 +1,33 @@
+{
+  "name": "@repo/ai",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AI C-Suite wrappers (CEO/COO/CCO/DeepSeek) + prompt loader",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ceo": "./src/providers/ceo.ts",
+    "./coo": "./src/providers/coo.ts",
+    "./cco": "./src/providers/cco.ts",
+    "./deepseek": "./src/providers/deepseek.ts",
+    "./deepseek-client": "./src/providers/deepseek-client.ts",
+    "./visual-prompt": "./src/providers/visual-prompt.ts",
+    "./prompts": "./src/prompts.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "lint": "echo no-lint"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
+    "@repo/core": "workspace:*",
+    "@repo/db": "workspace:*",
+    "openai": "^4.77.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "^5.5.0"
+  }
+}

@@ -1,0 +1,3235 @@
+OGZ STUDIOS · OPENCLAW
+Chain Library
+v2.0 Complete
+88 chains. Image + video variants. Full fal.ai JSON specs.
+The complete production chain library organized by 23 technique families. Every chain includes sophisticated fal.ai image prompts, image-to-video variant motion prompts where applicable, full JSON specs ready for the Supabase prompt_templates table, parameter mapping to BrandDNA, Saudi cultural adaptation notes, and the 10-chain Saudi UGC family engineered against AI-look failure modes.
+Migration spec at the back covers schema changes for BrandDNA Family A, the chains table, the brand_eligible_chains pre-computed view, the C-Suite agent updates, and the n8n workflow routing logic required for image-to-video variants.
+PREPARED BY
+OGz Studios
+FOR
+Weiblock + Claude Code
+VERSION
+v2.0 · 11 May 2026
+How to use this document
+This library is the canonical source for OpenClaw production chains. Every chain spec is structured identically so Weiblock can read them sequentially and insert into the Supabase prompt_templates table.
+Each chain contains
+Spec table with all metadata. Image generation prompt (the fal.ai instruction). Negative prompt (what fal.ai should avoid). Video variant motion prompt (additional instruction for fal.ai image-to-video models). Parameter mapping showing how BrandDNA fields resolve placeholders. Saudi cultural adaptation note. JSON specs for both image and video.
+Image vs Video
+Most chains support both formats. Static image generates first via FLUX, Kontext, or GPT Image 2. Video variant takes that image as the first frame and uses fal.ai image-to-video models (Kling v1.6 at $0.07/sec, Seedance 2.0 at $0.14/sec, Veo 3.1 at $0.40/sec) to add 5-7 seconds of motion. Dashboard offers static-or-video as per-chain choice.
+BrandDNA integration
+Parameters in curly braces ({like_this}) resolve at generation time from BrandDNA fields. The COO agent (Haiku 4.5) reads BrandDNA, fills placeholders, applies brand-specific creative direction persona, sends assembled prompt to fal.ai through n8n.
+Inventory overview
+ID
+FAMILY
+CHAINS
+#
+VIDEO?
+IMG COST
+TF01
+Product Hero (Clean)
+U01, T01, T02
+3
+✅ All
+$0.025–$0.05
+TF02
+Splash & Motion
+T03, T04, T05, T06, T07
+5
+✅ All
+$0.05–$0.07
+TF03
+Spotlight & Dark Stage
+T08, T09, T10, T11
+4
+✅ All
+$0.05
+TF04
+Natural Environment
+T12-T16
+5
+✅ All
+$0.04–$0.05
+TF05
+Hand & Human Touch
+T17-T20
+4
+✅ All
+$0.05
+TF06
+Studio Production Reveal
+T21-T23
+3
+✅ All
+$0.05–$0.07
+TF07
+Pastel & Shadow Play
+T24-T27
+4
+✅ All
+$0.05
+TF08
+Cinematic Environment
+T28-T32
+5
+✅ Seedance
+$0.05–$0.07
+TF09
+Portrait & Model
+T33-T37
+5
+✅ All
+$0.05–$0.07
+TF10
+Editorial Poster
+T38-T40
+3
+⚠️ Limited
+$0.10
+TF11
+Texture & Macro
+T41-T43
+3
+✅ All
+$0.05
+TF12
+Active Product Moment
+T44-T46
+3
+✅ Seedance
+$0.05
+TF13
+Lifestyle Context
+U04, U05, F02, T47-T50
+7
+✅ All
+$0.025–$0.05
+TF14
+Premium Pedestal
+T51-T53
+3
+✅ All
+$0.05–$0.07
+TF15
+Promotional & Text
+U02, F04, R03
+3
+❌ Static only
+$0.10
+TF16
+Occasion & Cultural
+U03, F03
+2
+✅ Seedance
+$0.025–$0.05
+TF17
+Before/After Transformation
+B01, B02
+2
+✅ Kling
+$0.025–$0.04
+TF18
+Product Flat Lay
+B03, B05, R01, R04
+4
+✅ Limited
+$0.025–$0.05
+TF19
+On-Model Apparel
+R02
+1
+✅ All
+$0.05
+TF20
+Premium Fragrance/Oud
+R05, F05
+2
+✅ Seedance
+$0.04–$0.07
+TF21
+Service CTA
+B04, U06
+2
+✅ All
+$0.025–$0.05
+TF22
+Video (legacy native)
+V01-V05
+5
+Native
+$0.42–$0.98
+TF23
+Saudi UGC Authentic
+S01-S10
+10
+✅ Kling+Seedance
+$0.05–$0.07
+Total: 88 chains across 23 technique families (88 because all 26 existing chains preserved alongside the 41 new technique chains plus 10 Saudi UGC plus 5 legacy video chains plus several additional functional chains). The Content Maker dashboard exposes static or video as per-chain choice.
+All 88 chain specifications
+TF01 — Product Hero (Clean)
+Clean product on simple background. Daily backbone chain.
+U01  Product Hero Static
+Single product on clean background with directional lighting. Daily backbone chain across all sectors.
+FAMILY
+TF01 — Product Hero (Clean)
+SECTORS
+F&B, Retail, Beauty, Home, Fitness
+QUALITY TIER
+universal
+IMAGE MODEL
+fal-ai/flux/dev  ·  $0.025
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+3-5 per week
+IMAGE PROMPT (FAL.AI)
+Professional commercial product photography of {product_descriptor}, hero shot on {background_color} seamless background, {quality_tier} editorial lighting from upper left at 45 degrees, soft fill light from right, sharp focus, shallow depth of field, centered composition with negative space, shot on 100mm macro at f/8, ultra-high resolution, hyper-realistic textures, no text, no people, no watermark
+NEGATIVE PROMPT
+text, watermark, logo, blurry, low quality, distorted, extra limbs, face, person, ugly, deformed, multiple products, busy background, harsh shadows
+VIDEO MOTION PROMPT
+Subtle camera dolly slowly forward toward product, gimbal-stabilized motion, soft natural light shift, product centered and sharp focus, no rotation, 5 seconds
+SAUDI ADAPTATION
+For Saudi premium tier prefer warm gold or sand-tone backgrounds over pure white. Avoid blue for traditional brands.
+JSON — IMAGE
+{ "chain_id": "U01", "technique_family": "TF01", "sectors_applicable": ["F&B","Retail","Beauty","Home","Fitness"], "fal_model": "fal-ai/flux/dev", "generation_params": { "image_size": "square_hd", "num_inference_steps": 28, "guidance_scale": 3.5 }, "cost_usd": 0.025, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T01  Floating Product Levitation
+Product appears to levitate with subtle shadow underneath. Minimalist, premium, modern.
+FAMILY
+TF01 — Product Hero (Clean)
+SECTORS
+Beauty, Retail (fragrance, jewelry, watches), F&B (premium beverage)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Premium product photography of {product_descriptor} floating in mid-air with soft elliptical shadow directly underneath, smooth {background_color} radial gradient backdrop, minimalist composition, soft even key light from above, subtle rim light separating product from background, ultra-sharp focus, hyper-realistic material rendering, shot on 85mm at f/5.6, no text, no watermark, no hands, no support visible
+NEGATIVE PROMPT
+text, watermark, hands, person, background clutter, multiple products, distorted, visible support, harsh shadows, cartoon
+VIDEO MOTION PROMPT
+Product slowly rotates on vertical axis at 30 degrees per second, soft shadow rotates in sync, gentle parallax of background gradient, 5 seconds
+SAUDI ADAPTATION
+Excellent as Eid or Founding Day launch reveal. For Saudi oud, replace 'smooth gradient' with 'rich amber radial gradient with subtle gold particles'.
+JSON — IMAGE
+{ "chain_id": "T01", "technique_family": "TF01", "sectors_applicable": ["Beauty","Retail","F&B"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T02  Pure Product Silhouette
+Product centered on pure white or black, no shadows, no styling. E-commerce catalog shot.
+FAMILY
+TF01 — Product Hero (Clean)
+SECTORS
+All sectors
+QUALITY TIER
+universal
+IMAGE MODEL
+fal-ai/flux/dev  ·  $0.025
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required (recommended)
+FREQUENCY
+On demand
+IMAGE PROMPT (FAL.AI)
+{product_descriptor} centered on pure {background_tone} seamless background, completely flat lighting with no shadows, even illumination from all sides, product fills 60% of frame, perfect symmetry, catalog photography style, hyper-realistic surface detail, ultra-sharp focus, e-commerce quality, no text, no watermark, no props
+NEGATIVE PROMPT
+text, watermark, shadow, props, styling elements, background gradient, low quality, distorted
+VIDEO MOTION PROMPT
+Product rotates 90 degrees revealing all sides, flat lighting maintained, smooth turntable motion, 5 seconds
+SAUDI ADAPTATION
+Critical chain for brands selling via Salla, Zid, Maroof Saudi e-commerce platforms.
+JSON — IMAGE
+{ "chain_id": "T02", "technique_family": "TF01", "sectors_applicable": ["F&B","Retail","Beauty","Home","Fitness"], "fal_model": "fal-ai/flux/dev", "cost_usd": 0.025, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF02 — Splash & Motion
+Liquid, sauce, ice, smoke caught in frozen motion. High-energy hero family.
+T03  Splash Ring Around Product
+Product suspended in 360-degree ring of water splash frozen mid-motion.
+FAMILY
+TF02 — Splash & Motion
+SECTORS
+Beauty, F&B (beverage), Retail (fragrance, oud)
+QUALITY TIER
+premium / luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.49 (7s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Hyper-realistic product photography of {product_descriptor} suspended in mid-air, surrounded by perfect circular ring of dynamic crystal-clear water splash frozen mid-motion at 1/8000 shutter, individual water droplets catching dramatic studio key light from upper left, deep {background_color} radial gradient backdrop fading to black at edges, product remains pristine and dry in center, hyper-detailed surface reflections, shot on 100mm macro at f/11, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, logo, blurry, distorted, ugly, cartoon, multiple products, wet product surface, ripples, low quality
+VIDEO MOTION PROMPT
+Water splash continues in extreme slow motion at 120fps simulation, droplets drift outward and slowly fall, product perfectly still in center, 7 seconds
+SAUDI ADAPTATION
+Highly resonant for Saudi oud and luxury fragrance brands. Water-ring against amber/gold oud produces strong contrast reading premium without being Western.
+JSON — IMAGE
+{ "chain_id": "T03", "technique_family": "TF02", "sectors_applicable": ["Beauty","F&B","Retail"], "fal_model": "fal-ai/flux-pro/v1.1-ultra", "reference_image": { "required": true }, "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 7, "cost_usd": 0.49, "async": true }
+T04  Beverage Pour Crown Splash
+Glass with ice cubes at moment liquid pours in, creating crown of splash droplets.
+FAMILY
+TF02 — Splash & Motion
+SECTORS
+F&B (beverage, coffee, iced tea, juice, karak)
+QUALITY TIER
+mid / premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.49 (7s)
+INTENT
+launch, grow, harvest
+OCCASION
+summer, ramadan
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Optional
+FREQUENCY
+2-3 per week
+IMAGE PROMPT (FAL.AI)
+Dynamic beverage photography of {beverage_descriptor} being poured from above into {glass_style} glass full of ice cubes, splash crown forming at rim with frozen droplets scattered 360 degrees, backlit {lighting_color} warm glow rim-lighting splash, additional ice scattered on dark wooden surface, condensation on glass exterior, dark moody gradient amber-to-black, frozen motion at 1/8000 shutter, shot on 50mm at f/4, no text, no hands
+NEGATIVE PROMPT
+text, watermark, hands, person, distorted glass, fingers, low quality, dirty glass, broken glass, cartoon
+VIDEO MOTION PROMPT
+Continuous slow-motion pour, stream extends down, droplets drift up then fall, ice settles, condensation forms, 7 seconds
+SAUDI ADAPTATION
+Top Ramadan iftar content. Karak, qamar al-din, jellab, vimto pour shots. Vimto canonical Saudi Ramadan beverage; default to vimto-purple during Ramadan.
+JSON — IMAGE
+{ "chain_id": "T04", "technique_family": "TF02", "sectors_applicable": ["F&B"], "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 7, "cost_usd": 0.49, "async": true }
+T05  Sauce Splash Around Food
+Fried food suspended mid-air with sauce splashing 360 degrees.
+FAMILY
+TF02 — Splash & Motion
+SECTORS
+F&B (QSR, fried, burgers, shawarma, broasted)
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.49 (7s)
+INTENT
+launch, grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Dynamic food photography of {food_item} pieces suspended mid-air with splash of glossy {sauce_color} sauce frozen around them at 1/8000 shutter, fresh ingredients lettuce and {accent_ingredient} dispersed in motion, scattered sesame seeds and herb fragments suspended, vivid {background_color} gradient backdrop, warm directional key light from upper right hitting food highlights, shot on 100mm macro at f/8, mouthwatering, no text, no plates, no hands
+NEGATIVE PROMPT
+text, watermark, hands, plates, distorted food, cartoon, raw uncooked, soggy, person
+VIDEO MOTION PROMPT
+Food drifts in slow motion, sauce droplets fall and splatter, lettuce tumbles gently, 7 seconds
+SAUDI ADAPTATION
+Highly performant for Saudi QSR — especially broasted chicken. For shawarma, replace 'lettuce' with 'shawarma garlic toum and pickled vegetables'.
+JSON — IMAGE
+{ "chain_id": "T05", "technique_family": "TF02", "sectors_applicable": ["F&B"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 7, "cost_usd": 0.49, "async": true }
+T06  Ice Cube Cluster Embrace
+Product embraced by floating cluster of crystal-clear ice cubes. Cool blue gradient.
+FAMILY
+TF02 — Splash & Motion
+SECTORS
+Beauty (cooling skincare), F&B (beverage), Retail (men's fragrance)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+summer
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month during summer
+IMAGE PROMPT (FAL.AI)
+{product_descriptor} centered and embraced by cluster of large crystal-clear ice cubes floating around and behind, cool blue radial gradient background fading light blue to deep navy at edges, water droplets and condensation on product, thin white vapor mist rising from ice, dramatic side lighting from left at 30 degrees, hyper-realistic, ice shows interior fractures and bubbles, shot on 85mm at f/5.6, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, hands, distorted ice, melting product, cartoon, warm tones, sunset lighting
+VIDEO MOTION PROMPT
+Ice cubes drift and rotate around product, vapor mist rises continuously, condensation droplets form, cool blue light pulses gently, 5 seconds
+SAUDI ADAPTATION
+May-September window. Saudi temperatures exceed 45C; cool visual produces emotional resonance warm imagery cannot match in summer.
+JSON — IMAGE
+{ "chain_id": "T06", "technique_family": "TF02", "sectors_applicable": ["Beauty","F&B","Retail"], "fal_model": "fal-ai/flux-pro/v1.1-ultra", "reference_image": { "required": true }, "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T07  Smoke Ring Mystique
+Fragrance bottle on reflective gold pedestal with soft smoke wisps curling around. Mystical, premium.
+FAMILY
+TF02 — Splash & Motion
+SECTORS
+Beauty (oud, niche fragrance), Retail (men's grooming)
+QUALITY TIER
+premium / luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, grow, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month
+IMAGE PROMPT (FAL.AI)
+Cinematic product photography of {product_descriptor} on reflective polished gold cylindrical pedestal, soft white smoke wisps rising and curling around product against pitch black studio background, warm amber rim lighting from behind catching smoke creating golden particle effects, gold pedestal mirrors product base, subtle volumetric god rays through smoke, hyper-realistic smoke physics, shot on 100mm at f/8, no text, no watermark, no fire
+NEGATIVE PROMPT
+text, watermark, fire, flames, cigarette, vape, low quality, cartoon, white background
+VIDEO MOTION PROMPT
+Smoke continuously rises and curls around product, amber rim light pulses subtly, mystical contemplative pace with soft ambient incense sound, 5 seconds
+SAUDI ADAPTATION
+Deeply resonant with Saudi luxury market for oud and bukhoor-adjacent products. Critical: smoke must read as incense vapor not cigarette. Negative explicitly counters this.
+JSON — IMAGE
+{ "chain_id": "T07", "technique_family": "TF02", "sectors_applicable": ["Beauty","Retail"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+TF03 — Spotlight & Dark Stage
+Single dramatic light on product against black. Theatrical, premium.
+T08  Single Overhead Spotlight
+Product under single overhead spotlight against pitch black. Theatrical.
+FAMILY
+TF03 — Spotlight & Dark Stage
+SECTORS
+Beauty, Retail (watches, jewelry), F&B (premium dishes)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Theatrical product photography of {product_descriptor} centered under single dramatic overhead spotlight against pure pitch black studio background, perfect circle of warm tungsten-tone light illuminating product creating halo on ground, hard light falloff with sharp darkness beyond, subtle smoke in light beam adding volumetric depth, shot on 85mm at f/5.6, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, multiple lights, ambient lighting, bright background, distorted, hands, person
+VIDEO MOTION PROMPT
+Spotlight intensity slowly pulses, atmospheric haze drifts through beam, slight camera dolly forward, 5 seconds
+SAUDI ADAPTATION
+Effective on Eid product reveals. Canonical register for Saudi luxury watch and jewelry brands.
+JSON — IMAGE
+{ "chain_id": "T08", "technique_family": "TF03", "sectors_applicable": ["Beauty","Retail","F&B"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T09  Ring Backlight Halo
+Product silhouetted with circular ring of light behind creating halo.
+FAMILY
+TF03 — Spotlight & Dark Stage
+SECTORS
+Beauty (fragrance), Retail (watches, jewelry)
+QUALITY TIER
+premium / luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month
+IMAGE PROMPT (FAL.AI)
+Dramatic product photography of {product_descriptor} centered against perfect circular ring of bright {halo_color} backlight creating strong halo behind product, product reads as silhouette with crisp rim lighting along edges, dark gradient background extending from edges, subtle fill light from front revealing details, shot on 100mm at f/8, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, flat lighting, bright background overall, multiple light sources, distorted, person
+VIDEO MOTION PROMPT
+Halo light slowly intensifies and dims, subtle particle drift through halo, mysterious ceremonial pace, 5 seconds
+SAUDI ADAPTATION
+Strong for Saudi luxury watch and jewelry during Eid launches. Halo produces ceremonial weight without religious symbolism.
+JSON — IMAGE
+{ "chain_id": "T09", "technique_family": "TF03", "sectors_applicable": ["Beauty","Retail"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T10  Column Light From Above
+Vertical column of light descending onto product. Sharp atmospheric beam.
+FAMILY
+TF03 — Spotlight & Dark Stage
+SECTORS
+Beauty (oud), Retail (luxury)
+QUALITY TIER
+luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Monumental product photography of {product_descriptor} at base of vertical column of light descending from upper frame at slight angle, sharp atmospheric beam with visible dust particles and god rays, complete darkness surrounding, ceremonial monolithic composition, shot on 85mm at f/8, no text, no watermark, no human figure
+NEGATIVE PROMPT
+text, watermark, multiple lights, flat lighting, bright surroundings, person, cartoon, religious symbols
+VIDEO MOTION PROMPT
+Dust particles drift through column of light, light intensity slowly modulates, ambient ethereal hum sound, 5 seconds
+SAUDI ADAPTATION
+Ceremonial register for luxury Saudi launches. Carefully avoids religious symbolism — negative explicitly excludes.
+JSON — IMAGE
+{ "chain_id": "T10", "technique_family": "TF03", "sectors_applicable": ["Beauty","Retail"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+T11  Noir Smoke & Spotlight
+Theatrical side spotlight, dramatic shadow, atmospheric smoke. Cinema-noir masculine.
+FAMILY
+TF03 — Spotlight & Dark Stage
+SECTORS
+Retail (men's fragrance, watches)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month for masculine brands
+IMAGE PROMPT (FAL.AI)
+Cinema noir product photography of {product_descriptor}, dramatic single-source side spotlight from upper right at 60 degrees casting sharp diagonal shadow across scene, low-key dark lighting overall, atmospheric haze and smoke filling space catching light beams, deep blacks dominate, product in light pool revealing rich material texture, heavy contrast chiaroscuro, shot on 50mm at f/4, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, soft lighting, bright background, multiple light sources, person, cartoon, low contrast
+VIDEO MOTION PROMPT
+Smoke drifts through light beam, shadow elongates, atmospheric haze pulses, 5 seconds
+SAUDI ADAPTATION
+For Saudi men's fragrance, oud cologne. Leans amber/gold rather than blue noir, culturally adjacent rather than imported.
+JSON — IMAGE
+{ "chain_id": "T11", "technique_family": "TF03", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF04 — Natural Environment
+Product in real bathroom, kitchen, bedroom, café settings.
+T12  Bathroom Marble Counter
+Product on luxury bathroom marble counter with gold faucet, towel, plant.
+FAMILY
+TF04 — Natural Environment
+SECTORS
+Beauty (skincare, fragrance), Home, Retail (premium grooming)
+QUALITY TIER
+mid / premium
+IMAGE MODEL
+fal-ai/flux-pro/kontext  ·  $0.04
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Lifestyle product photography of {product_descriptor} placed on white Carrara marble bathroom counter with brushed gold faucet in background, folded white towel beside product, small green plant in white ceramic pot, natural soft daylight from off-camera window on right, lived-in luxury aesthetic, shot on 35mm at f/2.8, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, hands, person, plastic-looking marble, cartoon, harsh studio lighting
+VIDEO MOTION PROMPT
+Camera slowly pans right revealing more of bathroom scene, soft daylight shifts subtly, 5 seconds
+SAUDI ADAPTATION
+For Saudi skincare brands. Include subtle Najdi or Hejazi architectural detail in faucet hardware or tile pattern.
+JSON — IMAGE
+{ "chain_id": "T12", "technique_family": "TF04", "sectors_applicable": ["Beauty","Home","Retail"], "fal_model": "fal-ai/flux-pro/kontext", "reference_image": { "required": true }, "cost_usd": 0.04, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T13  Kitchen Window Morning
+Product on rustic wooden kitchen counter near window. Morning light.
+FAMILY
+TF04 — Natural Environment
+SECTORS
+F&B (artisan food, coffee), Home
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/kontext  ·  $0.04
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Cozy lifestyle photography of {product_descriptor} on warm wooden kitchen counter near large window, soft morning daylight creating warm ambient interior glow, small white ceramic pitcher with greenery beside product, gentle steam rising if applicable, modern minimalist kitchen background slightly out of focus, shot on 50mm at f/2.8, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, hands, person, harsh lighting, cluttered, cartoon
+VIDEO MOTION PROMPT
+Morning light slowly intensifies through window, steam rises and dissipates, 5 seconds
+SAUDI ADAPTATION
+For Saudi specialty coffee and artisan food. Kitchen aesthetic can include Saudi traditional elements (brass dallah, Najdi pottery).
+JSON — IMAGE
+{ "chain_id": "T13", "technique_family": "TF04", "sectors_applicable": ["F&B","Home"], "fal_model": "fal-ai/flux-pro/kontext", "reference_image": { "required": true }, "cost_usd": 0.04, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T14  Bedroom Side Table Morning
+Product on minimal bedroom side table with neutral linen background.
+FAMILY
+TF04 — Natural Environment
+SECTORS
+Beauty (skincare, fragrance), Home (sleep, wellness)
+QUALITY TIER
+mid / premium
+IMAGE MODEL
+fal-ai/flux-pro/kontext  ·  $0.04
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per week
+IMAGE PROMPT (FAL.AI)
+Soft lifestyle photography of {product_descriptor} on minimal wooden bedroom side table, neutral cream linen visible suggesting bed, small ceramic dish with simple jewelry beside product, soft morning daylight, warm neutral palette, intimate domestic setting, shot on 35mm at f/2.8, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, hands, person, harsh lighting, busy clutter, cartoon
+VIDEO MOTION PROMPT
+Camera slowly pans revealing bedroom context, soft light shifts, peaceful morning pace, 5 seconds
+SAUDI ADAPTATION
+Modest bedroom framing — no implied intimacy, focuses on routine context only.
+JSON — IMAGE
+{ "chain_id": "T14", "technique_family": "TF04", "sectors_applicable": ["Beauty","Home"], "fal_model": "fal-ai/flux-pro/kontext", "reference_image": { "required": true }, "cost_usd": 0.04, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T15  Café Outdoor Terrace
+Product on café terrace table outdoor setting. Golden-hour light.
+FAMILY
+TF04 — Natural Environment
+SECTORS
+F&B (cafés, beverages), Beauty (ambient lifestyle)
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/kontext  ·  $0.04
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Lifestyle outdoor photography of {product_descriptor} on warm wooden café terrace table, soft golden-hour light from low angle, blurred café background with potted plants and neutral terrace furniture, ambient warm tones, shot on 50mm at f/2.8 with bokeh, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, hands, person, harsh sunlight, cluttered, cartoon
+VIDEO MOTION PROMPT
+Subtle ambient motion, golden-hour light shifts, leaves sway gently, peaceful pace, 5 seconds
+SAUDI ADAPTATION
+Saudi café outdoor terraces have distinct evening aesthetic. Best in cooler months October-March.
+JSON — IMAGE
+{ "chain_id": "T15", "technique_family": "TF04", "sectors_applicable": ["F&B","Beauty"], "fal_model": "fal-ai/flux-pro/kontext", "reference_image": { "required": true }, "cost_usd": 0.04, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T16  Retail Boutique Interior
+Product staged inside high-end retail boutique. Aspirational context.
+FAMILY
+TF04 — Natural Environment
+SECTORS
+Retail (luxury), Beauty (premium)
+QUALITY TIER
+premium / luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month
+IMAGE PROMPT (FAL.AI)
+Aspirational retail photography of {product_descriptor} on reflective black-and-gold counter inside luxury department store interior, deep amber lighting throughout, mirrored reflection at base, blurred premium store fixtures and gold trim visible, shot on 50mm at f/4, no text, no watermark, no shoppers
+NEGATIVE PROMPT
+text, watermark, person, shoppers, harsh lighting, cluttered, plastic feel
+VIDEO MOTION PROMPT
+Camera dollies right revealing more boutique context, amber light pulses gently, 5 seconds
+SAUDI ADAPTATION
+For brands implying scale and premium retail. NOT appropriate for indie or homegrown — feels inauthentic.
+JSON — IMAGE
+{ "chain_id": "T16", "technique_family": "TF04", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF05 — Hand & Human Touch
+Hand interacting with product — ring, wrist, application.
+T17  Hand Model With Ring
+Female hand at resting position showing ring. Editorial fashion-photography aesthetic.
+FAMILY
+TF05 — Hand & Human Touch
+SECTORS
+Retail (jewelry), Beauty (manicure)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+elevated (face-free)
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Editorial hand photography of elegant female hand at gentle angle showing {ring_descriptor} on ring finger, natural well-groomed nude or rose nail polish, hand positioned to catch soft window light creating beautiful highlights on ring stones, neutral cream background with subtle shadow play, real visible skin texture, shot on 100mm macro at f/4, no text, no watermark, no face
+NEGATIVE PROMPT
+text, watermark, face, body, distorted hand, extra fingers, missing fingers, doll hand, plastic skin, AI hand failures
+VIDEO MOTION PROMPT
+Hand subtly rotates revealing ring from different angles, light catches stone facets, 5 seconds
+SAUDI ADAPTATION
+Saudi female jewelry typically shows hands with subtle henna for bridal context. Default no henna for everyday, optional subtle pattern for bridal collections.
+JSON — IMAGE
+{ "chain_id": "T17", "technique_family": "TF05", "sectors_applicable": ["Retail","Beauty"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T18  Hand Reaching Toward Product
+Hand reaching down from above toward product. First-person POV.
+FAMILY
+TF05 — Hand & Human Touch
+SECTORS
+All sectors
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+2 per week
+IMAGE PROMPT (FAL.AI)
+First-person POV photography of {gender_specific} hand reaching down from upper frame toward {product_descriptor} on warm wooden or marble surface, soft natural daylight from upper right, real skin texture, hand caught mid-reach with relaxed fingers, ambient surroundings blurred, shot on 50mm at f/2.8, no text, no watermark, no face, no full body
+NEGATIVE PROMPT
+text, watermark, face, full body, distorted hand, extra fingers, plastic skin, AI hand failures
+VIDEO MOTION PROMPT
+Hand continues reaching down, fingers extend toward product, natural micro-movements, 5 seconds
+SAUDI ADAPTATION
+Default skin tone medium warm Mediterranean Arab. Male brands: subtle watch or ring. Female brands: optional subtle henna at thumb base.
+JSON — IMAGE
+{ "chain_id": "T18", "technique_family": "TF05", "sectors_applicable": ["F&B","Retail","Beauty","Home","Fitness"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T19  Wrist On Leather Watch Shot
+Close-up of male wrist with watch resting on black leather. Masculine premium.
+FAMILY
+TF05 — Hand & Human Touch
+SECTORS
+Retail (watches, men's accessories)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Editorial watch photography of male wrist showing {watch_descriptor} resting on dark luxury leather surface, white cuff edge of dress shirt visible, soft directional warm light from upper right creating crisp highlights on watch face and band, real skin texture, shot on 100mm macro at f/5.6, no text, no watermark, no face
+NEGATIVE PROMPT
+text, watermark, face, body, female wrist, distorted hand, extra fingers, plastic skin
+VIDEO MOTION PROMPT
+Watch second hand ticks visibly, subtle wrist movement, light catches watch face details, 5 seconds
+SAUDI ADAPTATION
+Saudi luxury watch market specific. Default cuff white dress shirt for business context. For thobe context replace cuff with thobe sleeve.
+JSON — IMAGE
+{ "chain_id": "T19", "technique_family": "TF05", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T20  Application Gesture Beauty
+Hand applying beauty product to face area (face not visible). Tactile, intimate.
+FAMILY
+TF05 — Hand & Human Touch
+SECTORS
+Beauty (skincare, makeup, fragrance)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Intimate beauty photography of elegant {gender_specific} hand mid-application of {product_descriptor} to neck or wrist area (face not visible, frame ends at chin), soft directional window light from left, real visible skin texture, fingertip caught mid-touch, shot on 100mm macro at f/4, no text, no watermark, no face visible
+NEGATIVE PROMPT
+text, watermark, face, full body, distorted hand, plastic skin, AI failures, harsh lighting
+VIDEO MOTION PROMPT
+Hand continues application gesture, fingertip glides across skin, soft light shifts, 5 seconds
+SAUDI ADAPTATION
+Application gesture must be modest — neck, wrist, back of hand only. NOT collarbone, chest, or other framings reading immodest.
+JSON — IMAGE
+{ "chain_id": "T20", "technique_family": "TF05", "sectors_applicable": ["Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF06 — Studio Production Reveal
+Visible photography setup — softbox lights, gallery pedestals.
+T21  Twin Softbox Studio Reveal
+Product with two visible softbox lights. Self-aware production aesthetic.
+FAMILY
+TF06 — Studio Production Reveal
+SECTORS
+Beauty, Retail (premium), F&B (signature dishes)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month
+IMAGE PROMPT (FAL.AI)
+Self-aware studio photography of {product_descriptor} centered with two large professional softbox lights flanking it on light stands visible in frame, lights at 45 degrees illuminating product from both sides, clean white seamless backdrop, premium black tripod legs visible at bottom edges, shot on 50mm at f/5.6, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, photographer, harsh lighting, cluttered, cartoon
+VIDEO MOTION PROMPT
+Softbox lights subtly pulse, product remains centered, studio ambient feel, 5 seconds
+SAUDI ADAPTATION
+Strong for emerging Saudi brands signaling production maturity and craft investment.
+JSON — IMAGE
+{ "chain_id": "T21", "technique_family": "TF06", "sectors_applicable": ["Beauty","Retail","F&B"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T22  Gold Spotlight Pedestal
+Product on reflective gold pedestal with warm directional spotlight.
+FAMILY
+TF06 — Studio Production Reveal
+SECTORS
+Retail (luxury watches, jewelry), Beauty (premium fragrance)
+QUALITY TIER
+luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Luxury commercial photography of {product_descriptor} on reflective polished gold cylindrical pedestal, single warm directional spotlight from upper left at 45 degrees casting dramatic light pool, deep cream gradient background, atmospheric haze, gold pedestal mirrors product base, shot on 85mm at f/5.6, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, multiple lights, cluttered, harsh, cartoon
+VIDEO MOTION PROMPT
+Light slowly modulates, atmospheric haze drifts, gold pedestal catches subtle motion, 5 seconds
+SAUDI ADAPTATION
+Canonical visual for Saudi luxury watch and jewelry launches.
+JSON — IMAGE
+{ "chain_id": "T22", "technique_family": "TF06", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1-ultra", "reference_image": { "required": true }, "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T23  Gallery Pedestal Solo
+Product on minimal pedestal in gallery space. Art-object positioning.
+FAMILY
+TF06 — Studio Production Reveal
+SECTORS
+Retail (luxury), Beauty (artistic niche), Home (designer)
+QUALITY TIER
+luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Museum-grade gallery photography of {product_descriptor} centered on minimal black or white cubic pedestal in clean white gallery space, soft overhead spot creating gentle pool of light on product, neutral gallery wall extending into negative space, shot on 35mm at f/8, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, other objects, cluttered, harsh lighting, cartoon
+VIDEO MOTION PROMPT
+Slow camera dolly forward toward product, peaceful contemplative pace, 5 seconds
+SAUDI ADAPTATION
+For Saudi brands positioning as design/art objects (premium oud, designer accessories).
+JSON — IMAGE
+{ "chain_id": "T23", "technique_family": "TF06", "sectors_applicable": ["Retail","Beauty","Home"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF07 — Pastel & Shadow Play
+Soft pastels, ribbons, botanical shadows, romantic tone.
+T24  Pink-Mint Split Background
+Product on split pink-and-mint pastel background with botanical shadow.
+FAMILY
+TF07 — Pastel & Shadow Play
+SECTORS
+Beauty (fragrance, lipstick), Retail (gifting)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month
+IMAGE PROMPT (FAL.AI)
+Editorial product photography of {product_descriptor} positioned bottom-left third on split pastel background (soft pink on left half, mint green on right half), soft botanical leaf shadow play across upper portion as if dappled morning light through plants, subtle long shadow extending from product, shot on 50mm at f/4, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, cluttered, cartoon, oversaturated
+VIDEO MOTION PROMPT
+Botanical shadow play shifts gently as if leaves move in breeze, 5 seconds
+SAUDI ADAPTATION
+Strong for Saudi beauty and gifting brands during Eid Al-Fitr, Mother's Day. Pastel signals modern femininity culturally readable.
+JSON — IMAGE
+{ "chain_id": "T24", "technique_family": "TF07", "sectors_applicable": ["Beauty","Retail"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T25  Soft Pink Petals Scatter
+Product surrounded by scattered rose petals on soft pink background.
+FAMILY
+TF07 — Pastel & Shadow Play
+SECTORS
+Beauty (fragrance, gifting), Retail (gifting)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+valentine, mothers_day, eid
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week during gifting
+IMAGE PROMPT (FAL.AI)
+Romantic product photography of {product_descriptor} centered on soft pink fabric background, scattered fresh pink rose petals around base, soft directional natural light from upper right, hyper-realistic petal texture and color variation, shot on 50mm at f/2.8 with shallow depth, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, fake petals, cartoon, oversaturated
+VIDEO MOTION PROMPT
+Petals subtly drift across frame as if light breeze, 5 seconds
+SAUDI ADAPTATION
+Strong during gifting occasions. Subtle Arabic calligraphy element or traditional motif optional for cultural anchoring.
+JSON — IMAGE
+{ "chain_id": "T25", "technique_family": "TF07", "sectors_applicable": ["Beauty","Retail"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T26  Ribbon Flat Lay Tactile
+Product on satin ribbon flat lay with soft pastel background.
+FAMILY
+TF07 — Pastel & Shadow Play
+SECTORS
+Beauty (fragrance), Retail (gifting)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+gifting
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per week during gifting
+IMAGE PROMPT (FAL.AI)
+Editorial gifting photography of {product_descriptor} placed centered on flowing pink satin ribbon arranged in elegant curves across soft pink background, ribbon catches light creating highlights and shadows, foreground slightly out of focus, shot on 85mm at f/2.8, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, distorted ribbon, cartoon
+VIDEO MOTION PROMPT
+Ribbon subtly shifts as if gentle motion, light catches different folds, 5 seconds
+SAUDI ADAPTATION
+Strong for Saudi gifting brands during Eid. Pink/cream palette appropriate; avoid red ribbons (Christmas-coded).
+JSON — IMAGE
+{ "chain_id": "T26", "technique_family": "TF07", "sectors_applicable": ["Beauty","Retail"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T27  Cherry Blossom Backdrop
+Product in front of cherry blossom backdrop with petals in motion.
+FAMILY
+TF07 — Pastel & Shadow Play
+SECTORS
+Beauty (floral fragrance), Retail (spring collections)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+spring
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month during spring
+IMAGE PROMPT (FAL.AI)
+Soft romantic product photography of {product_descriptor} appearing to float in front of soft cherry blossom backdrop with pink blossoms in soft focus, several scattered pink petals frozen mid-fall around product, soft directional natural light, dreamy pastel atmosphere, shot on 85mm at f/2.8, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, cartoon, oversaturated, fake-looking flowers
+VIDEO MOTION PROMPT
+Petals continue falling slowly, blossom backdrop sways gently, spring breeze ambient pace, 5 seconds
+SAUDI ADAPTATION
+Less culturally specific but works for international-leaning premium beauty. Strong for spring fragrance launches Feb-April.
+JSON — IMAGE
+{ "chain_id": "T27", "technique_family": "TF07", "sectors_applicable": ["Beauty","Retail"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF08 — Cinematic Environment
+Rain-slick street, desert sand, foggy city, brutalist architecture.
+T28  Rain-Slick Neon Street
+Product on rain-slick urban street at night with neon reflections. Cyberpunk noir.
+FAMILY
+TF08 — Cinematic Environment
+SECTORS
+Retail (men's grooming, streetwear), Beauty (men's niche)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month
+IMAGE PROMPT (FAL.AI)
+Cinematic urban photography of {product_descriptor} on rain-slick black asphalt street at night, vivid neon signs in pink and blue reflecting in puddles around product, atmospheric drizzle catching neon light, blurred urban silhouettes in distant background, deep moody contrast, shot on 35mm at f/2 with cinematic bokeh, no text, no watermark, no clear figures
+NEGATIVE PROMPT
+text, watermark, clear human figures, distorted reflections, cartoon, bright lighting, sunny
+VIDEO MOTION PROMPT
+Rain continues falling gently, neon signs flicker subtly, reflections shimmer, distant figures move slowly, atmospheric night sounds, 5 seconds
+SAUDI ADAPTATION
+Saudi youth urban brands targeting Riyadh/Jeddah young male. Carefully avoids alcohol references common in Western noir.
+JSON — IMAGE
+{ "chain_id": "T28", "technique_family": "TF08", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1-ultra", "reference_image": { "required": true }, "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+T29  Library Light Beam
+Product on dark wooden table with dramatic light beam in old library.
+FAMILY
+TF08 — Cinematic Environment
+SECTORS
+Retail (premium watches, fragrance), Beauty (heritage fragrance)
+QUALITY TIER
+premium / luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Atmospheric heritage photography of {product_descriptor} on weathered dark wood table in dimly lit old library setting, dramatic single beam of golden light streaming through unseen window catching dust particles, blurred bookshelves with leather-bound volumes in background, vintage globe slightly visible, shot on 50mm at f/4 with shallow depth, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, bright modern lighting, sterile, cartoon
+VIDEO MOTION PROMPT
+Dust particles drift through light beam, light intensity modulates as if clouds passing outside, contemplative pace, 5 seconds
+SAUDI ADAPTATION
+Library can be reinterpreted as traditional Saudi majlis with traditional manuscripts to localize.
+JSON — IMAGE
+{ "chain_id": "T29", "technique_family": "TF08", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1-ultra", "reference_image": { "required": true }, "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+T30  Desert Sand Dune Placement
+Product on golden Saudi desert sand dune with horizon. Cinematic, Saudi-native landscape.
+FAMILY
+TF08 — Cinematic Environment
+SECTORS
+Beauty (oud), Retail (heritage brands, fragrance)
+QUALITY TIER
+premium / luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, defend
+OCCASION
+national_day, founding_day
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per quarter, daily during national occasions
+IMAGE PROMPT (FAL.AI)
+Cinematic landscape photography of {product_descriptor} placed on rippling golden Saudi desert sand dune with sweeping dune patterns extending into distance, soft golden-hour light from low angle creating long shadows on sand texture, vast horizon meeting amber sky, shot on 35mm at f/8 with deep focus, evocative Saudi landscape, no text, no watermark, no people, no camels
+NEGATIVE PROMPT
+text, watermark, people, camels, tourist photography, distorted sand, cartoon, oasis stereotypes
+VIDEO MOTION PROMPT
+Gentle wind drifts sand particles across dune, golden light slowly shifts, ambient desert soundscape, 5 seconds
+SAUDI ADAPTATION
+Most culturally weighted environmental chain. Critical: avoid camel cliché (tourist photography). Dune patterns are Saudi Rub' al-Khali or Nafud, not Sahara.
+JSON — IMAGE
+{ "chain_id": "T30", "technique_family": "TF08", "sectors_applicable": ["Beauty","Retail"], "occasion_affinity": ["national_day","founding_day"], "fal_model": "fal-ai/flux-pro/v1.1-ultra", "reference_image": { "required": true }, "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+T31  Foggy Cityscape Above Clouds
+Product against backdrop of city skyline emerging from fog. Epic, urban-aspirational.
+FAMILY
+TF08 — Cinematic Environment
+SECTORS
+Retail (premium, watches), Beauty (modern fragrance), Fitness (urban)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Cinematic urban landscape photography of {product_descriptor} in foreground with backdrop of modern Riyadh or Saudi city skyline emerging from low morning fog clouds, soft golden dawn light, distant skyscrapers visible through mist, peaceful epic atmosphere, shot on 35mm at f/8, no text, no watermark, no people in foreground
+NEGATIVE PROMPT
+text, watermark, people, generic Western city skyline, cartoon, low quality
+VIDEO MOTION PROMPT
+Fog slowly drifts past skyline, dawn light intensifies gradually, peaceful epic pace, 5 seconds
+SAUDI ADAPTATION
+Default Riyadh skyline (Kingdom Tower, PIF tower, Mukaab) rather than generic 'modern city'. Jeddah brands: Jeddah Tower and coastal context.
+JSON — IMAGE
+{ "chain_id": "T31", "technique_family": "TF08", "sectors_applicable": ["Retail","Beauty","Fitness"], "fal_model": "fal-ai/flux-pro/v1.1-ultra", "reference_image": { "required": true }, "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+T32  Brutalist Architecture Portrait
+Product against brutalist concrete architecture. Modern editorial.
+FAMILY
+TF08 — Cinematic Environment
+SECTORS
+Retail (modernist fashion, watches), Beauty (architectural niche)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Editorial architectural photography of {product_descriptor} in foreground against backdrop of dramatic brutalist concrete architecture, geometric concrete forms creating strong diagonal composition, soft directional natural light, blue sky visible through architectural framing, shot on 35mm at f/8, modernist editorial, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, oversaturated, cartoon, generic urban
+VIDEO MOTION PROMPT
+Slow camera tilt reveals more architecture, light shifts subtly across concrete, 5 seconds
+SAUDI ADAPTATION
+Can incorporate Saudi brutalist references (King Saud University architecture, Riyadh modernist buildings) to localize.
+JSON — IMAGE
+{ "chain_id": "T32", "technique_family": "TF08", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF09 — Portrait & Model
+Hijab full-figure, thobe seated, walking shot, beauty close-up.
+T33  Hijab Full-Figure Colored Backdrop
+Saudi woman in modest hijab on vivid solid colored backdrop. Studio editorial.
+FAMILY
+TF09 — Portrait & Model
+SECTORS
+Retail (modest fashion, abaya), Beauty (premium campaigns)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+2-3 per month
+IMAGE PROMPT (FAL.AI)
+Editorial fashion photography of Saudi woman in late twenties wearing modest {color_descriptor} hijab and matching long-sleeve loose-fitting abaya in {abaya_color}, seated or standing pose on minimal {backdrop_color} solid colored studio backdrop, soft directional studio light from upper left, real visible skin texture, modest framing with full coverage neck to ankles, contemplative or confident expression looking slightly off-camera, shot on 85mm at f/4, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, exposed hair under hijab, tight clothing, deep neckline, immodest pose, distorted face, plastic skin, AI face failures, Western fashion model styling, oversaturated
+VIDEO MOTION PROMPT
+Subject subtly shifts pose, hijab fabric drapes naturally with motion, studio light pulses gently, 5 seconds
+SAUDI ADAPTATION
+Vivid colored backdrop signals modern editorial fashion rather than traditional. Default hijab styling contemporary Saudi.
+JSON — IMAGE
+{ "chain_id": "T33", "technique_family": "TF09", "sectors_applicable": ["Retail","Beauty"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T34  Thobe On Geometric Cube
+Saudi man in white thobe seated on yellow geometric cube. Modern editorial.
+FAMILY
+TF09 — Portrait & Model
+SECTORS
+Retail (men's fashion, thobe brands), Beauty (men's grooming)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Editorial fashion photography of Saudi man in late twenties wearing crisp white thobe with traditional collar, white ghutra and black iqal headwear, well-groomed short beard, seated on vivid {cube_color} geometric concrete cube against complementary solid colored backdrop, confident pose with one leg raised, real skin texture, modern editorial styling, shot on 85mm at f/4, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, Western suit, distorted face, plastic skin, AI face failures, exaggerated muscles, female features, oversaturated
+VIDEO MOTION PROMPT
+Subject subtly shifts pose, thobe fabric moves naturally, ghutra edge sways, 5 seconds
+SAUDI ADAPTATION
+Default thobe white. Fashion-forward brands can override to navy, beige, charcoal. Beard modern groomed not full-traditional.
+JSON — IMAGE
+{ "chain_id": "T34", "technique_family": "TF09", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T35  Modest Fashion Walking Shot
+Saudi woman in flowing abaya captured mid-walk in urban setting.
+FAMILY
+TF09 — Portrait & Model
+SECTORS
+Retail (modest fashion, abaya brands)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Optional
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Editorial fashion photography of Saudi woman in her twenties wearing flowing modest abaya in {abaya_color} captured mid-stride walking with fabric in elegant motion behind her, modest hijab in coordinated tone, urban Riyadh modernist architecture background slightly out of focus, golden-hour light, real skin texture, full modest coverage neck to ankles, confident walking pose, shot on 50mm at f/4, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, exposed hair, tight clothing, immodest framing, Western fashion model styling, distorted face, plastic skin
+VIDEO MOTION PROMPT
+Woman continues walking, abaya fabric flows in slow motion, hijab edge moves with stride, 5 seconds
+SAUDI ADAPTATION
+Background must be Saudi urban modernist (NEOM-adjacent, Riyadh modern) not generic global city.
+JSON — IMAGE
+{ "chain_id": "T35", "technique_family": "TF09", "sectors_applicable": ["Retail"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T36  Beauty Extreme Close-Up
+Extreme close-up of Saudi woman's eyes/partial face showing glow makeup.
+FAMILY
+TF09 — Portrait & Model
+SECTORS
+Beauty (premium skincare, makeup)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Editorial beauty close-up of Saudi woman with luminous gold-toned glow makeup catching warm light, frame focused on eyes and partial face from forehead to lips only (modest framing), modest hijab visible at edges of frame, real visible skin texture with natural pores and subtle imperfections, luminous highlighter on cheekbones, natural lip color, contemplative expression with slight lowered gaze, soft directional warm light from upper right, shot on 100mm macro at f/4, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, exposed hair, immodest framing below chin, heavy harsh makeup, smooth plastic skin, AI face failures, direct camera stare, glamour model aesthetic
+VIDEO MOTION PROMPT
+Woman slowly blinks, subtle eye motion, light shifts gently catching glow makeup, 5 seconds
+SAUDI ADAPTATION
+Hijab visible at frame edges essential for modest compliance. Face_visibility_permission governs rendering or partial framing.
+JSON — IMAGE
+{ "chain_id": "T36", "technique_family": "TF09", "sectors_applicable": ["Beauty"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/v1.1-ultra", "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T37  Full Studio Portrait Solo
+Single subject full studio portrait, neutral background, classical lighting.
+FAMILY
+TF09 — Portrait & Model
+SECTORS
+All sectors with face_visibility_permission true
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, defend
+OCCASION
+None
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Classical studio portrait of Saudi {subject_gender} in their thirties, {dress_specification}, three-quarter body pose facing camera, neutral cream studio backdrop with subtle gradient, soft directional key light from upper left at 45 degrees with subtle fill from right, real skin texture, confident composed expression, shot on 85mm at f/4, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, harsh lighting, distorted face, plastic skin, AI face failures, Western fashion styling, immodest dress
+VIDEO MOTION PROMPT
+Subject subtly shifts weight, slight expression change, classical portrait stillness with gentle life, 5 seconds
+SAUDI ADAPTATION
+Default dress: men thobe and ghutra, women modest hijab and conservative colored abaya. For brand ambassador moments where face must be visible.
+JSON — IMAGE
+{ "chain_id": "T37", "technique_family": "TF09", "sectors_applicable": ["Retail","Beauty","F&B","Home","Fitness"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF10 — Editorial Poster
+Magazine cover, billboard mockup, brand announcement card.
+T38  Magazine Cover With Typography
+Product or subject with editorial magazine-style typography overlay.
+FAMILY
+TF10 — Editorial Poster
+SECTORS
+Beauty (premium launches), Retail (luxury)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/gpt-image-2  ·  $0.10
+VIDEO VARIANT
+Not supported
+INTENT
+launch
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month
+IMAGE PROMPT (FAL.AI)
+Premium magazine cover layout featuring {product_or_subject_descriptor} with editorial typography overlay reading '{headline_text}' in elegant serif typeface and '{tagline_text}' in smaller sans-serif beneath, product occupies right two-thirds of frame, typography in left third, neutral premium background, soft directional light, magazine-cover composition, no text errors
+NEGATIVE PROMPT
+text errors, distorted typography, blurry text, cluttered, harsh lighting, cartoon, low quality
+SAUDI ADAPTATION
+GPT Image 2 used because Arabic typography needs compositional integration. Bilingual headline. Cairo font for Arabic.
+JSON — IMAGE
+{ "chain_id": "T38", "technique_family": "TF10", "sectors_applicable": ["Beauty","Retail"], "fal_model": "fal-ai/gpt-image-2", "reference_image": { "required": true }, "cost_usd": 0.10, "active": true }
+T39  Billboard Mockup On Building
+Brand campaign as billboard mockup on modernist building.
+FAMILY
+TF10 — Editorial Poster
+SECTORS
+Retail (premium), Beauty (campaign launches)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/gpt-image-2  ·  $0.10
+VIDEO VARIANT
+Not supported
+INTENT
+launch
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Modern out-of-home advertising mockup showing {brand_campaign_descriptor} as large rectangular billboard on side of contemporary modernist Riyadh building, building visible from street-level perspective with people walking past as small silhouettes for scale, billboard showing brand visual with bilingual headline in Arabic and English, soft directional daylight, shot on 35mm at f/8, no other competing billboards
+NEGATIVE PROMPT
+text errors, distorted typography, generic Western city, low quality, cluttered urban scene
+SAUDI ADAPTATION
+Default Riyadh skyline or recognizable Saudi modernist architecture. Bilingual text essential.
+JSON — IMAGE
+{ "chain_id": "T39", "technique_family": "TF10", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/gpt-image-2", "reference_image": { "required": true }, "cost_usd": 0.10, "active": true }
+T40  Brand Announcement Card
+Branded packaging plus typography card on split pastel background.
+FAMILY
+TF10 — Editorial Poster
+SECTORS
+Beauty (brand refresh), Retail (anniversary/launches)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/gpt-image-2  ·  $0.10
+VIDEO VARIANT
+Not supported
+INTENT
+launch, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Editorial brand announcement layout featuring {branded_packaging} bottom-left with separate white branded card beside it showing {announcement_text} in elegant Arabic and English typography, split pastel background pink on left mint on right, soft botanical leaf shadow across upper portion, premium brand aesthetic
+NEGATIVE PROMPT
+text errors, distorted typography, cluttered, harsh lighting, cartoon
+SAUDI ADAPTATION
+Bilingual text essential. Pastel palette appropriate for modern feminine; for masculine/heritage switch to deeper tone.
+JSON — IMAGE
+{ "chain_id": "T40", "technique_family": "TF10", "sectors_applicable": ["Beauty","Retail"], "fal_model": "fal-ai/gpt-image-2", "reference_image": { "required": true }, "cost_usd": 0.10, "active": true }
+TF11 — Texture & Macro
+Cream swatch, lipstick smear, food texture extreme close-up.
+T41  Foundation Cream Swatch Macro
+Extreme close-up swatch of cream/foundation/balm. Texture-as-subject.
+FAMILY
+TF11 — Texture & Macro
+SECTORS
+Beauty (skincare, makeup, cream)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Extreme macro photography of {product_color} cream swatch filling entire frame, swooping curved smear catching dramatic side light revealing texture peaks valleys and glistening highlights, warm earthy palette {color_descriptor}, no product visible no logo just pure texture as subject, hyper-realistic surface detail at sub-millimeter scale, shot on 100mm macro at f/8, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, product visible, hands, logo, low quality, cartoon
+VIDEO MOTION PROMPT
+Cream texture subtly shimmers as light shifts across surface, hypnotic macro pace, 5 seconds
+SAUDI ADAPTATION
+Excellent feed-aesthetic for Saudi premium beauty. Texture-only chains carry no cultural risk.
+JSON — IMAGE
+{ "chain_id": "T41", "technique_family": "TF11", "sectors_applicable": ["Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T42  Lipstick Smear With Roses
+Lipstick bullet with smear and fresh roses. Romantic beauty editorial.
+FAMILY
+TF11 — Texture & Macro
+SECTORS
+Beauty (lipstick, makeup)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+valentine, mothers_day, eid
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Romantic beauty photography of {lipstick_color} lipstick bullet on white marble pedestal with elegant curved smear of matching color beside it on marble surface, soft pink roses in background slightly out of focus, soft directional natural light from upper right, shot on 100mm macro at f/4, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, person, hands, harsh lighting, cluttered, cartoon
+VIDEO MOTION PROMPT
+Light shifts gently across smear surface, roses sway subtly, 5 seconds
+SAUDI ADAPTATION
+Pink/rose palette appropriate. Avoid red roses (Valentine-Christmas-coded for conservative audiences).
+JSON — IMAGE
+{ "chain_id": "T42", "technique_family": "TF11", "sectors_applicable": ["Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T43  Food Texture Extreme Macro
+Extreme close-up of food texture. Mouthwatering, abstract.
+FAMILY
+TF11 — Texture & Macro
+SECTORS
+F&B (premium dishes, specialty)
+QUALITY TIER
+mid / premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Extreme macro photography of {food_texture_descriptor} filling entire frame, dramatic side light revealing texture detail at sub-millimeter scale, warm rich color palette, hyper-realistic surface detail with all textures visible (bread crust, melted cheese strands, chocolate sheen, sauce droplets), shot on 100mm macro at f/8, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, full plate visible, hands, cartoon, low quality, raw uncooked
+VIDEO MOTION PROMPT
+Texture catches different light as if rotating slowly, sauce sheen shifts, melted cheese stretches, 5 seconds
+SAUDI ADAPTATION
+Strong for kunafa cheese stretch, kabsa rice grain texture, baklava layered detail, brownie texture.
+JSON — IMAGE
+{ "chain_id": "T43", "technique_family": "TF11", "sectors_applicable": ["F&B"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF12 — Active Product Moment
+Dropper drip, perfume spray, beverage pour stream.
+T44  Dropper Drip Mid-Fall
+Serum dropper captured mid-drip with droplet about to fall.
+FAMILY
+TF12 — Active Product Moment
+SECTORS
+Beauty (serum, oil, dropper products)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Dynamic product photography of {product_descriptor} serum dropper actively dripping single golden droplet caught mid-fall toward bottle below, droplet frozen at 1/8000 shutter, glass dropper visible in upper frame, bottle with logo at base catching light, soft pastel background, dramatic side light, shot on 100mm macro at f/5.6, no text, no watermark
+NEGATIVE PROMPT
+text overlay, watermark, hands, person, distorted dropper, fake-looking droplet, cartoon
+VIDEO MOTION PROMPT
+Droplet continues falling in extreme slow motion, lands on bottle creating tiny splash, second droplet forms at dropper tip, 5 seconds
+SAUDI ADAPTATION
+For Saudi serum/oil brands. Strong for argan oil, vitamin C serum, rose oil popular in Saudi premium beauty.
+JSON — IMAGE
+{ "chain_id": "T44", "technique_family": "TF12", "sectors_applicable": ["Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+T45  Perfume Spray Application
+Perfume bottle spraying mist captured mid-spray.
+FAMILY
+TF12 — Active Product Moment
+SECTORS
+Beauty (fragrance), Retail (men's fragrance, oud)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month
+IMAGE PROMPT (FAL.AI)
+Dynamic fragrance photography of {product_descriptor} perfume bottle captured at exact moment of spraying, fine mist of fragrance frozen mid-spray extending from atomizer in delicate cloud, dramatic side light catching mist particles, dark moody gradient background, bottle sharp focus in lower-right, mist extends to upper-left creating diagonal composition, shot on 100mm macro at f/5.6, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, hands, person, distorted bottle, fake-looking mist, cartoon
+VIDEO MOTION PROMPT
+Mist continues spreading outward in slow motion, particles drift and slowly fall, 5 seconds
+SAUDI ADAPTATION
+For Saudi fragrance brands. Strong for oud cologne sprays and Saudi luxury fragrance launches.
+JSON — IMAGE
+{ "chain_id": "T45", "technique_family": "TF12", "sectors_applicable": ["Beauty","Retail"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+T46  Beverage Pour Stream
+Beverage poured from height in steady stream into glass below.
+FAMILY
+TF12 — Active Product Moment
+SECTORS
+F&B (beverage, specialty coffee, juice)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Optional
+FREQUENCY
+2 per week
+IMAGE PROMPT (FAL.AI)
+Dynamic beverage photography of {beverage_descriptor} poured from height in continuous golden-amber stream into elegant glass below, stream caught at 1/8000 shutter, small splash and bubbles forming at point of impact, dark moody gradient background, warm directional backlight rim-lighting stream, shot on 100mm macro at f/5.6, no text, no watermark, no hands
+NEGATIVE PROMPT
+text, watermark, hands visible, person, distorted glass, low quality, cartoon
+VIDEO MOTION PROMPT
+Pour continues, stream extends down filling glass gradually, bubbles form and rise, 5 seconds
+SAUDI ADAPTATION
+For Saudi specialty coffee, karak, premium juice brands. Continuous-pour reads as crafted preparation.
+JSON — IMAGE
+{ "chain_id": "T46", "technique_family": "TF12", "sectors_applicable": ["F&B"], "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+TF13 — Lifestyle Context
+Laptop with coffee, kitchen morning, hotel candle moment.
+U04  Behind the Scenes
+Process, preparation, human behind the brand. Phone-camera aesthetic for authenticity.
+FAMILY
+TF13 — Lifestyle Context
+SECTORS
+F&B, Retail, Beauty, Home, Fitness
+QUALITY TIER
+universal
+IMAGE MODEL
+fal-ai/flux/dev  ·  $0.025
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Not required
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Authentic behind-the-scenes photograph showing {process_descriptor} in progress at {setting_descriptor}, intentionally phone-camera aesthetic with slight grain, natural ambient interior lighting, candid framing not posed, real hands and surfaces visible, slight motion blur suggesting genuine moment, focal length 28mm phone camera, authentic non-staged composition, warm interior tones
+NEGATIVE PROMPT
+studio lighting, model perfect, fashion shoot, glamour, distorted hands, AI face failures, watermark, text
+VIDEO MOTION PROMPT
+Process continues with natural hand and tool motion, candid pace, 5 seconds
+SAUDI ADAPTATION
+Default to Saudi-specific process: dallah brewing for coffee, traditional kunafa for desserts, abaya tailoring for fashion. Authentic Saudi process imagery dramatically outperforms generic.
+JSON — IMAGE
+{ "chain_id": "U04", "technique_family": "TF13", "sectors_applicable": ["F&B","Retail","Beauty","Home","Fitness"], "fal_model": "fal-ai/flux/dev", "cost_usd": 0.025, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+U05  Social Proof
+Customer reviews, third-party rankings, press features visualized.
+FAMILY
+TF13 — Lifestyle Context
+SECTORS
+F&B, Retail, Beauty
+QUALITY TIER
+universal
+IMAGE MODEL
+fal-ai/flux/dev  ·  $0.025
+VIDEO VARIANT
+Not supported
+INTENT
+grow, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per week
+IMAGE PROMPT (FAL.AI)
+Branded social proof layout featuring authentic-looking customer review or testimonial text against {brand_color} background with subtle product visual element, clean typography in elegant Arabic and English, premium brand aesthetic
+NEGATIVE PROMPT
+text errors, distorted typography, low quality, cluttered
+SAUDI ADAPTATION
+Reviews Saudi-context — Saudi cities (Riyadh, Jeddah, Dammam), Arabic names, Saudi platforms (Maroof, Google Saudi).
+JSON — IMAGE
+{ "chain_id": "U05", "technique_family": "TF13", "sectors_applicable": ["F&B","Retail","Beauty"], "fal_model": "fal-ai/flux/dev", "cost_usd": 0.025, "active": true }
+F02  Beverage Showcase
+Beverage hero with appetizing presentation in cafe-style context.
+FAMILY
+TF13 — Lifestyle Context
+SECTORS
+F&B (cafés, beverages, juice)
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux/dev  ·  $0.025
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Optional
+FREQUENCY
+3-4 per week
+IMAGE PROMPT (FAL.AI)
+Appetizing beverage photography of {beverage_descriptor} in {glass_style} on warm wooden cafe table, condensation on glass, soft directional natural light from upper right, blurred cafe interior, garnish visible, shot on 50mm at f/4, no text, no watermark, no hands
+NEGATIVE PROMPT
+text, watermark, hands, person, distorted glass, harsh lighting, cluttered
+VIDEO MOTION PROMPT
+Condensation droplets slowly form on glass, soft light shifts, ambient cafe pace, 5 seconds
+SAUDI ADAPTATION
+Default Saudi cafe staples: karak, iced latte, hibiscus, qahwa Arabia, vimto. Cafe interior modern Saudi minimalist.
+JSON — IMAGE
+{ "chain_id": "F02", "technique_family": "TF13", "sectors_applicable": ["F&B"], "fal_model": "fal-ai/flux/dev", "cost_usd": 0.025, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T47  Laptop With Coffee Morning
+Modern laptop with branded coffee cup, morning sunlight.
+FAMILY
+TF13 — Lifestyle Context
+SECTORS
+F&B (coffee, breakfast), Retail (professional)
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+1 per week
+IMAGE PROMPT (FAL.AI)
+Lifestyle photography of modern laptop open on wooden desk with {product_descriptor} positioned beside it, small succulent plant in white ceramic pot, soft morning sunlight from upper right, blurred modern office or home office background, shot on 35mm at f/4, no text on screen, no watermark, no people
+NEGATIVE PROMPT
+text on screen, watermark, person, harsh lighting, cluttered, cartoon
+VIDEO MOTION PROMPT
+Steam rises from coffee, soft morning light shifts slowly, 5 seconds
+SAUDI ADAPTATION
+For Saudi B2B-leaning brands. Default modern minimalist Saudi office context — NEOM-adjacent aesthetic.
+JSON — IMAGE
+{ "chain_id": "T47", "technique_family": "TF13", "sectors_applicable": ["F&B","Retail"], "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T48  Food Spread Tablet Planning
+Food spread on marble with iPad showing menu. Modern lifestyle context.
+FAMILY
+TF13 — Lifestyle Context
+SECTORS
+F&B (catering, premium), Home
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Optional
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Lifestyle photography of multiple small plates of {food_descriptor} on white marble countertop with iPad showing menu or recipe in upper portion of frame, hands of person visible holding tablet (face not visible), small ceramic bowls of sauces scattered around, soft natural daylight, shot on 35mm at f/4, no text on screen, no watermark
+NEGATIVE PROMPT
+text on screen, watermark, face, distorted hands, cartoon, harsh lighting
+VIDEO MOTION PROMPT
+Hand subtly adjusts tablet position, soft light shifts, 5 seconds
+SAUDI ADAPTATION
+For Saudi catering and premium dining. Food Saudi-appropriate — mezze for casual, mandi/kabsa traditional, modern fusion contemporary.
+JSON — IMAGE
+{ "chain_id": "T48", "technique_family": "TF13", "sectors_applicable": ["F&B","Home"], "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T49  Kitchen Countertop Morning
+Modern kitchen with morning breakfast scene, product centered.
+FAMILY
+TF13 — Lifestyle Context
+SECTORS
+F&B (breakfast, kitchen), Home
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/kontext  ·  $0.04
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per week
+IMAGE PROMPT (FAL.AI)
+Warm domestic lifestyle photography of {product_descriptor} centered on wooden kitchen countertop with small ceramic bowl, plant in window, white tea kettle, soft morning daylight from large window, blurred kitchen background, shot on 50mm at f/2.8, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, cluttered, cartoon
+VIDEO MOTION PROMPT
+Steam rises from kettle, morning light intensifies, peaceful domestic pace, 5 seconds
+SAUDI ADAPTATION
+Default kitchen modern minimalist Saudi — neutral palette, marble counters, traditional element optional (brass dallah).
+JSON — IMAGE
+{ "chain_id": "T49", "technique_family": "TF13", "sectors_applicable": ["F&B","Home"], "fal_model": "fal-ai/flux-pro/kontext", "reference_image": { "required": true }, "cost_usd": 0.04, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T50  Hotel Candle Moment
+Lit candle in soft hotel room setting. Evening warmth, intimate luxury.
+FAMILY
+TF13 — Lifestyle Context
+SECTORS
+Home (candles, scent), Beauty (ambient luxury)
+QUALITY TIER
+mid / premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per week
+IMAGE PROMPT (FAL.AI)
+Intimate lifestyle photography of {candle_descriptor} lit candle on wooden bedside table or tray, warm flickering candlelight illuminating immediate surroundings, blurred soft hotel room or bedroom background in evening tones, folded white towel nearby, shot on 50mm at f/2.8 with shallow depth, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, fake-looking flame, cartoon
+VIDEO MOTION PROMPT
+Flame flickers naturally, warm light pulses subtly, 5 seconds
+SAUDI ADAPTATION
+Setting should evoke 5-star Saudi hotel aesthetic (Ritz Riyadh, Address Jeddah) rather than generic boutique.
+JSON — IMAGE
+{ "chain_id": "T50", "technique_family": "TF13", "sectors_applicable": ["Home","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF14 — Premium Pedestal
+Reflective pedestal, ceramic stacked plinth, marble plinth.
+T51  Reflective Gold Pedestal Smoke
+Product on reflective gold cylindrical pedestal with soft smoke wisps.
+FAMILY
+TF14 — Premium Pedestal
+SECTORS
+Retail (luxury), Beauty (premium fragrance)
+QUALITY TIER
+luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Luxury product photography of {product_descriptor} on reflective polished gold cylindrical pedestal, soft white smoke wisps rising around base, pure black studio background, warm amber rim light from behind catching smoke creating golden glow, gold pedestal mirrors product perfectly, shot on 85mm at f/8, no text, no watermark, no fire
+NEGATIVE PROMPT
+text, watermark, fire, flames, cigarette feel, cartoon, low quality, white background
+VIDEO MOTION PROMPT
+Smoke continues curling around product, amber light pulses, ceremonial luxury pace with soft ambient sound, 5 seconds
+SAUDI ADAPTATION
+Canonical visual for Saudi luxury fragrance and oud launches.
+JSON — IMAGE
+{ "chain_id": "T51", "technique_family": "TF14", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1-ultra", "reference_image": { "required": true }, "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+T52  Ceramic Stacked Modern Plinth
+Product on stacked ceramic plinth. Designer object positioning.
+FAMILY
+TF14 — Premium Pedestal
+SECTORS
+Retail (designer accessories), Home (designer)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per month
+IMAGE PROMPT (FAL.AI)
+Modern designer product photography of {product_descriptor} balanced on stacked cream ceramic geometric plinth (two stacked rounded ceramic forms creating organic pedestal), soft directional natural light from upper right, neutral cream gradient background, shot on 85mm at f/5.6, contemporary design aesthetic, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, cluttered, cartoon
+VIDEO MOTION PROMPT
+Slow camera dolly forward, soft light shifts across ceramic forms, 5 seconds
+SAUDI ADAPTATION
+Ceramic aesthetic culturally appropriate (Saudi pottery traditions in Najd) while reading contemporary.
+JSON — IMAGE
+{ "chain_id": "T52", "technique_family": "TF14", "sectors_applicable": ["Retail","Home"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+T53  Marble Plinth With Spotlight
+Product on marble plinth with directional spotlight. Museum-quality presentation.
+FAMILY
+TF14 — Premium Pedestal
+SECTORS
+Retail (luxury), Beauty (premium)
+QUALITY TIER
+luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per quarter
+IMAGE PROMPT (FAL.AI)
+Museum-quality product photography of {product_descriptor} centered on white Carrara marble cylindrical plinth, single directional warm spotlight from upper left creating light pool on plinth and product, marble veining visible, neutral cream background, shot on 100mm at f/8, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, cluttered, cartoon, plastic-looking marble
+VIDEO MOTION PROMPT
+Spotlight slowly modulates intensity, peaceful gallery pace, 5 seconds
+SAUDI ADAPTATION
+Canonical luxury Saudi presentation. Marble culturally readable as premium.
+JSON — IMAGE
+{ "chain_id": "T53", "technique_family": "TF14", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF15 — Promotional & Text
+Price-led posts with Arabic text inside the image. Static only.
+U02  Promotional Offer
+Price-led content with discount or bundle. Arabic text composed into image.
+FAMILY
+TF15 — Promotional & Text
+SECTORS
+F&B, Retail, Beauty
+QUALITY TIER
+universal
+IMAGE MODEL
+fal-ai/gpt-image-2  ·  $0.10
+VIDEO VARIANT
+Not supported
+INTENT
+grow, harvest, defend
+OCCASION
+ramadan, eid, national_day
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Not required
+FREQUENCY
+2-3 per week
+IMAGE PROMPT (FAL.AI)
+{offer_type} promotional poster, {product_descriptor} prominently displayed, {discount_value} discount badge in {brand_color_primary}, urgent {urgency_level} typography in Arabic and English, {sector_visual_style}, professional design quality
+NEGATIVE PROMPT
+blurry, low quality, watermark, distorted text, fake currency, text errors
+SAUDI ADAPTATION
+Arabic typography Cairo font, right-to-left correct, discount in Arabic numerals or Hindi-Arabic based on brand. Saudi promotional periods: White Friday, National Day, Ramadan offers.
+JSON — IMAGE
+{ "chain_id": "U02", "technique_family": "TF15", "sectors_applicable": ["F&B","Retail","Beauty"], "fal_model": "fal-ai/gpt-image-2", "cost_usd": 0.10, "active": true }
+F04  Menu Price Card
+Food menu card with photo, bilingual names, prices.
+FAMILY
+TF15 — Promotional & Text
+SECTORS
+F&B (menu launches)
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/gpt-image-2  ·  $0.10
+VIDEO VARIANT
+Not supported
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+0.5 per week
+IMAGE PROMPT (FAL.AI)
+Modern menu price card design featuring {food_item} with branded layout, item name in Arabic and English, price in SAR clearly displayed, brand color palette, clean typography hierarchy, hyper-realistic food photography integrated with menu design, no text errors
+NEGATIVE PROMPT
+text errors, distorted typography, blurry, low quality, watermark
+SAUDI ADAPTATION
+Critical bilingual. SAR currency symbol or 'ريال' text. Saudi menu conventions: dish name both languages, description Arabic primary, price right-aligned.
+JSON — IMAGE
+{ "chain_id": "F04", "technique_family": "TF15", "sectors_applicable": ["F&B"], "fal_model": "fal-ai/gpt-image-2", "reference_image": { "required": true }, "cost_usd": 0.10, "active": true }
+R03  Price Tag Reveal
+Retail price tag with product, dramatic reveal aesthetic.
+FAMILY
+TF15 — Promotional & Text
+SECTORS
+Retail
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/gpt-image-2  ·  $0.10
+VIDEO VARIANT
+Not supported
+INTENT
+harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Retail price tag display featuring {product_descriptor} with elegant price tag prominently showing SAR price in Arabic and English, brand color palette, premium retail aesthetic, soft directional light, no text errors
+NEGATIVE PROMPT
+text errors, distorted typography, low quality, watermark
+SAUDI ADAPTATION
+SAR currency required. Saudi retail conventions: original price crossed out if on sale, current price prominent. Luxury tags subtle.
+JSON — IMAGE
+{ "chain_id": "R03", "technique_family": "TF15", "sectors_applicable": ["Retail"], "fal_model": "fal-ai/gpt-image-2", "reference_image": { "required": true }, "cost_usd": 0.10, "active": true }
+TF16 — Occasion & Cultural
+Ramadan, Eid, National Day cultural moments. Auto-triggered.
+U03  Occasion Greeting
+National holidays, Islamic occasions, seasonal moments. Auto-triggered by occasion layer.
+FAMILY
+TF16 — Occasion & Cultural
+SECTORS
+F&B, Retail, Beauty, Home, Fitness
+QUALITY TIER
+universal
+IMAGE MODEL
+fal-ai/flux/dev  ·  $0.025
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+all
+OCCASION
+ramadan, eid, national_day, founding_day
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Not required
+FREQUENCY
+1 per active occasion
+IMAGE PROMPT (FAL.AI)
+{occasion_visual_motif}, {brand_color_palette}, {occasion_atmosphere}, {sector_appropriate_setting}, elegant composition, no text in image (composed post-gen), no people facing camera, no watermark
+NEGATIVE PROMPT
+text, watermark, faces, cross, christmas, alcohol, pork, inappropriate symbols, religious figures
+VIDEO MOTION PROMPT
+Subtle ambient motion appropriate to occasion (Ramadan: lantern flickers / National Day: flag drapes / Eid: petals drift), ceremonial pace, ambient occasion-appropriate sound, 5 seconds
+SAUDI ADAPTATION
+Auto-triggered by BrandDNA.E.calendar.occasion_active. Each occasion has specific motif: Ramadan = crescent moons and lanterns / Eid = floral and gold / National Day = Saudi green + dates + palm / Founding Day = traditional Najdi mudbrick.
+JSON — IMAGE
+{ "chain_id": "U03", "technique_family": "TF16", "sectors_applicable": ["F&B","Retail","Beauty","Home","Fitness"], "compliance_level": "elevated", "fal_model": "fal-ai/flux/dev", "cost_usd": 0.025, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+F03  Ramadan Iftar Spread
+Full iftar table spread with dates, water, traditional and modern Saudi dishes. Auto-triggers during Ramadan.
+FAMILY
+TF16 — Occasion & Cultural
+SECTORS
+F&B (especially restaurants, catering)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+all
+OCCASION
+ramadan (high)
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Optional
+FREQUENCY
+2-3 per week during Ramadan
+IMAGE PROMPT (FAL.AI)
+Warm Ramadan iftar table photography showing traditional Saudi iftar spread with dates and water cups at center, vimto in glasses, samosas, harees, kabsa with lamb, {featured_dish}, traditional brass dallah coffee pot, warm tungsten ambient interior lighting, soft golden-hour quality suggesting just-after-sunset, no people, top-down or 45-degree angle, hyper-realistic food and brassware detail, shot on 35mm at f/5.6, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, alcohol, pork, people, Western dining, harsh lighting, AI food failures
+VIDEO MOTION PROMPT
+Steam rises from hot dishes, candle flickers, ambient evening sounds, peaceful iftar pace, 5 seconds
+SAUDI ADAPTATION
+Critical: just-after-sunset lighting essential (pre-sunset suggests breaking fast early — religiously incorrect). Featured dish varies by brand region. Auto-triggers during ramadan_active.
+JSON — IMAGE
+{ "chain_id": "F03", "technique_family": "TF16", "sectors_applicable": ["F&B"], "occasion_affinity": ["ramadan"], "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+TF17 — Before/After Transformation
+Transformation shots, primarily Beauty services.
+B01  Before / After Service
+Split before-and-after image showing beauty service result. Modest framing.
+FAMILY
+TF17 — Before/After Transformation
+SECTORS
+Beauty (lash, nail, skin, hair services)
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/kontext  ·  $0.04
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.49 (7s — transition)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Required (actual before photo)
+FREQUENCY
+1-2 per week for beauty services
+IMAGE PROMPT (FAL.AI)
+Side-by-side before-and-after split-screen of {service_area} showing clear transformation from {service_type} treatment, both images same lighting and angle for valid comparison, modest framing showing only treatment area (hands for nail, eyes for lash, profile for hair), soft natural daylight, hyper-realistic skin and result detail, no text overlay, no watermark
+NEGATIVE PROMPT
+text, watermark, full face if not permitted, distorted faces, exaggerated transformation, AI face failures
+VIDEO MOTION PROMPT
+Smooth transition wipe from before to after, both states visible briefly, professional reveal pace, 7 seconds
+SAUDI ADAPTATION
+Critical Saudi beauty content category. Modest framing essential. Default nail and lash hands-only or eyes-only framing.
+JSON — IMAGE
+{ "chain_id": "B01", "technique_family": "TF17", "sectors_applicable": ["Beauty"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/kontext", "reference_image": { "required": true }, "cost_usd": 0.04, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 7, "cost_usd": 0.49, "async": true }
+B02  Service Showcase Static
+Static showcase of beauty service result. Single result image without before comparison.
+FAMILY
+TF17 — Before/After Transformation
+SECTORS
+Beauty (services)
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux/dev  ·  $0.025
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow
+OCCASION
+None
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+3-4 per week beauty services
+IMAGE PROMPT (FAL.AI)
+Beauty service showcase photography of {service_area} showing premium {service_type} result, modest framing, soft natural daylight, hyper-realistic skin and result detail, clean aesthetic neutral background, shot on 85mm at f/4, premium beauty service aesthetic, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, full face if not permitted, distorted, AI face failures, harsh lighting
+VIDEO MOTION PROMPT
+Subtle ambient motion, light catches service result, peaceful beauty pace, 5 seconds
+SAUDI ADAPTATION
+Daily backbone content for Saudi beauty salons. Modest framing default. Treatment area focus.
+JSON — IMAGE
+{ "chain_id": "B02", "technique_family": "TF17", "sectors_applicable": ["Beauty"], "compliance_level": "elevated", "fal_model": "fal-ai/flux/dev", "cost_usd": 0.025, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF18 — Product Flat Lay
+Top-down product arrangements for retail and beauty.
+B03  Beauty Product Flat Lay
+Top-down arrangement of beauty products with complementary props. Editorial flat lay.
+FAMILY
+TF18 — Product Flat Lay
+SECTORS
+Beauty (multi-product brands)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/kontext  ·  $0.04
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s limited)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week
+IMAGE PROMPT (FAL.AI)
+Editorial top-down flat lay photography of {product_collection} arranged on {surface_descriptor}, complementary props (fresh flowers, ribbon, ceramic dish), soft natural daylight from above, hyper-realistic product and surface detail, shot from directly overhead at 90 degrees on 35mm at f/5.6, premium editorial flat lay aesthetic, no text, no watermark, no hands
+NEGATIVE PROMPT
+text, watermark, hands, person, harsh lighting, cluttered, cartoon
+VIDEO MOTION PROMPT
+Slow camera rotation around composition, light shifts subtly, peaceful pace, 5 seconds
+SAUDI ADAPTATION
+Props can include subtle traditional elements (Saudi pottery dish, traditional incense holder) for cultural anchoring.
+JSON — IMAGE
+{ "chain_id": "B03", "technique_family": "TF18", "sectors_applicable": ["Beauty"], "fal_model": "fal-ai/flux-pro/kontext", "reference_image": { "required": true }, "cost_usd": 0.04, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+B05  Bridal Beauty Package
+Bridal beauty collection flat lay with premium presentation. Wedding-occasion targeted.
+FAMILY
+TF18 — Product Flat Lay
+SECTORS
+Beauty (bridal services, premium skincare)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+wedding season
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per week wedding season
+IMAGE PROMPT (FAL.AI)
+Premium bridal beauty package flat lay showing {product_collection} arranged elegantly on cream silk fabric, white roses and small white pearl details, soft golden directional natural light, hyper-realistic luxury detail, shot from directly overhead, romantic premium aesthetic, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, cluttered, oversaturated
+VIDEO MOTION PROMPT
+Light shifts gently across silk and products, peaceful luxury pace, 5 seconds
+SAUDI ADAPTATION
+Saudi wedding beauty market significant. Cream and white palette appropriate (avoid pure white which reads Western bridal). Include subtle traditional elements.
+JSON — IMAGE
+{ "chain_id": "B05", "technique_family": "TF18", "sectors_applicable": ["Beauty"], "occasion_affinity": ["wedding"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+R01  Apparel Flat Lay
+Top-down apparel arrangement with styling accessories. Fashion editorial flat lay.
+FAMILY
+TF18 — Product Flat Lay
+SECTORS
+Retail (fashion, abaya, accessories)
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux/dev  ·  $0.025
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+3-5 per week for fashion brands
+IMAGE PROMPT (FAL.AI)
+Editorial fashion flat lay of {apparel_descriptor} arranged on neutral linen surface, complementary accessories (handbag, jewelry, folded scarf), soft natural daylight from above, hyper-realistic fabric texture detail, shot from directly overhead, fashion editorial aesthetic, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, person, model, harsh lighting, cluttered, cartoon
+VIDEO MOTION PROMPT
+Slow camera dolly around composition, light shifts subtly, fashion pace, 5 seconds
+SAUDI ADAPTATION
+For Saudi fashion and abaya brands. Default fabric tones earth/neutral (canonical Saudi modest fashion palette).
+JSON — IMAGE
+{ "chain_id": "R01", "technique_family": "TF18", "sectors_applicable": ["Retail"], "fal_model": "fal-ai/flux/dev", "reference_image": { "required": true }, "cost_usd": 0.025, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+R04  Collection Story Flat Lay
+Collection of products from same line presented in narrative flat lay. Story-driven layout.
+FAMILY
+TF18 — Product Flat Lay
+SECTORS
+Retail (collection launches, fashion)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per collection launch
+IMAGE PROMPT (FAL.AI)
+Editorial collection story flat lay showing {collection_descriptor} with multiple coordinated pieces in narrative layout suggesting collection theme, complementary props supporting brand story, soft directional natural light, hyper-realistic detail, shot from directly overhead at 35mm at f/5.6, premium fashion editorial aesthetic, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, cluttered, oversaturated
+VIDEO MOTION PROMPT
+Slow rotation around composition revealing different angles, peaceful pace, 5 seconds
+SAUDI ADAPTATION
+For Saudi fashion brand collection launches. Story reflects Saudi brand narrative through prop selection.
+JSON — IMAGE
+{ "chain_id": "R04", "technique_family": "TF18", "sectors_applicable": ["Retail"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF19 — On-Model Apparel
+Modest fashion and apparel worn by models.
+R02  Apparel On-Model
+Apparel worn by model in editorial fashion shoot. Studio or location.
+FAMILY
+TF19 — On-Model Apparel
+SECTORS
+Retail (fashion, modest fashion)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Optional
+FREQUENCY
+2-3 per week for fashion brands
+IMAGE PROMPT (FAL.AI)
+Editorial fashion photography of Saudi {model_gender} model wearing {apparel_descriptor}, modest styling appropriate to gender, {setting_descriptor}, professional fashion lighting, real visible skin texture, contemplative or confident expression looking off-camera, hyper-realistic fabric drape and skin detail, shot on 85mm at f/4, premium fashion editorial aesthetic, no text, no watermark
+NEGATIVE PROMPT
+text, watermark, immodest dress, exposed hair under hijab, distorted face, plastic skin, AI face failures, Western fashion styling
+VIDEO MOTION PROMPT
+Model subtly shifts pose, fabric moves naturally, fashion pace, 5 seconds
+SAUDI ADAPTATION
+Critical compliance: women in modest hijab and abaya, men in thobe or modern modest casual. No mixed-gender intimate framing.
+JSON — IMAGE
+{ "chain_id": "R02", "technique_family": "TF19", "sectors_applicable": ["Retail"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF20 — Premium Fragrance/Oud
+Oud-specific and luxury fragrance compositions.
+R05  Fragrance / Oud Showcase
+Premium fragrance bottle hero shot with luxury staging. Saudi oud market specialty.
+FAMILY
+TF20 — Premium Fragrance/Oud
+SECTORS
+Retail (fragrance, oud), Beauty (premium fragrance)
+QUALITY TIER
+luxury
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, defend
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month luxury fragrance
+IMAGE PROMPT (FAL.AI)
+Luxury fragrance photography of {fragrance_descriptor} bottle staged on dark wooden surface with traditional oud wood chips visible, soft warm amber lighting from upper right, brass and gold details in surroundings, hyper-realistic glass bottle reflections and oud wood texture, shot on 100mm macro at f/8, premium luxury Saudi aesthetic, no text, no watermark, no people
+NEGATIVE PROMPT
+text, watermark, person, harsh lighting, cartoon, cheap-looking presentation
+VIDEO MOTION PROMPT
+Amber light pulses gently, atmospheric haze drifts, peaceful luxury pace with subtle oud-incense ambient sound, 5 seconds
+SAUDI ADAPTATION
+Most culturally specific fragrance chain for Saudi market. Oud wood chips essential prop signaling traditional Saudi fragrance heritage.
+JSON — IMAGE
+{ "chain_id": "R05", "technique_family": "TF20", "sectors_applicable": ["Retail","Beauty"], "fal_model": "fal-ai/flux-pro/v1.1-ultra", "reference_image": { "required": true }, "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+F05  Cloud Kitchen Packaging
+Premium F&B packaging hero (similar pedestal logic). Brand-led packaging showcase.
+FAMILY
+TF20 — Premium Fragrance/Oud
+SECTORS
+F&B (cloud kitchen, premium delivery, packaged food)
+QUALITY TIER
+mid / premium
+IMAGE MODEL
+fal-ai/flux-pro/kontext  ·  $0.04
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week cloud kitchen brands
+IMAGE PROMPT (FAL.AI)
+Premium F&B packaging photography of {packaging_descriptor} with branded logo and design visible, food item visible through packaging window or peeking from open container, warm directional lighting, neutral premium background, hyper-realistic packaging material and food detail, shot on 50mm at f/5.6, contemporary delivery-focused brand aesthetic, no text overlay, no watermark
+NEGATIVE PROMPT
+text overlay, watermark, person, hands, distorted packaging, cartoon
+VIDEO MOTION PROMPT
+Steam rises from food if hot, packaging shifts subtly as if opening, peaceful brand pace, 5 seconds
+SAUDI ADAPTATION
+For Saudi cloud kitchen brands. Packaging should reflect modern Saudi delivery culture (Jahez, Hungerstation, Mrsool aesthetic).
+JSON — IMAGE
+{ "chain_id": "F05", "technique_family": "TF20", "sectors_applicable": ["F&B"], "fal_model": "fal-ai/flux-pro/kontext", "reference_image": { "required": true }, "cost_usd": 0.04, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF21 — Service CTA
+Booking, app-download, conversion-driven content.
+B04  Booking CTA
+Service booking call-to-action with appointment slot visual. Conversion-focused.
+FAMILY
+TF21 — Service CTA
+SECTORS
+Beauty (services), Fitness
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux/dev  ·  $0.025
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Optional
+FREQUENCY
+1-2 per week service brands
+IMAGE PROMPT (FAL.AI)
+Service booking visual showing {service_descriptor} treatment area or tools, clean modern aesthetic, soft natural daylight, hyper-realistic detail, premium service aesthetic, no text errors
+NEGATIVE PROMPT
+text errors, distorted typography, cluttered, harsh lighting
+VIDEO MOTION PROMPT
+Subtle ambient motion, peaceful service pace, 5 seconds
+SAUDI ADAPTATION
+CTA text in Arabic primary. Booking conventions in Saudi market: WhatsApp, app booking, in-salon walk-in.
+JSON — IMAGE
+{ "chain_id": "B04", "technique_family": "TF21", "sectors_applicable": ["Beauty","Fitness"], "fal_model": "fal-ai/flux/dev", "cost_usd": 0.025, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+U06  New Arrival / Launch
+New product launch announcement with reveal aesthetic. Cross-sector launch chain.
+FAMILY
+TF21 — Service CTA
+SECTORS
+All sectors
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month per active brand
+IMAGE PROMPT (FAL.AI)
+Product launch hero photography of {product_descriptor} dramatically lit against premium gradient background, subtle 'new arrival' visual treatment, hyper-realistic product detail, shot on 85mm at f/5.6, launch-moment editorial aesthetic, no text overlay, no watermark
+NEGATIVE PROMPT
+text overlay, watermark, person, harsh lighting, cluttered
+VIDEO MOTION PROMPT
+Camera slowly reveals product, light intensifies as if unveiling, anticipatory launch pace, 5 seconds
+SAUDI ADAPTATION
+For luxury brands lean darker/golder palette. For accessible brands lean lighter/brighter.
+JSON — IMAGE
+{ "chain_id": "U06", "technique_family": "TF21", "sectors_applicable": ["F&B","Retail","Beauty","Home","Fitness"], "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+TF22 — Video (Native)
+All async video generation chains. Native text-to-video.
+V01  Ramadan Atmosphere Clip
+Native Ramadan atmosphere video — lantern, dates, iftar prep sequence.
+FAMILY
+TF22 — Video (Native)
+SECTORS
+F&B (Ramadan campaigns)
+QUALITY TIER
+premium
+IMAGE MODEL
+—  ·  —
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro  ·  $0.70 (10s native)
+INTENT
+all
+OCCASION
+ramadan
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Not required
+FREQUENCY
+1 per week during Ramadan
+IMAGE PROMPT (FAL.AI)
+(Native text-to-video — no image generation step)
+VIDEO MOTION PROMPT
+Ramadan atmosphere video: traditional fanous lantern slowly illuminates in foreground, warm tungsten glow gradually intensifies, table with dates and water cups becomes visible, ambient golden-hour just-after-sunset light, peaceful contemplative atmosphere, no people, no text, ambient Ramadan sound, 10 seconds
+SAUDI ADAPTATION
+Auto-triggered during ramadan_active. Top Ramadan content for F&B.
+JSON — IMAGE
+{ "chain_id": "V01", "technique_family": "TF22", "fal_model": "fal-ai/kling-video/v1.6/pro", "format": "native_text_to_video", "cost_usd": 0.70, "active": true }
+V02  Before/After Transition Video
+Beauty service before/after as native video transition.
+FAMILY
+TF22 — Video (Native)
+SECTORS
+Beauty (services)
+QUALITY TIER
+premium
+IMAGE MODEL
+—  ·  —
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro  ·  $0.49 (7s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per week beauty services
+IMAGE PROMPT (FAL.AI)
+—
+VIDEO MOTION PROMPT
+Smooth before-and-after transition for {service_descriptor}: starts on before state, wipe transition reveals after state, both states clearly visible, modest framing throughout, professional reveal pace, 7 seconds
+SAUDI ADAPTATION
+Modest framing throughout — see B01 compliance notes.
+JSON — IMAGE
+{ "chain_id": "V02", "technique_family": "TF22", "fal_model": "fal-ai/kling-video/v1.6/pro", "compliance_level": "elevated", "cost_usd": 0.49, "active": true }
+V03  Product Unboxing Loop
+Native product unboxing loop video. Hands-and-product interaction.
+FAMILY
+TF22 — Video (Native)
+SECTORS
+Retail, Beauty, F&B (premium packaging)
+QUALITY TIER
+premium
+IMAGE MODEL
+—  ·  —
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro  ·  $0.42 (6s loop)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per week
+IMAGE PROMPT (FAL.AI)
+—
+VIDEO MOTION PROMPT
+Native product unboxing video of {product_descriptor}: hands carefully open premium packaging, reveal product inside, hold up for camera angle, soft natural daylight, hyper-realistic hands and packaging detail, no face visible, premium reveal pace, 6 seconds
+SAUDI ADAPTATION
+Default hands styled as Saudi/Arab. Critical: no face visible.
+JSON — IMAGE
+{ "chain_id": "V03", "technique_family": "TF22", "fal_model": "fal-ai/kling-video/v1.6/pro", "cost_usd": 0.42, "active": true }
+V04  Occasion Announcement Video
+Premium occasion announcement video with native audio. National Day, Founding Day, major Eid.
+FAMILY
+TF22 — Video (Native)
+SECTORS
+All sectors
+QUALITY TIER
+luxury
+IMAGE MODEL
+—  ·  —
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.98 (7s with audio)
+INTENT
+all
+OCCASION
+national_day, founding_day, major_eid
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Not required
+FREQUENCY
+1 per major occasion
+IMAGE PROMPT (FAL.AI)
+—
+VIDEO MOTION PROMPT
+Premium occasion announcement video for {occasion_descriptor}: cinematic opening showing occasion-appropriate visual motif (Saudi flag draping, traditional Najdi architecture, palm fronds), warm directional lighting, brand visual element subtly appears, peaceful ceremonial pace, native ambient occasion sound, 7 seconds
+SAUDI ADAPTATION
+Most weighted occasion chain. Native audio essential. Auto-triggers at major occasions.
+JSON — IMAGE
+{ "chain_id": "V04", "technique_family": "TF22", "fal_model": "fal-ai/seedance-2.0", "cost_usd": 0.98, "audio": true, "active": true }
+V05  New Arrival Reveal Video
+Native product launch reveal video. Cinematic anticipation building to product reveal.
+FAMILY
+TF22 — Video (Native)
+SECTORS
+All sectors
+QUALITY TIER
+premium
+IMAGE MODEL
+—  ·  —
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro  ·  $0.70 (10s)
+INTENT
+launch
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Required
+FREQUENCY
+1 per major launch
+IMAGE PROMPT (FAL.AI)
+—
+VIDEO MOTION PROMPT
+Cinematic product launch reveal video for {product_descriptor}: starts in darkness with hint of product silhouette, camera slowly approaches as lighting builds, product gradually reveals in dramatic warm light, final moment shows product fully illuminated, anticipation-building pace, 10 seconds
+SAUDI ADAPTATION
+Default reveal aesthetic warm golden tones rather than cool blue tech-aesthetic for traditional brands.
+JSON — IMAGE
+{ "chain_id": "V05", "technique_family": "TF22", "fal_model": "fal-ai/kling-video/v1.6/pro", "cost_usd": 0.70, "active": true }
+TF23 — Saudi UGC Authentic
+Saudi UGC Authentic — engineered against AI-look failure modes.
+S01  Saudi Woman Lifestyle — Coffee Moment
+Saudi woman in modest hijab and abaya, casual seated moment with takeaway coffee. Phone-camera aesthetic, real skin texture, candid.
+FAMILY
+TF23 — Saudi UGC Authentic
+SECTORS
+F&B, Beauty, Retail (lifestyle), Fitness
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, defend, recover
+OCCASION
+None
+COMPLIANCE
+elevated (modest fashion required)
+REFERENCE IMAGE
+Not required
+FREQUENCY
+2-3 per week for female-audience brands
+IMAGE PROMPT (FAL.AI)
+Authentic candid lifestyle photograph of a Saudi woman in her late twenties wearing modest beige or grey hijab with full coverage, loose-fitting black or earth-tone abaya with full sleeves, seated casually at café or home, holding takeaway coffee cup from {brand_descriptor}, natural soft daylight streaming from off-camera window on left, real visible skin texture with subtle pores and natural complexion, candid expression with subtle smile not looking directly at camera, slight motion blur on hand suggesting genuine moment, shot as if from friend's iPhone at eye level with slight grain, focal length 28mm phone camera, modest framing with hands visible naturally holding coffee, warm ambient interior tones, authentic non-staged composition
+NEGATIVE PROMPT
+smooth airbrushed skin, plastic skin, extra fingers, distorted hands, doll-like face, oversaturated colors, studio lighting, posed model expression, professional model look, makeup heavy beauty model, exposed hair under hijab failure, immodest dress, tight clothing, deep neckline, direct camera stare, perfect symmetry, uncanny valley, AI-generated look, 3D render, illustration, watermark, text
+VIDEO MOTION PROMPT
+Woman gently brings coffee cup toward face for sip, natural micro-movements of fingers, slight head tilt, hijab edge moves naturally with motion, soft window light shifts subtly, candid documentary pacing, 5 seconds
+SAUDI ADAPTATION
+Default hijab styling contemporary Saudi (modern colored hijab over earth-tone abaya, reads urban professional). For traditional audiences override to all-black abaya. Critical: chain must reject 'glamorous,' 'sexy,' 'fashion model' framings.
+JSON — IMAGE
+{ "chain_id": "S01", "technique_family": "TF23", "sectors_applicable": ["F&B","Beauty","Retail","Fitness"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/v1.1", "compliance_gate": { "modest_fashion": true, "no_intimate_framing": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+S02  Saudi Man Lifestyle — Thobe Casual Moment
+Saudi man in white thobe and ghutra, casual moment with brand product. Phone-camera, candid.
+FAMILY
+TF23 — Saudi UGC Authentic
+SECTORS
+F&B, Retail (men's), Fitness, Beauty (men's grooming)
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, defend, recover
+OCCASION
+None
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Not required
+FREQUENCY
+2-3 per week for male-audience brands
+IMAGE PROMPT (FAL.AI)
+Authentic candid lifestyle photograph of a Saudi man in his late twenties to early thirties wearing crisp white thobe with traditional collar, white ghutra head covering with black iqal, well-groomed short beard, casually holding or interacting with {brand_product}, seated or standing in modern Saudi setting like café or office lounge, natural daylight from window, real visible skin texture with subtle pores and natural Mediterranean Arab complexion, candid expression looking off-camera or downward at product, hand naturally gripping or gesturing, shot as if from friend's iPhone at chest height with slight grain, focal length 28mm phone camera, authentic non-staged composition, warm interior tones
+NEGATIVE PROMPT
+smooth airbrushed skin, plastic skin, extra fingers, distorted hands, model perfect features, oversaturated, studio lighting, posed expression, fashion model look, Western business suit, beard exaggerated or unnatural, beard absence on adult male, female features, multiple men unless specified, AI-generated look, 3D render, watermark, text
+VIDEO MOTION PROMPT
+Man brings product subtly closer to inspect, natural hand motion, slight head adjustment, ghutra edge moves with motion, candid pacing, 5 seconds
+SAUDI ADAPTATION
+Default white thobe canonical Saudi. White or red-checked ghutra. Iqal essential — visual marker confirming Saudi rather than Gulf-generic. Beard modern short-trimmed.
+JSON — IMAGE
+{ "chain_id": "S02", "technique_family": "TF23", "sectors_applicable": ["F&B","Retail","Fitness","Beauty"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+S03  Saudi Family — Iftar Table Gathering
+Extended Saudi family three generations around iftar table during Ramadan. Multi-generational, authentic.
+FAMILY
+TF23 — Saudi UGC Authentic
+SECTORS
+F&B (restaurant, catering, delivery), Home & Lifestyle
+QUALITY TIER
+mid / premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, grow, defend
+OCCASION
+ramadan (high)
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Optional
+FREQUENCY
+Daily during Ramadan for F&B
+IMAGE PROMPT (FAL.AI)
+Warm authentic photograph of extended Saudi family gathered around large iftar table just after sunset breaking Ramadan fast, three generations visible — grandfather in white thobe and ghutra, father in thobe, mother and adult daughter in modest hijab and conservative colored abayas, young children at table edge, table covered with traditional Saudi iftar foods including dates and water cups at center, vimto in glasses, samosas, harees, lamb dish, {featured_dish}, warm tungsten ambient interior lighting, soft golden-hour quality from window indicating just-after-sunset timing, candid moment with some family members reaching for food, real skin textures on all faces, natural expressions of gratitude and quiet conversation, shot from elevated angle suggesting phone-camera positioning, authentic non-staged composition
+NEGATIVE PROMPT
+studio lighting, model perfect features, smooth plastic skin, distorted hands, extra fingers, alcohol bottles, pork, immodest dress on women, mixed-gender intimate framing, AI look, watermark, text, dinner party Western style
+VIDEO MOTION PROMPT
+Family begins reaching for food after Adhan, gentle hand motion, slight conversation gestures, warm light pulses softly, ambient evening sounds, 5 seconds
+SAUDI ADAPTATION
+Critical: family scenes never depict romantic interaction. Just-after-sunset lighting essential (pre-sunset suggests breaking fast early — religiously incorrect). Featured dish matches brand region: Najdi → jereesh/harees, Hejazi → mandi/saleeg.
+JSON — IMAGE
+{ "chain_id": "S03", "technique_family": "TF23", "sectors_applicable": ["F&B","Home"], "occasion_affinity": ["ramadan"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/v1.1-ultra", "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+S04  Hands-Only Product Interaction — Saudi Context
+Hands-only shot of product being held or used. No face visible. Solves face-visibility compliance gracefully.
+FAMILY
+TF23 — Saudi UGC Authentic
+SECTORS
+All sectors
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+launch, grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard (face-free)
+REFERENCE IMAGE
+Required
+FREQUENCY
+3-4 per week (default UGC for face-restricted brands)
+IMAGE PROMPT (FAL.AI)
+Authentic close-up hand photography showing only hands and forearms interacting with {product_descriptor}, Saudi or Arab natural medium-warm skin tone, neat well-groomed nails, {gender_specific_details}, no face visible, shot from slight overhead angle as if first-person POV, natural daylight from window, soft directional shadow, real skin texture with subtle wrinkles and natural skin markings, hands holding product naturally, focal length 35mm phone camera, candid non-staged composition, warm ambient surroundings slightly out of focus, authentic moment of use
+NEGATIVE PROMPT
+face visible, full body, distorted hands, extra fingers, missing fingers, doll hands, AI hand failures, watermark, text, plastic skin, oversaturated, studio lighting, fingernail polish on male hands, exaggerated henna
+VIDEO MOTION PROMPT
+Hands subtly adjust grip on product, slight rotation revealing product details, natural finger micro-movements, ambient daylight shift, 5 seconds
+SAUDI ADAPTATION
+Critical for brands with face_visibility_permission false. Default skin tone warm medium Mediterranean Arab. Henna detail for female brands subtle pattern at thumb base, not elaborate bridal henna.
+JSON — IMAGE
+{ "chain_id": "S04", "technique_family": "TF23", "sectors_applicable": ["F&B","Retail","Beauty","Home","Fitness"], "compliance_level": "standard", "fal_model": "fal-ai/flux-pro/v1.1", "reference_image": { "required": true }, "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+S05  Saudi Woman Beauty Routine — Bathroom Mirror
+Saudi woman applying skincare in front of bathroom mirror, modest at-home framing. Hijab off in private home context (compliant).
+FAMILY
+TF23 — Saudi UGC Authentic
+SECTORS
+Beauty (skincare, makeup), Home & Lifestyle
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+elevated (at-home women's content)
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+2 per week for beauty brands
+IMAGE PROMPT (FAL.AI)
+Authentic at-home morning routine photograph of a Saudi woman in her mid-twenties applying {product_type} in front of softly lit bathroom mirror, hair pulled back in casual loose bun, modest sleeveless or short-sleeve home top with shoulder coverage, focus on her hands applying product to her face, real visible skin texture with natural pores and subtle imperfections in mirror reflection, candid expression of concentration, warm bathroom interior lighting, slightly out-of-focus bathroom surroundings, shot as if from phone propped on counter, slight angle from below, authentic morning routine non-staged composition, no excessive makeup, no model-perfect features
+NEGATIVE PROMPT
+smooth plastic skin, model perfect features, heavy makeup, glamour lighting, sleeveless deep neckline, immodest framing, distorted reflection, AI face failures, watermark, text, sexual undertone, full body bathroom scene
+VIDEO MOTION PROMPT
+Woman continues applying product with gentle circular motion, hand moves smoothly across face, slight head turn checking reflection, soft bathroom light, intimate routine pacing, 5 seconds
+SAUDI ADAPTATION
+At-home women's content is canonical Saudi beauty UGC category. Compliance: chain frames woman from chest-up only. Hair-down permitted because context is unambiguously private home space.
+JSON — IMAGE
+{ "chain_id": "S05", "technique_family": "TF23", "sectors_applicable": ["Beauty","Home"], "compliance_level": "elevated", "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+S06  Saudi Man Grooming Mirror Moment
+Saudi man applying grooming product in front of bathroom mirror. Casual home framing, real skin texture.
+FAMILY
+TF23 — Saudi UGC Authentic
+SECTORS
+Beauty (men's grooming), Retail (men's fragrance, grooming kits)
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+1-2 per week for men's grooming
+IMAGE PROMPT (FAL.AI)
+Authentic at-home morning routine photograph of a Saudi man in his early thirties applying {product_type} to his beard or face in front of softly lit bathroom mirror, well-groomed short to medium beard, casual home shirt or simple undershirt, focus on hands carefully applying product, real visible skin texture with natural pores beard hairs and slight imperfections, candid expression of focused concentration, warm interior bathroom lighting, slightly out-of-focus surroundings, shot as if from phone propped on counter at chest height, authentic morning routine non-staged composition, natural body type
+NEGATIVE PROMPT
+smooth plastic skin, model perfect features, fashion magazine pose, dramatic lighting, shirtless full body, AI face failures, watermark, text, female features, exaggerated muscles, beard absence
+VIDEO MOTION PROMPT
+Man continues applying product with deliberate motion, slight head turn checking beard groom, soft bathroom light, focused morning pace, 5 seconds
+SAUDI ADAPTATION
+Saudi men's grooming market exploded since 2022. Reflects modern urban Saudi male aesthetic — well-groomed beard rather than full traditional or clean-shaven, casual home wear rather than thobe (private grooming).
+JSON — IMAGE
+{ "chain_id": "S06", "technique_family": "TF23", "sectors_applicable": ["Beauty","Retail"], "compliance_level": "standard", "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+S07  Saudi Friends Group — Café Setting
+Three or four Saudi friends in modern Saudi café, social moment, product on table. Single-gender groups only.
+FAMILY
+TF23 — Saudi UGC Authentic
+SECTORS
+F&B (cafés, dessert shops, casual dining), Home & Lifestyle
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, defend
+OCCASION
+None
+COMPLIANCE
+elevated (single-gender groups only)
+REFERENCE IMAGE
+Not required
+FREQUENCY
+2 per week for café/lifestyle brands
+IMAGE PROMPT (FAL.AI)
+Authentic candid photograph of {group_gender} Saudi friends in their twenties seated together in modern Saudi café with warm wood and beige interior, modest casual fashion appropriate to gender ({fashion_details}), products from {brand_descriptor} on table between them including coffee cups and small dessert plates, three or four people in frame, candid expressions of laughter and conversation, some looking at each other rather than camera, natural daylight from large café window, real skin textures on all visible faces, shot from across-the-table angle suggesting phone documenting moment, authentic non-staged composition, slight grain texture, single-gender group composition
+NEGATIVE PROMPT
+mixed-gender intimate framing, posed group photo, fashion model expressions, smooth plastic skin, distorted faces, multiple people with same face, restaurant Western style, alcohol, AI look, watermark, text
+VIDEO MOTION PROMPT
+Friends continue conversation with natural gesture, slight laughter motion, hands occasionally reaching for coffee, ambient café sounds, candid pacing, 5 seconds
+SAUDI ADAPTATION
+Saudi single-gender social groups cultural norm. Mixed-gender friend groups read as family or romantic which is non-compliant. Saudi cafés have distinct interior aesthetic — warm wood, beige tones, neutral palette.
+JSON — IMAGE
+{ "chain_id": "S07", "technique_family": "TF23", "sectors_applicable": ["F&B","Home"], "compliance_level": "elevated", "compliance_gate": { "single_gender_only": true }, "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+S08  Saudi Workplace Moment — Modern Office
+Saudi professional in modern Saudi corporate office, Vision-2030 era aesthetic.
+FAMILY
+TF23 — Saudi UGC Authentic
+SECTORS
+F&B (coffee, lunch), Retail (professional accessories), Home (office)
+QUALITY TIER
+mid / premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, harvest
+OCCASION
+None
+COMPLIANCE
+standard
+REFERENCE IMAGE
+Recommended
+FREQUENCY
+1-2 per week B2B-leaning brands
+IMAGE PROMPT (FAL.AI)
+Authentic professional photograph of a Saudi {subject_gender} in their late twenties to mid-thirties working at modern open-plan office desk in Riyadh corporate setting, {dress_specification}, laptop open showing slight screen glow, {brand_product} positioned naturally on desk beside laptop, focused expression looking at screen, real skin texture visible, natural office lighting with mix of window daylight and ambient LED, modern minimalist office interior visible slightly out of focus, shot from slightly elevated angle suggesting candid colleague phone capture, authentic non-staged composition, contemporary Saudi business aesthetic
+NEGATIVE PROMPT
+Western business suit fashion model, glamour lighting, oversaturated, posed corporate stock photo, smooth plastic skin, distorted hands, AI look, watermark, text
+VIDEO MOTION PROMPT
+Subject reaches for {brand_product} on desk, brings it slightly closer, slight head turn toward laptop, natural office pace, 5 seconds
+SAUDI ADAPTATION
+Vision 2030 Saudi professional reality. Men can wear thobe (canonical) or modern business casual. Women in professional context wear modest hijab with conservative business attire. Office aesthetic modern minimalist Saudi (NEOM-adjacent), not 1990s American corporate.
+JSON — IMAGE
+{ "chain_id": "S08", "technique_family": "TF23", "sectors_applicable": ["F&B","Retail","Home"], "compliance_level": "standard", "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+S09  Saudi Mother & Daughter Moment
+Saudi mother in her forties and adult daughter in her twenties together. Generational warmth. Modest hijab on both.
+FAMILY
+TF23 — Saudi UGC Authentic
+SECTORS
+F&B (family dining, gifting), Beauty (skincare, traditional), Home
+QUALITY TIER
+mid
+IMAGE MODEL
+fal-ai/flux-pro/v1.1  ·  $0.05
+VIDEO VARIANT
+fal-ai/kling-video/v1.6/pro/image-to-video  ·  $0.35 (5s)
+INTENT
+grow, defend
+OCCASION
+mother's day, eid
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Not required
+FREQUENCY
+Weekly for family-oriented brands, daily during gifting occasions
+IMAGE PROMPT (FAL.AI)
+Authentic warm candid photograph of a Saudi mother in her late forties and her adult daughter in her mid-twenties together in soft warm interior setting, both wearing modest hijab in coordinated earth-tone abayas, mother's hijab in beige or soft taupe daughter in slightly more contemporary cream or warm beige, both with real visible skin texture and natural complexion showing age difference authentically, candid moment of conversation or shared smile, daughter perhaps holding {brand_product} or both leaning in to look at it together, natural golden-hour window light, warm interior with traditional or contemporary Saudi home elements slightly out of focus, shot from across-the-room angle suggesting natural family moment captured by phone, authentic generational warmth non-staged composition
+NEGATIVE PROMPT
+model perfect features both subjects, age inconsistency, plastic skin, AI face failures, oversaturated, posed studio shot, mother daughter look-alike too similar, exposed hair under hijab, immodest dress, intimate physical contact, distorted faces, watermark, text
+VIDEO MOTION PROMPT
+Mother and daughter share warm moment, slight head turns toward each other, gentle conversation gestures, shared smile motion, warm light pulses, generational tenderness pace, 5 seconds
+SAUDI ADAPTATION
+Multi-generational family scenes deeply resonant in Saudi market — signal cultural continuity and family values. Critical: AI tends to make mother characters look like older sisters. Prompt explicitly demands 'showing age difference authentically.'
+JSON — IMAGE
+{ "chain_id": "S09", "technique_family": "TF23", "sectors_applicable": ["F&B","Beauty","Home"], "compliance_level": "elevated", "occasion_affinity": ["mothers_day","eid"], "fal_model": "fal-ai/flux-pro/v1.1", "cost_usd": 0.05, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/kling-video/v1.6/pro/image-to-video", "duration_seconds": 5, "cost_usd": 0.35, "async": true }
+S10  Saudi Outdoor Lifestyle — Heritage Setting
+Saudi subject in heritage outdoor setting (Diriyah, AlUla, Najdi architecture, palm groves). Cultural pride.
+FAMILY
+TF23 — Saudi UGC Authentic
+SECTORS
+Retail (heritage brands), F&B (premium), Beauty (traditional)
+QUALITY TIER
+premium
+IMAGE MODEL
+fal-ai/flux-pro/v1.1-ultra  ·  $0.07
+VIDEO VARIANT
+fal-ai/seedance-2.0  ·  $0.70 (5s with audio)
+INTENT
+launch, defend
+OCCASION
+national_day, founding_day
+COMPLIANCE
+elevated
+REFERENCE IMAGE
+Required
+FREQUENCY
+1-2 per month, daily during national occasions
+IMAGE PROMPT (FAL.AI)
+Cinematic authentic photograph of a Saudi {subject} in their early thirties standing in traditional Najdi heritage setting with mudbrick architecture or palm grove visible in background suggesting Diriyah or Najd region at golden hour just before sunset, {dress_specification}, holding or interacting with {brand_product} naturally, warm directional golden-hour light from low angle casting long shadows, real skin texture with natural complexion showing slight desert tan, candid contemplative expression looking off-frame, authentic cultural setting non-staged composition, hyper-realistic textures on traditional architecture and natural Saudi landscape elements, shot on 50mm at f/2.8 with soft bokeh in background, no tourist framing
+NEGATIVE PROMPT
+tourist photograph aesthetic, model fashion shoot, oversaturated colors, AI face failures, distorted architecture, smooth plastic skin, Egyptian or Levantine architecture details, palm trees that look tropical not Saudi, watermark, text, posed fashion model, drone shot
+VIDEO MOTION PROMPT
+Subject slowly turns head taking in heritage view, slight smile of pride, golden light shifts gently as if sun moving, ambient soft desert wind, cultural pride pace, 5 seconds
+SAUDI ADAPTATION
+Most culturally weighted UGC chain. Heritage settings (Najdi mudbrick from Diriyah, AlUla sandstone, palm groves of Al-Ahsa) signal authentic Saudi-ness. Critical: Najdi architecture is mudbrick with distinct geometric patterns and triangular details, NOT Egyptian sandstone, NOT Moroccan zellige, NOT Levantine arches. Auto-triggers during National Day (Sep 23) and Founding Day (Feb 22).
+JSON — IMAGE
+{ "chain_id": "S10", "technique_family": "TF23", "sectors_applicable": ["Retail","F&B","Beauty"], "compliance_level": "elevated", "occasion_affinity": ["national_day","founding_day"], "fal_model": "fal-ai/flux-pro/v1.1-ultra", "reference_image": { "required": true }, "cost_usd": 0.07, "active": true }
+JSON — VIDEO
+{ "fal_model": "fal-ai/seedance-2.0", "duration_seconds": 5, "cost_usd": 0.70, "audio": true, "async": true }
+Part 3 — System migration spec
+To make technique-organized chains plus image-to-video variants work end-to-end, six components need updates. None are breaking changes — all additive. Existing chains continue functioning during migration.
+Migration 1 — Supabase chains table
+Add five columns. Back-fill existing 26 chains with defaults.
+ALTER TABLE chains ADD COLUMN technique_family TEXT NOT NULL DEFAULT 'TF01';
+ALTER TABLE chains ADD COLUMN sectors_applicable TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE chains ADD COLUMN production_quality_tier TEXT NOT NULL DEFAULT 'universal';
+ALTER TABLE chains ADD COLUMN visual_style_tags TEXT[] DEFAULT '{}';
+ALTER TABLE chains ADD COLUMN video_variant JSONB DEFAULT NULL;
+-- Back-fill existing 26 chains:
+UPDATE chains SET sectors_applicable = ARRAY[sector]
+  WHERE sectors_applicable = '{}';
+UPDATE chains SET production_quality_tier =
+  CASE WHEN fal_model LIKE '%pro%' THEN 'premium'
+       WHEN fal_model LIKE '%ultra%' THEN 'luxury'
+       ELSE 'universal' END
+  WHERE production_quality_tier = 'universal';
+Migration 2 — BrandDNA Family A schema
+Add fields powering eligible-chains filtering.
+// BrandDNA.A — additions
+{
+  "archetype_primary": "Caregiver | Everyman | Lover | Creator | Hero | ...",
+  "archetype_secondary": "optional second archetype",
+  "lifecycle_stage": "pre_launch | launch | growth | maturity | recovery",
+  "visual_style_preference": ["TF03","TF07","TF14"],   // technique family IDs
+  "production_quality_tier": "budget | mid | premium | luxury",
+  "asset_dependency_tolerance": "high | medium | low",
+  "face_visibility_permission": true,
+  "format_preference": "static_default | video_default | mixed"
+}
+Migration 3 — brand_eligible_chains pre-computed view
+New table holds pre-filtered chain list per brand. Updated at onboarding and when relevant BrandDNA fields change.
+CREATE TABLE brand_eligible_chains (
+  brand_id TEXT NOT NULL,
+  chain_id TEXT REFERENCES chains(chain_id),
+  eligibility_score NUMERIC(4,2),
+  static_eligible BOOLEAN DEFAULT TRUE,
+  video_eligible BOOLEAN DEFAULT FALSE,
+  last_computed_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (brand_id, chain_id)
+);
+CREATE INDEX idx_brand_eligible_score
+  ON brand_eligible_chains(brand_id, eligibility_score DESC);
+Migration 4 — C-Suite agent updates
+CEO agent now queries brand_eligible_chains rather than re-filtering every generation. Reads BrandDNA.A.visual_style_preference to weight technique families. Reads BrandDNA.A.format_preference to default static or video.
+COO agent now reads chain.video_variant alongside chain.positive_prompt. When video requested, assembles both image prompt (generates first frame) and video motion prompt (extends to 5-7 second clip). Sends both to N8N-V01 sequentially.
+CCO agent checks chain.compliance_level against BrandDNA.B.compliance_requirements. For TF23 Saudi UGC chains specifically, runs additional checks: modest fashion verification, single-gender group enforcement, face-visibility permission, no-religious-symbols verification.
+Migration 5 — n8n workflow updates
+N8N-V01 gains sync vs async branch determined by chain.video_variant presence and format selected. Static runs sync (8-25 sec). Video runs async with polling (45-90 sec).
+// N8N-V01 routing pseudocode
+if (request.format === 'video' && chain.video_variant) {
+  // Step 1: Generate static image (sync)
+  const image = await falApi.imageGenerate({
+    model: chain.fal_model,
+    prompt: assembledImagePrompt,
+    reference_image: chain.reference_image
+  });
+  // Step 2: Static as first frame for video (async)
+  const videoJob = await falApi.imageToVideoSubmit({
+    model: chain.video_variant.fal_model,
+    first_frame_url: image.cdn_url,
+    motion_prompt: chain.video_variant.motion_prompt,
+    duration_seconds: chain.video_variant.duration_seconds
+  });
+  // Step 3: Poll until complete
+  const video = await pollUntilComplete(videoJob.id, 6);
+  // Step 4: Reupload to Supabase Storage
+  return await uploadToSupabase(video.cdn_url);
+} else {
+  // Sync image only
+  return await falApi.imageGenerate({...});
+}
+Migration 6 — Content Maker dashboard
+Dashboard gains 'Static or Video' toggle per chain selection. Default state determined by BrandDNA.A.format_preference and tier allocation. Cost displayed transparently on both options. Pro tier shows both freely; Starter shows video as locked except for occasion auto-triggers.
+Migration timing
+All six migrations can run in parallel and are fully additive. No downtime required. Existing client calendars continue running on existing chains during migration. New chains and video variants become available as each migration completes. Recommended sequence: Migration 1 first (chains table), then Migration 2 (BrandDNA), then Migrations 3-6 in parallel.
+OGZ STUDIOS · OPENCLAW · CHAIN LIBRARY v2.0
+Confidential · 11 May 2026 · for Weiblock + Claude Code

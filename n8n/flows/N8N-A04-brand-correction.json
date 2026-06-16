@@ -1,0 +1,1072 @@
+﻿{
+  "name": "N8N-A04 — Brand Correction (rev6-batch)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "openclaw-correction",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "trigger-webhook",
+      "name": "Webhook · /openclaw-correction",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Node 2: Verify HMAC + validate inbound payload (rev7 — partial-batch) ───\n// Accepts either:\n//   { brand_id, fields: [{field_name, current_value, corrected_value, reasoning}] }  (batch)\n//   { brand_id, field_name, current_value, corrected_value, reasoning }               (legacy single)\n// Per-field validation: invalid fields are SKIPPED with a reason logged — valid\n// fields continue. Only hard-reject when ZERO valid fields remain.\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\n\nconst headers = $input.first().json.headers || {};\nconst given   = headers['x-n8n-signature'];\nconst ts      = headers['x-n8n-timestamp'];\nconst rid     = headers['x-n8n-request-id'];\n\nif (!given || !ts || !rid) {\n  return { json: { _rejected: true, _rejection_reason: 'Missing required HMAC headers', brand_id: null, fields: [] } };\n}\n\nconst drift = Math.abs(Date.now() - new Date(ts).getTime());\nif (drift > 24 * 60 * 60 * 1000) {\n  return { json: { _rejected: true, _rejection_reason: `Timestamp drift too large (${drift}ms)`, brand_id: null, fields: [] } };\n}\n\nconst rawBody  = JSON.stringify($input.first().json.body);\nconst expected = crypto.createHmac('sha256', SECRET).update(rawBody).digest('hex');\nif (expected !== given) {\n  return { json: { _rejected: true, _rejection_reason: 'HMAC signature mismatch', brand_id: null, fields: [] } };\n}\n\nconst body = $input.first().json.body || {};\n\nif (!body.brand_id) {\n  return { json: { _rejected: true, _rejection_reason: 'brand_id is required', brand_id: null, fields: [] } };\n}\n\n// Complete allowlist — kept in sync with apps/web/src/app/actions/brand-correction.ts\nconst ALLOWED_FIELDS = new Set([\n  'arabic_dialect','price_position','formality_level','humor_tolerance',\n  'religious_sensitivity','bilingual_ratio','brand_differentiator',\n  'primary_kpi_type','primary_channel','ramadan_relevance',\n  'tone_anti_attribute_ids','archetype_primary','archetype_secondary',\n  'lifecycle_stage','intent_state','primary_color_hex',\n  'audience_description_ar','audience_age_range','audience_language_preference',\n  'sub_sector','region_primary','tone_register','archetype_family',\n  'founding_story','owner_values','comfort_on_camera','way_of_speaking',\n  'communication_style','brand_goals','posting_rhythm','caption_style',\n  'permission_level','cultural_tension_owned','goal_phase','brave_safe_default',\n  'national_day_relevance','eid_fitr_relevance','eid_adha_relevance','founding_day_relevance',\n  'emotions','occasions_ranked','lifestyle','music','music_link','brand_refs',\n  'price_nums','vision','vision_text','tagline','cust_quote','caption_ex',\n  'metric','anything','custom_restriction','custom_occasion',\n  'scale_minmax','scale_quietloud','scale_localglobal','scale_tradmod',\n  'social','platforms','name_meaning','hero_why','lifecycle',\n  'respected_brands','respected_why','goal','problems',\n  'founded_year','brand_name_en','city_primary','sector',\n  // AudienceProfile namespaced variants\n  'AudienceProfile.description_ar','AudienceProfile.age_range','AudienceProfile.language_preference',\n]);\n\n// Normalise to a fields array regardless of input shape\nlet rawFields;\nif (Array.isArray(body.fields) && body.fields.length > 0) {\n  rawFields = body.fields;\n} else if (body.field_name) {\n  rawFields = [{ field_name: body.field_name, current_value: body.current_value ?? null, corrected_value: body.corrected_value, reasoning: body.reasoning ?? null }];\n} else {\n  return { json: { _rejected: true, _rejection_reason: 'Either fields[] or field_name is required', brand_id: body.brand_id, fields: [] } };\n}\n\n// Validate each field — skip invalid ones, continue with valid ones\nconst validatedFields = [];\nconst skippedFields = [];\nfor (const f of rawFields) {\n  if (!f.field_name) { skippedFields.push({ field_name: '?', reason: 'missing field_name' }); continue; }\n  if (!ALLOWED_FIELDS.has(f.field_name)) { skippedFields.push({ field_name: f.field_name, reason: 'not a correctable BrandDNA field' }); continue; }\n  if (!f.corrected_value && f.corrected_value !== 0) { skippedFields.push({ field_name: f.field_name, reason: 'corrected_value is required' }); continue; }\n  const correctedNorm = String(f.corrected_value ?? '').trim();\n  validatedFields.push({\n    field_name:      f.field_name,\n    current_value:   f.current_value  || null,\n    corrected_value: correctedNorm,\n    reasoning:       f.reasoning      || null,\n  });\n}\n\n// Hard-reject only if nothing valid remains\nif (validatedFields.length === 0) {\n  const reason = skippedFields.length > 0\n    ? skippedFields.map(s => `${s.field_name}: ${s.reason}`).join('; ')\n    : 'No valid fields to process';\n  return { json: { _rejected: true, _rejection_reason: reason, brand_id: body.brand_id, fields: [], skipped_fields: skippedFields } };\n}\n\nconst fieldNames = validatedFields.map(f => f.field_name);\n\nreturn { json: {\n  _rejected:      false,\n  brand_id:       body.brand_id,\n  slug:           body.slug || null,\n  fields:         validatedFields,\n  field_names:    fieldNames,\n  skipped_fields: skippedFields,\n  request_id:     rid,\n  received_at:    new Date().toISOString(),\n}};"
+      },
+      "id": "verify-hmac",
+      "name": "Verify HMAC + parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json._rejected }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-valid",
+      "name": "Validation error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        560,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validation-error path: emit correction_rejected stage so the UI\n// immediately shows the error instead of staying stuck on 'Queued'.\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst d      = $json;\nconst reason = d._rejection_reason || 'Validation failed';\n\nlet stageBody = null;\nlet stageHeaders = null;\nif (d.brand_id) {\n  const sb = JSON.stringify({ brand_id: d.brand_id, stage: 'correction_rejected', fields: d.fields || [], metadata: { rejection_reason: reason } });\n  const sts = new Date().toISOString();\n  const ssig = crypto.createHmac('sha256', SECRET).update(sb).digest('hex');\n  stageBody = sb;\n  stageHeaders = { 'content-type': 'application/json', 'x-n8n-signature': ssig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': sts };\n}\n\nreturn { json: { ...d, _reason: reason, _stage_body: stageBody, _stage_headers: stageHeaders } };"
+      },
+      "id": "build-validation-error",
+      "name": "Build validation error response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/correction/stage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "timeout": 5000,
+          "neverError": true
+        }
+      },
+      "id": "http-stage-validation-error",
+      "name": "POST · stage correction_rejected (validation)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        920,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 400,
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $('Build validation error response').first().json._reason, brand_id: $('Build validation error response').first().json.brand_id }) }}"
+      },
+      "id": "respond-validation-error",
+      "name": "Respond · 400 Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Emit stage: correction_received — UI shows 'Received' for ALL fields\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst d = $json;\nconst body = JSON.stringify({ brand_id: d.brand_id, stage: 'correction_received', fields: d.field_names });\nconst ts = new Date().toISOString();\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn { json: { ...d,\n  _stage_body: body,\n  _stage_headers: { 'content-type': 'application/json', 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': ts },\n}};"
+      },
+      "id": "emit-received",
+      "name": "Emit · correction_received",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        740,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/correction/stage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "timeout": 5000,
+          "neverError": true
+        }
+      },
+      "id": "http-stage-received",
+      "name": "POST · stage correction_received",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        920,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build CEO classify body + emit stage: ceo_classifying\n// CEO gets ALL fields in trigger_payload so it can nominate memory writes for each.\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst d = $('Verify HMAC + parse').first().json;\nconst stageBody = JSON.stringify({ brand_id: d.brand_id, stage: 'ceo_classifying', fields: d.field_names });\nconst stageTs  = new Date().toISOString();\nconst stageSig = crypto.createHmac('sha256', SECRET).update(stageBody).digest('hex');\nconst evidenceBundleStates = {\n  arabic_dialect:        'inferred_medium',\n  price_position:        'inferred_medium',\n  formality_level:       'inferred_medium',\n  humor_tolerance:       'inferred_medium',\n  religious_sensitivity: 'inferred_medium',\n  bilingual_ratio:       'inferred_medium',\n  brand_differentiator:  'inferred_medium',\n  primary_kpi_type:      'inferred_medium',\n  primary_channel:       'inferred_medium',\n  ramadan_relevance:     'inferred_medium',\n  archetype_primary:     'inferred_medium',\n  lifecycle_stage:       'inferred_medium',\n};\n// Pass the full fields array so CEO can produce nominations for each\nconst ceoBody = JSON.stringify({\n  flow_id:  'N8N-A04',\n  brand_id: d.brand_id,\n  payload:  {\n    request_type: 'brand_correction',\n    trigger_payload: {\n      fields:        d.fields,\n      submitted_via: 'correction_form_batch',\n    },\n    evidence_bundle_states:  evidenceBundleStates,\n    occasion_flags:          ['none'],\n    current_month_spend_usd: 0,\n    monthly_ceiling_usd:     50,\n  },\n});\nconst ceoTs  = new Date().toISOString();\nconst ceoSig = crypto.createHmac('sha256', SECRET).update(ceoBody).digest('hex');\nreturn { json: { ...d,\n  _stage_body: stageBody,\n  _stage_headers: { 'content-type': 'application/json', 'x-n8n-signature': stageSig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': stageTs },\n  _ceo_raw_body: ceoBody,\n  _ceo_headers: { 'content-type': 'application/json', 'x-n8n-signature': ceoSig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': ceoTs },\n}};"
+      },
+      "id": "build-ceo-body",
+      "name": "Build CEO body + emit ceo_classifying",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/correction/stage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "timeout": 5000,
+          "neverError": true
+        }
+      },
+      "id": "http-stage-classifying",
+      "name": "POST · stage ceo_classifying",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1280,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/agents/ceo/classify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $('Build CEO body + emit ceo_classifying').first().json._ceo_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $('Build CEO body + emit ceo_classifying').first().json._ceo_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $('Build CEO body + emit ceo_classifying').first().json._ceo_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $('Build CEO body + emit ceo_classifying').first().json._ceo_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Build CEO body + emit ceo_classifying').first().json._ceo_raw_body }}",
+        "options": {
+          "timeout": 45000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "retry": {
+            "retryOnFailure": false
+          }
+        }
+      },
+      "id": "http-ceo",
+      "name": "POST · /api/agents/ceo/classify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1460,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse CEO response + decide approved/rejected\nconst raw      = $('POST · /api/agents/ceo/classify').first().json;\nconst inbound  = $('Verify HMAC + parse').first().json;\n\nconst ok       = raw?.ok === true;\nconst decision = raw?.result?.decision ?? {};\nconst memory   = raw?.result?.memory   ?? {};\n\nconst nominated = (memory.enqueued ?? 0) + (memory.skipped_duplicates ?? 0);\nconst hasWork   = nominated > 0;\nconst approved  = ok && hasWork;\n\nconst rejectionReason = !ok\n  ? (raw?.error ?? 'CEO classify call failed')\n  : !hasWork\n    ? 'CEO did not produce any nominations for this correction'\n    : null;\n\nreturn { json: {\n  ...inbound,\n  _ceo_resp:         raw,\n  _decision:         decision,\n  _approved:         approved,\n  _enqueued:         memory.enqueued           ?? 0,\n  _duplicates:       memory.skipped_duplicates ?? 0,\n  _dropped:          memory.dropped            ?? 0,\n  _routing_id:       decision.decision_id      ?? null,\n  _rejection_reason: rejectionReason,\n}};"
+      },
+      "id": "parse-ceo",
+      "name": "Parse CEO response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json._approved }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-approved",
+      "name": "CEO approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1820,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Approved path: emit stage ceo_approved + build memory body\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst d = $('Verify HMAC + parse').first().json;\nconst stageBody = JSON.stringify({ brand_id: d.brand_id, stage: 'ceo_approved', fields: d.field_names });\nconst stageTs  = new Date().toISOString();\nconst stageSig = crypto.createHmac('sha256', SECRET).update(stageBody).digest('hex');\nconst memBody  = JSON.stringify({ flow_id: 'N8N-A04', batch_size: 50 });\nconst memTs    = new Date().toISOString();\nconst memSig   = crypto.createHmac('sha256', SECRET).update(memBody).digest('hex');\nreturn { json: { ...d,\n  _ceo_resp:   $('Parse CEO response').first().json._ceo_resp,\n  _routing_id: $('Parse CEO response').first().json._routing_id,\n  _stage_body: stageBody,\n  _stage_headers: { 'content-type': 'application/json', 'x-n8n-signature': stageSig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': stageTs },\n  _mem_raw_body: memBody,\n  _mem_headers: { 'content-type': 'application/json', 'x-n8n-signature': memSig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': memTs },\n}};"
+      },
+      "id": "build-mem-body",
+      "name": "Build Memory body + emit ceo_approved",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/correction/stage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "timeout": 5000,
+          "neverError": true
+        }
+      },
+      "id": "http-stage-approved",
+      "name": "POST · stage ceo_approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2180,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/memory/process",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $('Build Memory body + emit ceo_approved').first().json._mem_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $('Build Memory body + emit ceo_approved').first().json._mem_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $('Build Memory body + emit ceo_approved').first().json._mem_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $('Build Memory body + emit ceo_approved').first().json._mem_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Build Memory body + emit ceo_approved').first().json._mem_raw_body }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "retry": {
+            "retryOnFailure": true,
+            "maxTries": 2,
+            "waitBetweenTries": 2000
+          }
+        }
+      },
+      "id": "http-memory",
+      "name": "POST · /api/memory/process",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2360,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Qdrant invalidate + emit stage memory_writing\nconst crypto   = require('crypto');\nconst SECRET   = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst d        = $('Verify HMAC + parse').first().json;\nconst qBody    = JSON.stringify({ brand_id: d.brand_id, flow_id: 'N8N-A04' });\nconst qTs      = new Date().toISOString();\nconst qSig     = crypto.createHmac('sha256', SECRET).update(qBody).digest('hex');\nconst stageBody = JSON.stringify({ brand_id: d.brand_id, stage: 'memory_writing', fields: d.field_names });\nconst stageTs  = new Date().toISOString();\nconst stageSig = crypto.createHmac('sha256', SECRET).update(stageBody).digest('hex');\nreturn { json: {\n  brand_id: d.brand_id,\n  fields:   d.fields,\n  field_names: d.field_names,\n  _mem_result: $('POST · /api/memory/process').first().json?.result || {},\n  _qdrant_raw_body: qBody,\n  _qdrant_headers: { 'content-type': 'application/json', 'x-n8n-signature': qSig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': qTs },\n  _stage_body: stageBody,\n  _stage_headers: { 'content-type': 'application/json', 'x-n8n-signature': stageSig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': stageTs },\n}};"
+      },
+      "id": "sign-qdrant",
+      "name": "Build qdrant + emit memory_writing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2540,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/correction/stage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $('Build qdrant + emit memory_writing').first().json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $('Build qdrant + emit memory_writing').first().json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $('Build qdrant + emit memory_writing').first().json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $('Build qdrant + emit memory_writing').first().json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Build qdrant + emit memory_writing').first().json._stage_body }}",
+        "options": {
+          "timeout": 5000,
+          "neverError": true
+        }
+      },
+      "id": "http-stage-memory",
+      "name": "POST · stage memory_writing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2720,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/vectors/invalidate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $('Build qdrant + emit memory_writing').first().json._qdrant_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $('Build qdrant + emit memory_writing').first().json._qdrant_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $('Build qdrant + emit memory_writing').first().json._qdrant_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $('Build qdrant + emit memory_writing').first().json._qdrant_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Build qdrant + emit memory_writing').first().json._qdrant_raw_body }}",
+        "options": {
+          "timeout": 10000,
+          "neverError": true
+        }
+      },
+      "id": "http-qdrant",
+      "name": "POST · /api/vectors/invalidate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2900,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build correction_applied callback — includes all field names in payload\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst d      = $('Verify HMAC + parse').first().json;\nconst memR   = $('POST · /api/memory/process').first().json?.result || {};\nconst cbBody = JSON.stringify({\n  event_type: 'correction_applied',\n  flow_id:    'N8N-A04',\n  brand_id:   d.brand_id,\n  payload: {\n    fields:          d.field_names,\n    memory_written:  memR.written  ?? 0,\n    memory_rejected: memR.rejected ?? 0,\n    memory_skipped:  memR.skipped  ?? 0,\n  },\n});\nconst ts  = new Date().toISOString();\nconst sig = crypto.createHmac('sha256', SECRET).update(cbBody).digest('hex');\nreturn { json: { ...d,\n  _cb_raw_body: cbBody,\n  _cb_headers: { 'content-type': 'application/json', 'x-n8n-signature': sig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': ts },\n}};"
+      },
+      "id": "build-callback",
+      "name": "Build status callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3080,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._cb_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._cb_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._cb_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._cb_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._cb_raw_body }}",
+        "options": {
+          "timeout": 10000,
+          "neverError": true
+        }
+      },
+      "id": "http-callback",
+      "name": "POST · /api/webhooks/n8n (correction_applied)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3260,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, brand_id: $('Verify HMAC + parse').first().json.brand_id, fields: $('Verify HMAC + parse').first().json.field_names, memory_written: ($('POST · /api/memory/process').first().json?.result?.written ?? 0) }) }}"
+      },
+      "id": "respond-ok",
+      "name": "Respond · 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        3440,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rejected path: build rejection callback + ceo_rejected stage emit\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst d    = $('Verify HMAC + parse').first().json;\nconst ceoR = $('Parse CEO response').first().json;\nconst reason = ceoR._rejection_reason || 'CEO did not approve this correction';\nconst cbBody = JSON.stringify({\n  event_type: 'correction_rejected',\n  flow_id:    'N8N-A04',\n  brand_id:   d.brand_id,\n  payload: {\n    fields:           d.field_names,\n    rejection_reason: reason,\n    human_gate:       ceoR._decision?.human_gate_required ?? false,\n    anomaly_flag:     ceoR._decision?.anomaly_flag ?? null,\n  },\n});\nconst cbTs  = new Date().toISOString();\nconst cbSig = crypto.createHmac('sha256', SECRET).update(cbBody).digest('hex');\nconst stageBody = JSON.stringify({ brand_id: d.brand_id, stage: 'correction_rejected', fields: d.field_names, metadata: { rejection_reason: reason } });\nconst stageTs  = new Date().toISOString();\nconst stageSig = crypto.createHmac('sha256', SECRET).update(stageBody).digest('hex');\nreturn { json: { ...d,\n  _rej_reason:  reason,\n  _stage_body:  stageBody,\n  _stage_headers: { 'content-type': 'application/json', 'x-n8n-signature': stageSig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': stageTs },\n  _cb_raw_body: cbBody,\n  _cb_headers: { 'content-type': 'application/json', 'x-n8n-signature': cbSig, 'x-n8n-request-id': crypto.randomUUID(), 'x-n8n-timestamp': cbTs },\n}};"
+      },
+      "id": "build-reject-cb",
+      "name": "Build rejection callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/correction/stage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._stage_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._stage_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._stage_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._stage_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._stage_body }}",
+        "options": {
+          "timeout": 5000,
+          "neverError": true
+        }
+      },
+      "id": "http-stage-rejected",
+      "name": "POST · stage correction_rejected",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2180,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $('Build rejection callback').first().json._cb_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $('Build rejection callback').first().json._cb_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $('Build rejection callback').first().json._cb_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $('Build rejection callback').first().json._cb_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Build rejection callback').first().json._cb_raw_body }}",
+        "options": {
+          "timeout": 10000,
+          "neverError": true
+        }
+      },
+      "id": "http-reject-cb",
+      "name": "POST · /api/webhooks/n8n (correction_rejected)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2360,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, brand_id: $('Verify HMAC + parse').first().json.brand_id, fields: $('Verify HMAC + parse').first().json.field_names, rejection_reason: $('Build rejection callback').first().json._rej_reason }) }}"
+      },
+      "id": "respond-rejected",
+      "name": "Respond · 200 Rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2540,
+        680
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "On Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build HMAC-signed S03 alert — fires on any unhandled A04 error.\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst e = $json;\n\nlet brand_id = null;\ntry { brand_id = $('Verify HMAC + parse').first().json.brand_id ?? null; } catch (_) {}\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst makeUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n  const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\n\nconst body = JSON.stringify({\n  anomaly_id:   makeUUID(),\n  anomaly_type: 'n8n_failure',\n  severity:     'error',\n  source_flow:  'N8N-A04',\n  brand_id,\n  message:      e.execution?.error?.message || 'A04 brand-correction flow failed',\n  details: {\n    failed_node:  e.execution?.lastNodeExecuted ?? null,\n    error_name:   e.execution?.error?.name      ?? null,\n    execution_id: e.execution?.id               ?? null,\n  },\n  timestamp: new Date().toISOString(),\n});\n\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  _body: body,\n  _headers: {\n    'content-type':     'application/json',\n    'x-n8n-signature':  sig,\n    'x-n8n-request-id': `${$execution.id}-err-a04`,\n    'x-n8n-timestamp':  new Date().toISOString(),\n  },\n};"
+      },
+      "id": "error-build-alert",
+      "name": "Build S03 alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogzstudios.app.n8n.cloud/webhook-test/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "timeout": 10000,
+          "neverError": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "error-post-s03",
+      "name": "POST · S03 anomaly-alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        600,
+        900
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook · /openclaw-correction": {
+      "main": [
+        [
+          {
+            "node": "Verify HMAC + parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify HMAC + parse": {
+      "main": [
+        [
+          {
+            "node": "Validation error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation error?": {
+      "main": [
+        [
+          {
+            "node": "Build validation error response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Emit · correction_received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build validation error response": {
+      "main": [
+        [
+          {
+            "node": "POST · stage correction_rejected (validation)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage correction_rejected (validation)": {
+      "main": [
+        [
+          {
+            "node": "Respond · 400 Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Emit · correction_received": {
+      "main": [
+        [
+          {
+            "node": "POST · stage correction_received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage correction_received": {
+      "main": [
+        [
+          {
+            "node": "Build CEO body + emit ceo_classifying",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build CEO body + emit ceo_classifying": {
+      "main": [
+        [
+          {
+            "node": "POST · stage ceo_classifying",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage ceo_classifying": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/agents/ceo/classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/agents/ceo/classify": {
+      "main": [
+        [
+          {
+            "node": "Parse CEO response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse CEO response": {
+      "main": [
+        [
+          {
+            "node": "CEO approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CEO approved?": {
+      "main": [
+        [
+          {
+            "node": "Build Memory body + emit ceo_approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build rejection callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Memory body + emit ceo_approved": {
+      "main": [
+        [
+          {
+            "node": "POST · stage ceo_approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage ceo_approved": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/memory/process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/memory/process": {
+      "main": [
+        [
+          {
+            "node": "Build qdrant + emit memory_writing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build qdrant + emit memory_writing": {
+      "main": [
+        [
+          {
+            "node": "POST · stage memory_writing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage memory_writing": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/vectors/invalidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/vectors/invalidate": {
+      "main": [
+        [
+          {
+            "node": "Build status callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build status callback": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/webhooks/n8n (correction_applied)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/webhooks/n8n (correction_applied)": {
+      "main": [
+        [
+          {
+            "node": "Respond · 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build rejection callback": {
+      "main": [
+        [
+          {
+            "node": "POST · stage correction_rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · stage correction_rejected": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/webhooks/n8n (correction_rejected)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/webhooks/n8n (correction_rejected)": {
+      "main": [
+        [
+          {
+            "node": "Respond · 200 Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On Error": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build S03 alert": {
+      "main": [
+        [
+          {
+            "node": "POST · S03 anomaly-alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "errorWorkflow": "N8N-S03",
+    "timezone": "Asia/Riyadh"
+  },
+  "pinData": {},
+  "versionId": "6.0.0",
+  "id": "N8N-A04",
+  "active": true,
+  "_meta": {
+    "description": "Brand correction pipeline (rev6-batch). Accepts fields[] array OR legacy single field_name. All changed fields submitted as ONE n8n trigger → ONE CEO call → one set of stage events applying to ALL fields simultaneously → one correction_applied callback covering all field names. Stage events carry fields[] list so the UI updates all pending field rows at once."
+  }
+}

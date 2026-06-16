@@ -1,0 +1,1651 @@
+﻿{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// ── Build Brand-Months (3-Month Rolling fan-out, A06 'Build branches' pattern) ──\n// Expands each brand into N items, one per month_offset, so the existing per-brand\n// generation chain runs ONCE PER (brand, month) — producing 3 calendars from a\n// SINGLE A01 run. rolling mode decides how many months:\n//   'initial' (strategy-approval / onboarding / monthly seed) → [0,1,2] = full runway\n//   'append'  (1st-of-month cron)                              → [2]     = new far month\n//   'single'  (nightly weekly upkeep / explicit offset)        → [month_offset]\nconst cfg = $('Prepare Batch Config').first().json;\nconst rolling = cfg.rolling || 'single';\nconst offsets = rolling === 'initial' ? [0,1,2]\n              : rolling === 'append'  ? [2]\n              : [ (typeof cfg.month_offset==='number' ? cfg.month_offset : 0) ];\nconst out = [];\nfor (const item of $input.all()) {\n  const b = item.json;\n  if (!b || !b.brand_id) continue;\n  for (const off of offsets) out.push({ json: { ...b, _month_offset: off } });\n}\nreturn out;\n"
+      },
+      "id": "5aa54843-d5df-4c46-9d36-1d4ef25411f9",
+      "name": "Build Brand-Months2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4400,
+        27904
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 3-Month Rolling — 1st-of-month cron path. Sends rolling:'append' so A01's\n// Build Brand-Months fan-out appends ONLY the new far month (+2); months 0 & 1\n// already exist. batch_type MONTHLY = process all active brands.\nreturn [{ json: { body: { rolling: 'append', batch_type: 'MONTHLY', source: 'rolling-cron' } } }];"
+      },
+      "id": "55ee364b-f32a-49ef-ae29-db2d336c2b8e",
+      "name": "Set Rolling Offset",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5888,
+        27920
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Skeleton Builder (Decoupled Producer) ─────────────────────────────────────\n// Pure deterministic assembly. NO image generation, NO HTTP. One brand per run.\n// Folds in the old Merge Posts mapping + Spine pre-gen compliance.\n// Output: rows for ONE bulk insert into calendar_posts.\n//   ALL posts → 'pending_visual' (every post generates an image; compliance\n//   status = 'pending_visual' → everything else; the V01 Worker will claim it.\nconst crypto = require('crypto');\nconst ARABIC_RE = /[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/;\n\nconst brandData = $('Prepare Brand Data3').last().json;\n\n// posts: prefer Match Chain output, then DeepSeek\nlet posts_raw = [];\ntry {\n  const m = $('Call: Match Chain').last().json || {};\n  posts_raw = (m.result && m.result.posts) || m.posts || [];\n} catch(_) {}\nif (!posts_raw.length) { try { posts_raw = $('Call: DeepSeek Generate').last().json?.result?.posts || []; } catch(_) {} }\n\n// plan slots (chain_id + format)\nlet planSlots = [];\ntry { const ps = $('Call: Plan Slots3').last().json || {}; planSlots = (ps.result || ps).slots || []; } catch(_) {}\n\n// CCO scores\nlet ccoResult = [];\ntry { ccoResult = $('Call: CCO Quality Check').last().json.result || []; } catch(_) {}\n\n// CEO gate\nlet human_gate = false, confidence_mode = 'Standard';\ntry { human_gate = $('Call: CEO Confidence Gate').last().json.result?.decision?.human_gate_required || false; } catch(_) {}\n// Per-post human-override holds (the 11 triggers, Doc §6.4) computed deterministically\n// by /api/agents/ceo/confidence-gate. Map post_id -> [{trigger,reason,detail}].\nlet humanOverridesByPost = {};\ntry { humanOverridesByPost = $('Call: CEO Confidence Gate').last().json.result?.human_overrides?.per_post || {}; } catch(_) {}\n// Per-post pillar scores (Doc §9.3) from confidence-gate: visual/caption/brand_fit/occasion.\n// Stored in calendar_posts.flags.pillars so score-insight.tsx can show the 4-pillar breakdown.\nlet pillarsByPost = {};\ntry {\n  const ps = $('Call: CEO Confidence Gate').last().json.result?.post_scores || $('Call: CEO Confidence Gate').last().json.post_scores || [];\n  for (const p of ps) { if (p?.post_id && p?.pillars) pillarsByPost[p.post_id] = p.pillars; }\n} catch(_) {}\ntry { confidence_mode = $('Call: CEO Route & Classify3').last().json.result?.decision?.confidence_mode || 'Standard'; } catch(_) {}\n\n// calendar_id from HTTP: Upsert Calendar1 (this node's input)\nconst _calRaw = $input.first().json;\nconst calIn = Array.isArray(_calRaw) ? _calRaw[0] : _calRaw;\nconst calendarId = calIn?.calendar_id || calIn?.id || null;\n\nconst scheduleDates = brandData.schedule_dates || [];\nconst holdThreshold = confidence_mode === 'Cautious' ? 65 : 50;\nconst isMinimal = confidence_mode === 'Minimal';\n\n// ── Spine compliance constants (pre-generation hard blocks) ──\nconst RELIGIOUS_PATTERNS = [\n  /[؀-ۿ].*(?:قرآن|آية|حديث|الصلاة|الزكاة|الحج|سورة|دعاء)/u,\n  /\\b(quran|hadith|prophet\\s+muhammad|pbuh|sallallahu|salah|zakat|islamic\\s+prayer|dua\\b|surah)\\b/i,\n];\nconst GESTURE_HARD_BLOCKS = [\n  'left hand serv','left hand exchang','left hand offer','sole point','sole of foot',\n  'beckoning palm','palm.up beckon','cross.gender contact','cross gender contact',\n  'quran.*mishandl','mishandl.*quran',\n];\n\nfunction getOccasionVisualMotif(occasions){\n  if(!occasions||occasions.length===0) return 'celebratory motion';\n  const o=occasions[0];\n  if(o==='ramadan') return 'warm spiritual motif with crescent and lanterns';\n  if(o==='eid_al_fitr'||o==='eid_al_adha') return 'joyful celebratory motif with stars and lights';\n  if(o==='national_day') return 'patriotic motif with green and gold, Saudi flag elements';\n  if(o==='founding_day') return 'heritage motif with traditional architecture and maps';\n  return 'celebratory motion';\n}\n\nif (!brandData?.brand_id) throw new Error('Skeleton Builder: missing brand_id');\nif (!calendarId)          throw new Error('Skeleton Builder: no calendar_id');\nif (posts_raw.length===0) throw new Error('Skeleton Builder: zero posts for ' + brandData.brand_id);\n\nconst out = posts_raw.map((caption, index) => {\n  const slot = planSlots[index] || {};\n  const sched = scheduleDates[index] || {};\n  // Format source of truth (Doc §9.5, current design): ONE authority per post, never\n  // a union (a union of DeepSeek's + plan-slots' video picks can exceed VIDEO_CAP and\n  // blow the video cost budget). Priority: DeepSeek self-decided `caption.format`\n  // (the current design — \"DeepSeek replaces plan-slots\"); if DeepSeek gave no format\n  // for this post, use plan-slots `slot.format`; else 'image' (doc: normal = image-only).\n  // The old is_video_slot tier heuristic is removed entirely.\n  // FORMAT = SINGLE AUTHORITY: plan-slots (the deterministic doc §9.5 engine) decides\n  // image vs video — NOT DeepSeek. The doc model is: every post defaults to IMAGE, and\n  // plan-slots promotes a small CAPPED set to video based on tier + active occasion +\n  // whether a video chain exists (pickVideoSlots). Letting DeepSeek's per-post\n  // caption.format win (the old `_dsFmt ||` here) let a non-deterministic LLM promote\n  // random posts to video, ignoring VIDEO_CAP/occasion → cost blowups + 'why is THIS a\n  // video?' confusion. DeepSeek owns caption + content_type; format is plan-slots only.\n  const _planFmt = (slot.format === 'image' || slot.format === 'video') ? slot.format : (slot.format_tier === 'video' ? 'video' : null);\n  const format_tier = _planFmt || 'image';\n  // CHAIN AUTHORITY: match-chain (content-aware, post-generation) is the source of\n  // truth — it read this post's caption + visual_brief and picked the meaningful chain.\n  // plan-slots' pre-generation score is only a fallback if match-chain returned nothing.\n  const chain_id = caption.chain_id || slot.chain_id || null;\n\n  const score_obj = Array.isArray(ccoResult) ? (ccoResult.find(s=>s.post_id===caption.post_id) || {}) : {};\n  // FAIL-SAFE (was: default 75 = CLEAN). A missing/malformed CCO result must\n  // NOT silently auto-publish. Score stays null and the post is force-routed\n  // to human review (see needs_review below) so a CCO outage fails CLOSED.\n  const cco_failed = typeof score_obj.score !== 'number';\n  const cco_score = cco_failed ? null : score_obj.score;\n  if (cco_failed) console.warn('[A01] CCO returned no score for post=' + caption.post_id + ' brand=' + brandData.brand_id + ' — holding for review');\n\n  // visual_brief_en — ENGLISH ONLY (Hard Rule #3). Strip any Arabic leak.\n  let visual_brief_en = (caption.visual_brief_en || caption.prompt_en || (brandData.brand_name_en + ' product Saudi Arabia')).trim();\n  if (ARABIC_RE.test(visual_brief_en)) {\n    visual_brief_en = (brandData.brand_name_en || 'product').replace(ARABIC_RE,'').trim() || 'product photography Saudi Arabia';\n  }\n\n  // ── Spine pre-gen compliance → hard_block decision ──\n  const briefLower = visual_brief_en.toLowerCase();\n  const captionText = caption.caption_ar || '';\n  const combined = captionText + ' ' + briefLower;\n  let hard_block = false, hold_reason = null, negpat = score_obj.negpat_flag || 'NONE';\n\n  if ((brandData.religious_sensitivity||'') === 'High') {\n    for (const p of RELIGIOUS_PATTERNS) { if (p.test(combined)) { hard_block=true; hold_reason='compliance_religious_content'; break; } }\n  }\n  if (!hard_block) {\n    for (const kw of GESTURE_HARD_BLOCKS) { if (new RegExp(kw,'i').test(briefLower)) { hard_block=true; hold_reason='gesture_hard_block'; break; } }\n  }\n  if (!hard_block && negpat === 'HARD_BLOCK') { hard_block=true; hold_reason='negpat_hard_block'; }\n  if (!hard_block && (brandData.sector||'').toLowerCase()==='government') { hard_block=true; hold_reason='government_sector'; }\n\n  // ── Merge the 11 deterministic human-override triggers (Doc §6.4) ──\n  // These come from the CEO confidence-gate. They NEVER block generation — the\n  // image is always produced (Point 1); they only force requires_human_review so\n  // the post is routed to /admin/qa with the exact reasons for the human admin.\n  const overrideHolds = humanOverridesByPost[caption.post_id] || [];\n  const overrideHeld = overrideHolds.length > 0;\n  const overrideReason = overrideHeld ? overrideHolds[0].reason : null;\n  const overrideDetails = overrideHolds.map(h => h.detail);\n  // A post is held-for-review if EITHER a pre-gen hard_block OR any override fired.\n  // cco_low_confidence is the existing trigger key for 'score too low / unknown'.\n  const needs_review = hard_block || overrideHeld || cco_failed;\n  const final_hold_reason = hold_reason || overrideReason || (cco_failed ? 'cco_scoring_unavailable' : null);\n\n  const product_descriptor = brandData.brand_differentiator || brandData.brand_name_en || 'product';\n  const palette = (brandData.primary_color_hex||'#000000') + ' and ' + (brandData.secondary_color_hex||'#ffffff');\n  const occasion = (brandData.occasions && brandData.occasions[0] && brandData.occasions[0]!=='none') ? brandData.occasions[0] : '';\n\n  return { json: {\n    post_id: crypto.randomUUID(), calendar_id: calendarId, brand_id: brandData.brand_id,\n    position: index+1, chain_id,\n    caption_ar: caption.caption_ar || null, hashtags: caption.hashtags || [],\n    content_type: slot.content_type || caption.content_type || 'emotional',\n    posting_time: sched.posting_time || caption.posting_time || null,\n    visual_brief_en, image_prompt_en: visual_brief_en, format: format_tier,\n    cco_score, confidence_score: cco_score,\n    negpat_flag: negpat, brave_route_flag: score_obj.brave_route_flag || false,\n    dialect_flag: score_obj.dialect_flag || false,\n    // Persist the FULL CCO evaluation (migration 0111). These columns now exist\n    // on calendar_posts, so the structured 'why this score' survives to the DB\n    // instead of being silently dropped by PostgREST.\n    cultural_flag: score_obj.cultural_flag || false,\n    cco_issues: Array.isArray(score_obj.issues) ? score_obj.issues : [],\n    method_adherence_score: (typeof score_obj.method_adherence_score === 'number') ? score_obj.method_adherence_score : null,\n    product_descriptor, brand_color_palette: palette,\n    occasion_visual_motif: format_tier==='video' ? getOccasionVisualMotif(brandData.occasions) : null,\n    occasion, brand_name_ar: brandData.brand_name_ar || null, dialect: brandData.arabic_dialect || null,\n    font_color: caption.font_color || '#FFFFFF', font_size: caption.font_size || 48,\n    sharp_text_gravity: caption.sharp_text_gravity || 'south',\n    primary_color_hex: brandData.primary_color_hex || '', sector: brandData.sector || '',\n    channel: brandData.primary_channel || 'Instagram',\n    // ── DECOUPLE: standard posts wait for the Worker; only hard fails are blocked ──\n    // POLICY (June 2026): generate an image for EVERY post so admin sees the real\n    // visual before deciding. Compliance issues no longer auto-block generation —\n    // carried as a flag (hold_reason + requires_human_review) so the post is\n    // force-routed to admin review in QA AFTER its image is generated.\n    status: 'pending_visual',\n    hold_reason: final_hold_reason,\n    route_decision: null,\n    requires_human_review: needs_review || undefined,\n    // Full trigger reasons for the /admin/qa UI (why this post was flagged).\n    human_gate_triggers: overrideHolds.length ? overrideHolds : undefined,\n    human_gate_detail: overrideDetails.length ? overrideDetails.join(' ') : (hard_block ? hold_reason : undefined),\n    // Store 4-pillar scores in flags.pillars so score-insight.tsx shows real values.\n    // pillarsByPost is populated from confidence-gate post_scores above.\n    flags: pillarsByPost[caption.post_id] ? { pillars: pillarsByPost[caption.post_id] } : undefined,\n    watermark: false, visual_failed: false,\n  }};\n});\nreturn out;\n"
+      },
+      "id": "901fb787-dc34-4ba3-a0e6-8dd6c4ad2058",
+      "name": "Skeleton Builder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -176,
+        26688
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://redzmrlzhxkkpgcokgvl.supabase.co/rest/v1/calendar_posts?on_conflict=calendar_id,position",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json._rows || []) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "afdbc0d9-8c54-45bf-90b1-9f17e31d7659",
+      "name": "Bulk Insert calendar_posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        64,
+        26592
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 20 * * 0,1,2,3,4"
+            }
+          ]
+        }
+      },
+      "id": "5126a277-0546-40e6-930a-3f160d5ac37c",
+      "name": "Cron: Nightly Shard (Sun–Thu 23:00 AST)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -6112,
+        28112
+      ]
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 20 1 * *"
+            }
+          ]
+        }
+      },
+      "id": "cbe401cd-826f-462c-a98a-19119059ac91",
+      "name": "Cron: 1st of Month — Orchestrator",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -6112,
+        27920
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "openclaw-batch-calendar",
+        "options": {}
+      },
+      "id": "37abac1e-b8af-4611-9e5e-ef5c1aec27c0",
+      "name": "Webhook: openclaw-batch-calendar",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -6112,
+        28304
+      ],
+      "webhookId": "7bf22011-24d6-43f1-bb0a-4de1e6bd83b1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst currMonth = now.getMonth();\nconst currYear  = now.getFullYear();\nconst dayOfWeek = now.getDay();\nconst monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];\nlet target_month = currMonth, target_year = currYear;\nlet target_month_key = target_year + '-' + String(target_month+1).padStart(2,'0');\nlet off_days = [0,6];\ntry { const raw = '0,6'; if(raw) off_days=raw.split(',').map(n=>parseInt(n.trim(),10)).filter(n=>!isNaN(n)); } catch(_){}\nconst DOW_TO_SHARD = {0:0,1:1,2:2,3:3,4:4};\nlet batch_type  = now.getDate()===1?'MONTHLY':'WEEKLY';\nlet batch_shard = batch_type==='WEEKLY'?(DOW_TO_SHARD[dayOfWeek]??0):null;\nconst daysInMonth = new Date(currYear,currMonth+1,0).getDate();\nconst is_last_sunday = dayOfWeek===0 && (now.getDate()+7)>daysInMonth;\nlet batch_id = batch_type==='MONTHLY'?'monthly-'+target_month_key:'shard-'+batch_shard+'-'+target_month_key;\nlet month_offset=0, target_brand_id=null, is_partial=false, partial_start_date=null, webhook_occasion_flags=null;\nlet rolling = null; // 'initial' (3 months) | 'append' (just +2) | 'single' (1)\nlet off_days_csv = '0,6';   // app forwards .env.local OFF_DAYS here (dynamic, not hardcoded)\nlet posts_per_week = null;    // brand cadence; default decided downstream (doc: 4-5/wk)\nlet bodyFound = false;        // SAFETY: true only when a real webhook/cron body arrived\ntry {\n  // Body source: the webhook (onboarding/admin/manual triggers) OR the upstream\n  // 'Set Rolling Offset' code node (the 1st-of-month cron path injects month_offset=2).\n  // n8n throws if a referenced node wasn't in the execution path, so guard each.\n  let body = {};\n  try { body = $('Webhook: openclaw-batch-calendar').first().json.body || {}; } catch(_) {}\n  if (!body || Object.keys(body).length === 0) {\n    try { body = $('Set Rolling Offset').first().json.body || {}; } catch(_) {}\n  }\n  // SAFETY GUARD: was this triggered by a REAL source (webhook body or cron-offset\n  // node)? If neither produced a body, it's a bare manual 'Execute workflow' click —\n  // which would otherwise default to MONTHLY = ALL brands (a 6-hour, rate-limit-\n  // blowing accident). We cap that case below. Stored on output as manual_unsafe.\n  bodyFound = !!(body && Object.keys(body).length > 0);\n  if(body.brand_id) target_brand_id=body.brand_id;\n  if(body.batch_type) batch_type=body.batch_type;\n  if(typeof body.batch_shard==='number') batch_shard=body.batch_shard;\n  else if(batch_type==='WEEKLY') batch_shard=batch_shard??(DOW_TO_SHARD[dayOfWeek]??0);\n  batch_id=batch_type==='MONTHLY'?'monthly-'+target_month_key:'shard-'+batch_shard+'-'+target_month_key;\n  if(body.partial===true&&body.start_date){is_partial=true;partial_start_date=body.start_date;}\n  if(target_brand_id&&!body.batch_type){batch_type='MONTHLY';batch_shard=null;batch_id='monthly-'+target_month_key;}\n  if(typeof body.month_offset==='number'&&body.month_offset>=0&&body.month_offset<=2) month_offset=body.month_offset;\n  if(typeof body.rolling==='string') rolling=body.rolling;\n  if(typeof body.off_days==='string') off_days_csv = body.off_days;\n  if(Array.isArray(body.off_days)) off_days = body.off_days;\n  if(typeof body.posts_per_week==='number') posts_per_week = body.posts_per_week;\n  if(target_brand_id&&!is_partial&&now.getDate()>1){is_partial=true;const _y=now.getFullYear();const _m=String(now.getMonth()+1).padStart(2,'0');const _d=String(now.getDate()).padStart(2,'0');partial_start_date=_y+'-'+_m+'-'+_d;}\n  if(body.occasion_flags&&Array.isArray(body.occasion_flags)) webhook_occasion_flags=body.occasion_flags;\n} catch(e){}\nif(month_offset>0){\n  const od=new Date(target_year,target_month+month_offset,1);\n  target_month=od.getMonth(); target_year=od.getFullYear();\n  target_month_key=target_year+'-'+String(target_month+1).padStart(2,'0');\n  batch_id=batch_type==='MONTHLY'?'monthly-'+target_month_key+'-offset'+month_offset:'shard-'+batch_shard+'-'+target_month_key;\n  is_partial=false; partial_start_date=null;\n}\n// Default rolling mode: explicit body.rolling wins; else MONTHLY batch = seed 3\n// months (initial), WEEKLY/nightly = single current month.\nif(!rolling) rolling = (batch_type==='MONTHLY') ? 'initial' : 'single';\n\n// ── SAFETY CAP (prevents the 'Execute workflow' accident) ────────────────────\n// A bare manual Execute click produces NO body (no webhook, no cron-offset) and no\n// brand_id → it would fan out MONTHLY across ALL brands (≈63 × 3 months ≈ 6 hours,\n// blowing the OpenAI/DeepSeek rate limits and producing nothing). Detect that exact\n// case and CAP it to a tiny dev batch so an accidental click is harmless. Real\n// triggers (single-brand webhook, cron) are unaffected.\nconst DEV_SAFE_BRAND_CAP = 2;            // accidental manual run touches ≤2 brands\n// Distinguish a bare 'Execute workflow' click from a real cron/webhook trigger.\n// n8n sets $execution.mode = 'manual' ONLY for editor Execute clicks; cron/webhook\n// runs are 'trigger'/'webhook'. So a manual run with no body and no brand_id is the\n// dangerous accident — a real nightly cron (also bodyless) is NOT manual, so it runs full.\nlet _execMode = 'trigger';\ntry { _execMode = $execution.mode; } catch(_) {}\nconst manual_unsafe = (_execMode === 'manual') && !bodyFound && !target_brand_id;\nlet max_brands_per_batch = batch_type==='MONTHLY' ? 500 : 60;\nif (manual_unsafe) {\n  max_brands_per_batch = DEV_SAFE_BRAND_CAP;\n  // also force single-month so an accidental click can't fan to 3× either\n  rolling = 'single';\n}\nreturn [{ json:{target_month,target_year,target_month_name:monthNames[target_month],target_month_key,batch_type,batch_shard,is_last_sunday,batch_id,generated_at:now.toISOString(),target_brand_id,off_days,is_partial,partial_start_date,expected_posts_per_brand:20,month_offset,max_brands_per_batch,manual_unsafe,webhook_occasion_flags,rolling,off_days,off_days_csv,posts_per_week} }];"
+      },
+      "id": "aa60e5d7-7b60-4a2a-87de-66b3bd52ff4e",
+      "name": "Prepare Batch Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5888,
+        28112
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "tableId": "usage_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-A01"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "Batch Start"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "batch_started"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify({ batch_type: $json.batch_type, batch_shard: $json.batch_shard, is_last_sunday: $json.is_last_sunday, target_month: $json.target_month_key, batch_id: $json.batch_id, generated_at: $json.generated_at }) }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "98e45eaa-e939-4c3f-980f-2aabcbef3a71",
+      "name": "Supabase: Log Batch Start",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -5664,
+        28112
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3ca1073e-32ba-4732-863d-6ee2a63d12da",
+              "leftValue": "={{ $('Prepare Batch Config').first().json.batch_type }}",
+              "rightValue": "MONTHLY",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "709ab4d5-9f42-420a-b5e4-bd1cfac2e03c",
+      "name": "IF: Monthly or Weekly?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -5440,
+        28112
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "brand_profiles",
+        "limit": 500
+      },
+      "id": "6fa37fb4-d0c4-420c-bb88-89454d4e6472",
+      "name": "Supabase: Fetch All Active Brands",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -5216,
+        27984
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://redzmrlzhxkkpgcokgvl.supabase.co/rest/v1/brand_profiles?batch_shard=eq.' + $('Prepare Batch Config').first().json.batch_shard + '&or=(tier.neq.free,total_calendars_generated.lt.3)&select=*' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "1302da27-4f6b-4223-a3b0-75ecdc23fe3b",
+      "name": "Supabase: Fetch Brands by Shard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -4416,
+        28896
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const batchCfg = $(\"Prepare Batch Config\").first().json;\nconst targetBrandId = batchCfg.target_brand_id||null;\n// SAFETY CAP: enforce max_brands_per_batch. On a bare manual 'Execute' click,\n// Prepare Batch Config sets this to a tiny number (DEV_SAFE_BRAND_CAP) + manual_unsafe,\n// so an accidental click processes only a couple of brands instead of all ~63.\nconst maxBrands = Number(batchCfg.max_brands_per_batch) || 500;\nconst seen = new Set(); const result = [];\nfor (const item of $input.all()) {\n  const b = item.json;\n  if(!b.brand_id) continue;\n  if(b.tier==='free'&&(b.total_calendars_generated||0)>=3) continue; // free = 3 onboarding months, then stop\n  if(targetBrandId&&b.brand_id!==targetBrandId) continue;\n  if(!seen.has(b.brand_id)){seen.add(b.brand_id);result.push({json:b});}\n  if(result.length >= maxBrands) break; // hard cap (also the dev-safe guard)\n}\nif (batchCfg.manual_unsafe) {\n  console.warn('[A01] MANUAL UNSAFE run detected (bare Execute click, no brand_id) — capped to ' + result.length + ' brand(s). For a real run, trigger via webhook with brand_id, or via cron.');\n}\nreturn result;"
+      },
+      "id": "2dd0cd22-82a6-417f-a89e-183acdd03352",
+      "name": "Merge Brand Sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4992,
+        27984
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── KICK V01 WORKER (fires ONCE, when A01 has finished ALL months) ───────────\n// Runs off the Loop Guard (loop 'done' branch), so it triggers exactly once after\n// the whole 3-month run is written to the DB — NOT per brand. One ping drains the\n// entire calendar because the Worker now claim-all-then-batches internally.\n// Fire-and-forget: a failure here must NEVER fail A01 (the Worker's 1-min cron is a\n// safety net that picks the posts up anyway). TESTING uses /webhook-test/.\nconst WORKER_WEBHOOK = 'https://ogzstudios.app.n8n.cloud/webhook-test/openclaw-run-worker';\ntry {\n  await this.helpers.httpRequest({\n    method: 'POST', url: WORKER_WEBHOOK,\n    headers: { 'content-type': 'application/json' },\n    body: { source: 'N8N-A01-complete', triggered_at: new Date().toISOString(),\n            expected: ($json && $json.expected) || null, completed: ($json && $json.completed) || null },\n    json: true, timeout: 8000,\n  });\n} catch (e) { /* Worker cron will still pick the posts up — non-fatal */ }\nreturn $input.all();\n"
+      },
+      "id": "7fb08b00-4423-4568-b54f-938d7eb398b1",
+      "name": "Kick V01 Worker (final)2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3776,
+        27472
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://redzmrlzhxkkpgcokgvl.supabase.co/rest/v1/calendars?on_conflict=brand_id,month",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const cfg = $('Prepare Batch Config').first().json; const off = (typeof $json._month_offset === 'number') ? $json._month_offset : (cfg.month_offset || 0); const base = new Date(cfg.target_year, cfg.target_month + off, 1); const mk = base.getFullYear() + '-' + String(base.getMonth()+1).padStart(2,'0'); return JSON.stringify({ brand_id: $json.brand_id, month: mk, status: 'draft' }); })() }}",
+        "options": {}
+      },
+      "id": "7d7c725d-ac85-4953-ad58-1de3c31f981e",
+      "name": "Supabase: Insert Calendar Lease3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -4096,
+        27664
+      ],
+      "retryOnFail": false,
+      "alwaysOutputData": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// $input here is the OUTPUT of 'Insert Calendar Lease3' (HTTP node) — the Supabase\n// CALENDARS row {calendar_id, brand_id, month, status}. It has NO brand identity\n// (brand_name_ar/en, sector, dialect, city, …), so reading those off it yields\n// undefined → COO/CEO/DeepSeek/CCO all ran on 'Brand: undefined' + generic F&B\n// defaults. ROOT-CAUSE FIX (same pattern as the _month_offset recovery below):\n// recover the REAL per-iteration brand object from the splitInBatches loop item\n// (batchSize=1 → .last() IS this iteration's brand), then keep calendar_id from\n// the lease row so the calendar linkage stays correct.\nconst leaseRow = $input.first().json;\nlet brandSrc = {};\nif (leaseRow && leaseRow.brand_name_ar) {\n  brandSrc = leaseRow; // already has identity (shouldn't normally, but harmless)\n} else {\n  for (const nm of ['Loop Over Items','Build Brand-Months2','Build Brand-Months']) {\n    try { const v = $(nm).last().json; if (v && v.brand_name_ar) { brandSrc = v; break; } } catch(_) {}\n  }\n}\n// Merge: real brand identity wins; carry calendar_id/brand_id from the lease row.\nconst brand = { ...brandSrc, ...leaseRow, brand_name_ar: brandSrc.brand_name_ar ?? leaseRow.brand_name_ar, brand_name_en: brandSrc.brand_name_en ?? leaseRow.brand_name_en };\n// Keep identity fields the lease row doesn't have (spread of leaseRow above would\n// only override keys it actually contains, so brandSrc's sector/dialect/etc. survive).\nconst batchConfig = $('Prepare Batch Config').first().json;\n// Off-days are DYNAMIC: app reads .env.local OFF_DAYS and forwards it in the\n// webhook body → Prepare Batch Config → here. Default Sun(0)+Sat(6) if absent.\nconst offDaysRaw = (Array.isArray(batchConfig.off_days) && batchConfig.off_days.length)\n  ? batchConfig.off_days\n  : String(batchConfig.off_days_csv || '0,6').split(',').map(s=>parseInt(s.trim(),10)).filter(n=>!isNaN(n));\n// 3-Month Rolling: each brand item carries its OWN _month_offset (0/1/2) from\n// Build Brand-Months, so this run builds THAT month's calendar. Shift the base\n// target month by the per-item offset.\n// ── ROOT-CAUSE FIX (3-month rolling): recover _month_offset for THIS iteration. ──\n// $input.first() here is the OUTPUT of 'Insert Calendar Lease3' (an HTTP node), which\n// REPLACES the item with the Supabase calendar row {calendar_id,brand_id,month,...}\n// — that row has NO _month_offset, so reading brand._month_offset was ALWAYS undefined\n// → fell back to 0 → every month built the offset-0 (current, partial 15-post) schedule.\n// THAT is why July/Aug got 15 June-shaped posts. The brand item that DOES carry\n// _month_offset is the current iteration's item on the splitInBatches loop. Read it\n// from $('Loop Over Items').last() (batchSize=1 → that IS this iteration's item).\nlet _off = (typeof brand._month_offset === 'number') ? brand._month_offset : null;\nif (_off === null) {\n  // current loop item (has _month_offset) — try the loop node, then Build Brand-Months.\n  for (const nm of ['Loop Over Items','Build Brand-Months2','Build Brand-Months']) {\n    try { const v = $(nm).last().json._month_offset; if (typeof v === 'number') { _off = v; break; } } catch(_) {}\n  }\n}\nif (_off === null) _off = (typeof batchConfig.month_offset === 'number') ? batchConfig.month_offset : 0;\nconst _base = new Date(batchConfig.target_year, batchConfig.target_month + _off, 1);\nconst year = _base.getFullYear(), month = _base.getMonth();\nconst daysInMonth=new Date(year,month+1,0).getDate();\nconst _MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];\nconst monthName=_MONTHS[month];\n// ── HARD GUARD: a valid month MUST be computable. If year/month are NaN (offset\n// could not resolve), FAIL LOUDLY here instead of emitting month_key=undefined,\n// which downstream sends as month:null to the calendars upsert → NOT NULL 23502 →\n// the misleading 'Skeleton Builder: no calendar_id'. This names the REAL cause.\nif (!Number.isInteger(year) || !Number.isInteger(month) || month < 0 || month > 11) {\n  throw new Error('Prepare Brand Data3: could not compute a valid month (year=' + year + ', month=' + month + ', offset=' + _off + '). Check Build Brand-Months/_month_offset wiring.');\n}\nconst isFirstCalendar=(brand.total_calendars_generated||0)===0;\nconst now=new Date();\nconst _isPartialThisMonth = (_off===0) && batchConfig.is_partial && batchConfig.partial_start_date;\nconst startDay=_isPartialThisMonth?parseInt(batchConfig.partial_start_date.split('-')[2],10):(_off===0?(batchConfig.start_day||now.getDate()):1);\nconst monthEnd=new Date(year,month+1,0);\nconst peakHours=[8,11,12,13,14,15,17,18,19,20,21,12,13,17,18,19,20,12,17,19];\n\n// ── 1. Collect ALL eligible working days this month (leap-year safe — daysInMonth\n//      is dynamic via new Date(year,month+1,0)). For the CURRENT month we only keep\n//      future days (and from partial_start_date if set). ──\nconst workingDays=[];\nlet cursor=new Date(year,month,startDay);\nwhile(cursor<=monthEnd){\n  const dow=cursor.getDay();\n  if(!offDaysRaw.includes(dow)){\n    const yyyy=cursor.getFullYear(),mm=String(cursor.getMonth()+1).padStart(2,'0'),dd=String(cursor.getDate()).padStart(2,'0');\n    // for the current month only, drop days already past\n    if(_off!==0 || new Date(`${yyyy}-${mm}-${dd}T23:59:59+03:00`)>now){\n      workingDays.push({yyyy,mm,dd});\n    }\n  }\n  cursor.setDate(cursor.getDate()+1);\n}\n\n// ── 2. Decide HOW MANY posts: cadence-driven (posts_per_week × weeks), capped at\n//      the month's real working days. posts_per_week from brand cadence → batch\n//      config → working-days-per-week → default 5 (doc: \"4-5x/week steady\"). This\n//      makes Feb (fewer days), 30- and 31-day months, and leap years all correct. ──\nconst workingDaysPerWeek = Math.max(1, 7 - offDaysRaw.length);\nconst postsPerWeek = Math.min(\n  workingDaysPerWeek,\n  Number(brand.posts_per_week) || Number(batchConfig.posts_per_week) || 5\n);\nconst weeksInMonth = (workingDays.length>0) ? (workingDays.length / workingDaysPerWeek) : 0;\nlet targetPosts = Math.round(postsPerWeek * weeksInMonth);\ntargetPosts = Math.max(0, Math.min(targetPosts, workingDays.length)); // never exceed real working days\nif(workingDays.length>0 && targetPosts===0) targetPosts=Math.min(workingDays.length, postsPerWeek); // partial month floor\n\n// ── 3. Distribute the N posts EVENLY across the working days (largest-remainder\n//      stride) so they aren't front-loaded with empty days at month-end. ──\nconst scheduleDates=[];\nif(targetPosts>0){\n  const stride = workingDays.length / targetPosts;\n  for(let i=0;i<targetPosts;i++){\n    const idx = Math.min(workingDays.length-1, Math.floor(i*stride + stride/2));\n    const wd = workingDays[idx];\n    const hour = peakHours[i % peakHours.length]; // CYCLIC — never undefined past 20\n    scheduleDates.push({\n      date:`${wd.yyyy}-${wd.mm}-${wd.dd}`, hour,\n      posting_time:`${wd.yyyy}-${wd.mm}-${wd.dd}T${String(hour).padStart(2,'0')}:00:00+03:00`,\n      is_video_slot:false\n    });\n  }\n}\nconst totalPosts=scheduleDates.length;\n\n// ── Video slot distribution: DELEGATED to /api/agents/calendar/plan-slots ────\n// (Doc §5.2/§9.5). The deterministic chain-selection engine decides image vs.\n// video per slot from: brand tier (Pro floor 3 / Free ≥1-in-8) + active occasion\n// + VIDEO_CAP + whether a video chain actually exists. We no longer force video\n// here — that old tier/8 heuristic existed nowhere in the docs and OVERRODE the\n// engine's slot.format. schedule_dates keep is_video_slot:false purely as a\n// backward-compat placeholder; Skeleton Builder now reads format from Plan Slots.\nconst videoCount = 0; // legacy field kept in output for compat; not used to force video\n\nconst SAUDI_OCCASIONS={\n  'January':{occasions:['pre_ramadan_warmup'],engagement_multiplier:1.0,themes:['winter_warmth','comfort_food','family_dining','hot_beverages','qahwa'],avoid:[]},\n  'February':{occasions:['ramadan_2026','founding_day'],engagement_multiplier:2.8,ramadan:true,themes:['iftar_specials','suhoor_menu','saudi_heritage_food','founding_day_pride','family_gathering','generosity'],avoid:['daytime_food_photos','alcohol_adjacent','western_valentine_push']},\n  'March':{occasions:['ramadan_end_2026','eid_al_fitr_2026'],engagement_multiplier:2.5,ramadan:true,eid:true,themes:['eid_celebration','family_feast','sweets_gifting','eid_menu_launch','joy_togetherness'],avoid:[]},\n  'April':{occasions:['post_eid_spring','mothers_day_arab'],engagement_multiplier:1.2,themes:['outdoor_dining','spring_freshness','light_menu','mothers_day_dining','dates_culture'],avoid:[]},\n  'May':{occasions:['eid_al_adha_2026','hajj_season_2026'],engagement_multiplier:2.2,eid:true,themes:['meat_grills','mandi','kabsa','family_feast','eid_adha_special','sacrifice_generosity','bbq_grills'],avoid:['heavy_vegetarian_push','pork_adjacent']},\n  'June':{occasions:['summer_start','saudi_summer_program'],engagement_multiplier:1.0,themes:['cooling_drinks','fresh_juices','indoor_comfort','refreshing_desserts','iced_coffee','summer_specials'],avoid:['outdoor_heat_photos','heavy_meat_content']},\n  'July':{occasions:['saudi_summer_festival','school_vacation_peak'],engagement_multiplier:1.1,themes:['family_entertainment','kids_meal','ice_cream','cold_beverages','mall_dining','fun_moments'],avoid:['formal_corporate_tone']},\n  'August':{occasions:['back_to_school_prep','late_summer'],engagement_multiplier:1.0,themes:['quick_bites','student_deals','family_prep','comfort_food','affordable_options'],avoid:[]},\n  'September':{occasions:['national_day','back_to_school'],engagement_multiplier:1.9,themes:['saudi_pride','traditional_saudi_cuisine','green_gold_colors','heritage_dishes','kabsa','mandi','jareesh','harees','national_day_offer'],avoid:['non_saudi_cultural_references','western_themed_content']},\n  'October':{occasions:['world_coffee_day','world_food_day','fall_season'],engagement_multiplier:1.3,themes:['arabic_coffee','qahwa_culture','seasonal_warmth','autumn_menu','food_story','behind_scenes','artisan_quality'],avoid:[]},\n  'November':{occasions:['pre_winter_season','saudi_entertainment_season'],engagement_multiplier:1.2,themes:['warm_beverages','hearty_meals','cozy_ambiance','traditional_soups','shorbah','warm_tone'],avoid:[]},\n  'December':{occasions:['winter_peak','riyadh_season','year_end'],engagement_multiplier:1.4,themes:['year_end_gratitude','family_gatherings','winter_warmth','special_menu','gifting_sweets','premium_experience','year_review'],avoid:['christmas_themes_for_conservative_brands','new_year_party_content']}\n};\nconst monthData=SAUDI_OCCASIONS[monthName]||{occasions:[],engagement_multiplier:1.0,themes:[],avoid:[]};\nreturn [{ json:{\n  brand_id:brand.brand_id,brand_name_ar:brand.brand_name_ar,brand_name_en:brand.brand_name_en||brand.brand_name_ar,\n  sector:brand.sector,arabic_dialect:brand.arabic_dialect,city:brand.city_primary,tier:brand.tier,\n  total_calendars:brand.total_calendars_generated||0,primary_channel:brand.primary_channel||'Instagram',\n  religious_sensitivity:brand.religious_sensitivity||'High',price_position:brand.price_position||'mid_market',\n  ramadan_relevance:brand.ramadan_relevance||'High',bilingual_ratio:brand.bilingual_ratio||'arabic_primary',\n  month:monthName,month_key:year+'-'+String(month+1).padStart(2,'0'),year,days_in_month:daysInMonth,\n  posts_per_week:7-offDaysRaw.length,total_posts:scheduleDates.length,off_days:offDaysRaw,schedule_dates:scheduleDates,\n  video_count_forced:videoCount,\n  occasions:monthData.occasions,occasion_themes:monthData.themes||[],occasion_avoid:monthData.avoid||[],\n  engagement_multiplier:monthData.engagement_multiplier||1.0,ramadan_active:monthData.ramadan||false,\n  eid_active:monthData.eid||false,is_first_calendar:isFirstCalendar,batch_id:batchConfig.batch_id,\n  is_partial:(_off===0 ? (batchConfig.is_partial||false) : false),\n  month_offset:_off,\n  primary_color_hex:brand.primary_color_hex||'',secondary_color_hex:brand.secondary_color_hex||'',\n  brand_differentiator:brand.brand_differentiator||''\n} }];"
+      },
+      "id": "a3476dcb-5ad6-4090-9b94-d3768f9a405a",
+      "name": "Prepare Brand Data3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3952,
+        27904
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const httpRequest = async ({method='GET', url, headers={}, body, timeout=60000}) => {\n  try {\n    const res = await this.helpers.httpRequest({ method, url, headers, body, timeout, json: false });\n    if (typeof res === 'string') { try { return JSON.parse(res); } catch(_) { return res; } }\n    return res;\n  } catch (err) {\n    const b = err && err.response && err.response.body;\n    if (b !== undefined) { if (typeof b==='string'){ try { return JSON.parse(b); } catch(_) { return b; } } return b; }\n    throw err;\n  }\n};\nconst crypto   = require('crypto');\nconst brandData = $input.first().json;\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\n\nconst bodyObj = {\n  flow_id: 'N8N-A01', brand_id: brandData.brand_id,\n  payload: {\n    request_type: 'calendar_scheduled',\n    trigger_payload: {\n      brand_id: brandData.brand_id, brand_name_ar: brandData.brand_name_ar,\n      brand_name_en: brandData.brand_name_en, sector: brandData.sector,\n      arabic_dialect: brandData.arabic_dialect, city: brandData.city, tier: brandData.tier,\n      primary_channel: brandData.primary_channel, religious_sensitivity: brandData.religious_sensitivity,\n      price_position: brandData.price_position, ramadan_relevance: brandData.ramadan_relevance,\n      bilingual_ratio: brandData.bilingual_ratio, month: brandData.month_key,\n      occasions: brandData.occasions, occasion_themes: brandData.occasion_themes||[],\n      occasion_avoid: brandData.occasion_avoid||[], engagement_multiplier: brandData.engagement_multiplier||1.0,\n      ramadan_active: brandData.ramadan_active||false, eid_active: brandData.eid_active||false,\n      is_first_calendar: brandData.is_first_calendar||false,\n      total_posts: brandData.total_posts||20, schedule_dates: brandData.schedule_dates||[]\n    },\n    occasion_flags: (brandData.occasions&&brandData.occasions.length>0&&brandData.occasions[0]!=='none') ? brandData.occasions : []\n  }\n};\nconst body      = JSON.stringify(bodyObj);\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\n\n// Retry up to 2 times with 2s backoff (mirrors old retryOnFail:2)\nlet resp, lastErr;\nfor (let attempt = 0; attempt < 3; attempt++) {\n  try {\n    resp = await httpRequest({\n      method: 'POST',\n      url: '' + 'https://unwieldable-mavis-unbacked.ngrok-free.dev' + '/api/agents/ceo/classify',\n      headers: {\n        'content-type': 'application/json', 'x-n8n-signature': signature,\n        'x-n8n-request-id': requestId, 'x-n8n-timestamp': timestamp,\n        'Authorization': 'Bearer REDACTED_OPENAI_KEY'\n      },\n      body, timeout: 45000\n    });\n    lastErr = null; break;\n  } catch(err) {\n    lastErr = err;\n    if (attempt < 2) await new Promise(r => setTimeout(r, 2000));\n  }\n}\nif (lastErr) throw lastErr; // → continueErrorOutput → Build S03 alert1\n\nreturn [{ json: resp }];"
+      },
+      "id": "1ef52620-8eeb-4d27-9a8c-08e0c5207ff1",
+      "name": "Call: CEO Route & Classify3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3728,
+        27904
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const httpRequest = async ({method='GET', url, headers={}, body, timeout=60000}) => {\n  try {\n    const res = await this.helpers.httpRequest({ method, url, headers, body, timeout, json: false });\n    if (typeof res === 'string') { try { return JSON.parse(res); } catch(_) { return res; } }\n    return res;\n  } catch (err) {\n    const b = err && err.response && err.response.body;\n    if (b !== undefined) { if (typeof b==='string'){ try { return JSON.parse(b); } catch(_) { return b; } } return b; }\n    throw err;\n  }\n};\nconst crypto   = require('crypto');\nconst brandData = $('Prepare Brand Data3').last().json;\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\n\nconst body = JSON.stringify({\n  flow_id: 'N8N-A01', brand_id: brandData.brand_id,\n  payload: {\n    post_count:    brandData.total_posts||20,\n    schedule_dates: brandData.schedule_dates||[],\n    occasion_flags: (brandData.occasions&&brandData.occasions.length>0&&brandData.occasions[0]!=='none')\n                    ? brandData.occasions : [],\n    ...(brandData.calendar_id ? { calendar_id: brandData.calendar_id } : {})\n  }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\n\nlet resp = { result: { slots: [] } }; // safe default if API unreachable\ntry {\n  resp = await httpRequest({\n    method: 'POST',\n    url: '' + 'https://unwieldable-mavis-unbacked.ngrok-free.dev' + '/api/agents/calendar/plan-slots',\n    headers: { 'content-type':'application/json','x-n8n-signature':signature,\n               'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp },\n    body, timeout: 30000\n  });\n} catch(_) {} // continueRegularOutput semantics — slot fallback handled in Merge Posts Data1\n\nreturn [{ json: resp }];"
+      },
+      "id": "3acfcd11-049a-40bd-ba42-a8ee7d044f29",
+      "name": "Call: Plan Slots3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3248,
+        28144
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "766c8d5f-d091-4ea5-976b-8e9266e0eada",
+              "leftValue": "={{ $json.result.decision.confidence_mode }}",
+              "rightValue": "blocked",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b424279b-e11d-4dd7-a3c4-eb39a02fbf73",
+      "name": "IF: Brand Blocked?3",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -3504,
+        27984
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const httpRequest = async ({method='GET', url, headers={}, body, timeout=60000}) => {\n  try {\n    const res = await this.helpers.httpRequest({ method, url, headers, body, timeout, json: false });\n    if (typeof res === 'string') { try { return JSON.parse(res); } catch(_) { return res; } }\n    return res;\n  } catch (err) {\n    const b = err && err.response && err.response.body;\n    if (b !== undefined) { if (typeof b==='string'){ try { return JSON.parse(b); } catch(_) { return b; } } return b; }\n    throw err;\n  }\n};\nconst crypto   = require('crypto');\nconst brandData = $('Prepare Brand Data3').last().json;\nconst ceoResult = $('Call: CEO Route & Classify3').last().json?.result || {};\nconst decision  = ceoResult.decision || {};\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\n\nconst contentMix = brandData.ramadan_active\n  ? { emotional:0.4, lifestyle:0.2, offer:0.2, educational:0.05, testimonial:0.05, announcement:0.1 }\n  : brandData.eid_active\n  ? { emotional:0.35, lifestyle:0.15, offer:0.25, educational:0.05, testimonial:0.1, announcement:0.1 }\n  : { emotional:0.3, lifestyle:0.2, offer:0.2, educational:0.1, testimonial:0.1, announcement:0.1 };\n\nconst body = JSON.stringify({\n  flow_id: 'N8N-A01', brand_id: brandData.brand_id,\n  payload: {\n    confidence_mode: decision.confidence_mode||'Standard',\n    occasion_flags:  (decision.occasion_flags&&decision.occasion_flags.length>0) ? decision.occasion_flags : ['none'],\n    platform_spec:   brandData.primary_channel||'Instagram',\n    content_mix:     contentMix,\n    post_count:      brandData.total_posts||20,\n    brand: {\n      brand_id: brandData.brand_id, brand_name_ar: brandData.brand_name_ar,\n      brand_name_en: brandData.brand_name_en, sector: brandData.sector,\n      arabic_dialect: brandData.arabic_dialect, city: brandData.city,\n      religious_sensitivity: brandData.religious_sensitivity, price_position: brandData.price_position,\n      ramadan_relevance: brandData.ramadan_relevance, bilingual_ratio: brandData.bilingual_ratio,\n      month: brandData.month_key, occasions: brandData.occasions,\n      occasion_themes: brandData.occasion_themes||[], occasion_avoid: brandData.occasion_avoid||[],\n      engagement_multiplier: brandData.engagement_multiplier||1.0,\n      ramadan_active: brandData.ramadan_active||false, eid_active: brandData.eid_active||false,\n      schedule_dates: brandData.schedule_dates\n    },\n    negative_patterns: [], cost_constraint: decision.cost_status||'normal'\n  }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\n\n// No retry — timeout is 3 min; failure routes to COO Fallback node\nlet resp;\ntry {\n  resp = await httpRequest({\n    method: 'POST',\n    url: '' + 'https://unwieldable-mavis-unbacked.ngrok-free.dev' + '/api/agents/coo/compile-caption-context',\n    headers: { 'content-type':'application/json','x-n8n-signature':signature,\n               'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp,\n               'Authorization':'Bearer REDACTED_OPENAI_KEY' },\n    body, timeout: 180000\n  });\n} catch(err) {\n  throw err; // → continueErrorOutput → COO Fallback: Use Brand Bio\n}\n\nreturn [{ json: resp }];"
+      },
+      "id": "45f4a678-26c6-42bb-a99c-3f32b222640a",
+      "name": "Call: COO Build CaptionContext3",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3024,
+        28144
+      ],
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "3d3a6cb9-3812-49b3-ab6c-ca71a921dded",
+              "leftValue": "={{ ($('Call: COO Build CaptionContext3').last().json?.result?.dialect_confirmed === true) || ($('COO Fallback: Use Brand Bio').last().json?.result?.dialect_confirmed === true) || (!!$('Prepare Brand Data3').last().json?.arabic_dialect) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3273301f-f2a8-466d-834e-f74de0215220",
+      "name": "IF: Dialect Confirmed?3",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2576,
+        28144
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "qa_review_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $('Prepare Brand Data3').last().json.brand_id }}"
+            },
+            {
+              "fieldId": "trigger_reason",
+              "fieldValue": "dialect_not_confirmed"
+            },
+            {
+              "fieldId": "flags",
+              "fieldValue": "={{ JSON.stringify({ skip_reason: 'dialect_not_confirmed', brand_name: $('Prepare Brand Data3').last().json.brand_name_ar, batch_id: $('Prepare Brand Data3').last().json.batch_id }) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "id": "51cd7052-2d08-48db-900b-127302454b9c",
+      "name": "Supabase: Log to QA Queue",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1488,
+        28912
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const httpRequest = async ({method='GET', url, headers={}, body, timeout=60000}) => {\n  try {\n    const res = await this.helpers.httpRequest({ method, url, headers, body, timeout, json: false });\n    if (typeof res === 'string') { try { return JSON.parse(res); } catch(_) { return res; } }\n    return res;\n  } catch (err) {\n    const b = err && err.response && err.response.body;\n    if (b !== undefined) { if (typeof b==='string'){ try { return JSON.parse(b); } catch(_) { return b; } } return b; }\n    throw err;\n  }\n};\nconst crypto    = require('crypto');\nconst brandData = $('Prepare Brand Data3').last().json;\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\n\n// COO caption context (success path, then fallback, then inline default)\nlet cooResult = {};\ntry { cooResult = $('Call: COO Build CaptionContext3').last().json?.result || {}; } catch(_) {}\nif (!cooResult.caption_context) { try { cooResult = $('COO Fallback: Use Brand Bio').last().json?.result || {}; } catch(_) {} }\nif (!cooResult.caption_context || cooResult.caption_context.trim().length < 10) {\n  cooResult.caption_context = [\n    'Brand: '+(brandData.brand_name_ar||'')+' ('+(brandData.brand_name_en||'')+')',\n    'Sector: '+(brandData.sector||'F&B'), 'Dialect: '+(brandData.arabic_dialect||'saudi'),\n    'Month: '+(brandData.month||'')+' '+(brandData.year||''),\n    'Occasions: '+(brandData.occasions||[]).join(', '),\n    'Tone: Authentic, warm, culturally resonant. Proper Arabic grammar only.',\n    'Mix: 30% emotional, 20% lifestyle, 20% offer, 10% educational, 10% testimonial, 10% announcement.'\n  ].join('\\n');\n}\nconst MAX_CHARS = 4000;\nlet context = cooResult.caption_context;\nconst contextTruncated = context.length > MAX_CHARS;\nif (contextTruncated) context = context.slice(0, MAX_CHARS) + '\\n[…context truncated…]';\n\nconst occasionContext = (brandData.occasions&&brandData.occasions.length>0&&brandData.occasions[0]!=='none')\n  ? { name:brandData.occasions[0], lead_weeks:1, priority: brandData.engagement_multiplier>=2.0?'Critical':'Normal' }\n  : undefined;\n\nconst schedule = brandData.schedule_dates || [];\nconst body = JSON.stringify({\n  flow_id:'N8N-A01', brand_id:brandData.brand_id,\n  payload:{\n    month: brandData.month_key,\n    caption_context: context,\n    post_count: schedule.length || brandData.total_posts || 5,\n    schedule_dates: schedule,\n    start_date: schedule?.[0]?.date || brandData.month_key+'-01',\n    off_days: brandData.off_days||[0,6],\n    ...(occasionContext ? { occasion_context: occasionContext } : {}),\n    intended_format: 'image',\n    watermark_required: cooResult.watermark_flag||false\n  }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\nconst headers = { 'content-type':'application/json','x-n8n-signature':signature,\n  'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp,\n  'Authorization':'Bearer sk-cdb54723c86f4667a7173d2f1e391975' };\n\n// ONE call — the route chunks + parallelizes + retries + merges server-side.\nlet resp, lastErr;\nfor (let attempt = 0; attempt < 2; attempt++) {\n  try {\n    resp = await httpRequest({ method:'POST',\n      url:'https://unwieldable-mavis-unbacked.ngrok-free.dev/api/agents/deepseek/generate-all',\n      headers, body, timeout: 300000 });\n    lastErr = null; break;\n  } catch(err) { lastErr = err; if (attempt < 1) await new Promise(r=>setTimeout(r,5000)); }\n}\n\n// Normalise to { result: { posts: [...] } } for downstream Collect/Match Chain.\nconst postsArr = (resp && resp.result && Array.isArray(resp.result.posts)) ? resp.result.posts\n  : (resp && Array.isArray(resp.posts)) ? resp.posts : [];\nif (lastErr && postsArr.length === 0) {\n  return { json: { result: { posts: [] }, _deepseek_total_failed: true, _chunk_error: lastErr.message } };\n}\nreturn { json: { result: { posts: postsArr }, _deepseek_total_failed: false, _total_posts_collected: postsArr.length, brand_id: brandData.brand_id, month_key: brandData.month_key } };\n"
+      },
+      "id": "ab5ebeff-e065-4efd-a0b7-73ef10683db5",
+      "name": "Call: DeepSeek Generate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1008,
+        28688
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const httpRequest = async ({method='GET', url, headers={}, body, timeout=60000}) => {\n  try {\n    const res = await this.helpers.httpRequest({ method, url, headers, body, timeout, json: false });\n    if (typeof res === 'string') { try { return JSON.parse(res); } catch(_) { return res; } }\n    return res;\n  } catch (err) {\n    const b = err && err.response && err.response.body;\n    if (b !== undefined) { if (typeof b==='string'){ try { return JSON.parse(b); } catch(_) { return b; } } return b; }\n    throw err;\n  }\n};\nconst crypto    = require('crypto');\nconst brandData  = $('Prepare Brand Data3').last().json;\nconst deepseekPosts = ($input.first().json?.result?.posts || []).map(p => ({\n  post_id: p.post_id,\n  caption_ar: p.caption_ar || null,            // the post's MEANING — selector reads this\n  visual_brief_en: (p.visual_brief_en||p.prompt_en||'').slice(0,400),\n  content_type: p.content_type||'emotional',\n  hashtags: Array.isArray(p.hashtags) ? p.hashtags.slice(0,8) : [],\n  occasion: p.occasion || null,\n  format: p.format||'image',\n  offer_type: p.offer_type||null\n}));\nconst secret    = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId = crypto.randomUUID();\nconst timestamp = new Date().toISOString();\nconst body = JSON.stringify({\n  flow_id:'N8N-A01', brand_id:brandData.brand_id,\n  payload:{ posts:deepseekPosts, sector:brandData.sector,\n            occasions:brandData.occasions||[], primary_channel:brandData.primary_channel||'Instagram',\n            month:brandData.month_key }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\n\n// Preserve _deepseek_posts passthrough for Merge Posts Data1 fallback\nconst _deepseek_posts = $input.first().json?.result?.posts || [];\n\nlet resp = { result: { posts: _deepseek_posts }, _match_skipped: true }; // safe fallback\nlet lastErr;\nfor (let attempt = 0; attempt < 2; attempt++) {\n  try {\n    resp = await httpRequest({\n      method:'POST', url:'' + 'https://unwieldable-mavis-unbacked.ngrok-free.dev' + '/api/agents/ceo/match-chain',\n      headers:{'content-type':'application/json','x-n8n-signature':signature,\n               'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp},\n      body, timeout: 60000\n    });\n    lastErr = null; break;\n  } catch(err) { lastErr = err; if (attempt < 1) await new Promise(r => setTimeout(r, 3000)); }\n}\n\n// ── MERGE match-chain's per-post chain_id back onto the DeepSeek posts ──────────\n// match-chain returns { matches:[{post_id, chain_id, chain_family, reasoning}] }.\n// Skeleton reads result.posts[].chain_id, so we MERGE the selected chain_id onto each\n// DeepSeek post here. Without this merge the content-aware selection is silently lost\n// and Skeleton falls back to plan-slots. On failure, posts pass through with no chain_id\n// (Skeleton then uses slot.chain_id as the documented fallback).\nconst matches = (resp && Array.isArray(resp.matches)) ? resp.matches : [];\nconst chainById = {};\nfor (const m of matches) { if (m && m.post_id) chainById[m.post_id] = m.chain_id || null; }\nconst mergedPosts = _deepseek_posts.map(p => ({\n  ...p,\n  chain_id: (p.post_id in chainById) ? chainById[p.post_id] : (p.chain_id || null),\n}));\nresp = { result: { posts: mergedPosts }, _match_count: matches.length, _deepseek_posts };\nif (lastErr) resp = { result:{ posts: _deepseek_posts }, _match_skipped:true, _deepseek_posts };\n\nreturn [{ json: resp }];"
+      },
+      "id": "79ba5f08-a3ca-4276-8d34-71a3792123bc",
+      "name": "Call: Match Chain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        27840
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const httpRequest = async ({method='GET', url, headers={}, body, timeout=60000}) => {\n  try {\n    const res = await this.helpers.httpRequest({ method, url, headers, body, timeout, json: false });\n    if (typeof res === 'string') { try { return JSON.parse(res); } catch(_) { return res; } }\n    return res;\n  } catch (err) {\n    const b = err && err.response && err.response.body;\n    if (b !== undefined) { if (typeof b==='string'){ try { return JSON.parse(b); } catch(_) { return b; } } return b; }\n    throw err;\n  }\n};\nconst crypto    = require('crypto');\nconst brandData  = $('Prepare Brand Data3').last().json;\nconst secret     = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId  = crypto.randomUUID();\nconst timestamp  = new Date().toISOString();\n\n// Read caption_context for excerpt — try Call: node names\nlet captionCtx = '';\ntry { captionCtx = $('Call: COO Build CaptionContext3').last().json?.result?.caption_context || ''; } catch(_) {}\nif (!captionCtx) { try { captionCtx = $('COO Fallback: Use Brand Bio').last().json?.result?.caption_context || ''; } catch(_) {} }\n\nconst matchResult = $('Call: Match Chain').last().json || {};\nconst posts_raw = (matchResult.result?.posts) || (matchResult.posts) || ($('Call: DeepSeek Generate').last().json?.result?.posts) || [];\nconst posts = posts_raw.map(p => ({ post_id:p.post_id, caption_ar:p.caption_ar,\n  content_type:p.content_type, hashtags:p.hashtags||[], posting_time:p.posting_time,\n  // v2 method-adherence inputs: the visual brief (Component 3 - visual_idiom)\n  // and the post objective (Component 4 - cadence_role). Forwarded so the CCO\n  // can actually grade these components instead of defaulting them to neutral.\n  visual_brief_en: p.visual_brief_en || p.image_prompt_en || undefined,\n  objective: p.objective || p.strategic_objective || undefined }));\n\n// Pull the brand's STRUCTURED method profile from the COO caption-context\n// response (now exposed alongside the prose context - no extra DB call). These\n// five components are the ground truth the CCO grades method adherence against.\nlet methodProfile = null;\ntry { methodProfile = $('Call: COO Build CaptionContext3').last().json?.result?.method_profile || null; } catch(_) {}\nif (!methodProfile) { try { methodProfile = $('COO Fallback: Use Brand Bio').last().json?.result?.method_profile || null; } catch(_) {} }\n\nconst body = JSON.stringify({\n  flow_id:'N8N-A01', brand_id:brandData.brand_id,\n  payload:{\n    // No longer sliced to 600 chars - the prose context was being truncated\n    // before the method/tone/anti-attribute layers, gutting the score. Send a\n    // generous cap so the full identity+direction+constraints layers survive.\n    caption_context_excerpt: String(captionCtx || '').slice(0, 8000),\n    posts,\n    // Structured method profile drives the 30% method-adherence weight.\n    ...(methodProfile ? { method_profile: methodProfile } : {})\n  }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\n\nlet resp, lastErr;\nfor (let attempt = 0; attempt < 2; attempt++) {\n  try {\n    resp = await httpRequest({\n      method:'POST', url:'' + 'https://unwieldable-mavis-unbacked.ngrok-free.dev' + '/api/agents/cco/qc',\n      headers:{'content-type':'application/json','x-n8n-signature':signature,\n               'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp,'Authorization':'Bearer REDACTED_OPENAI_KEY'},\n      body, timeout: 120000\n    });\n    lastErr = null; break;\n  } catch(err) { lastErr = err; if (attempt < 1) await new Promise(r => setTimeout(r, 3000)); }\n}\nif (lastErr) throw lastErr; // → continueErrorOutput → Build S03 alert1\n\nreturn [{ json: resp }];"
+      },
+      "id": "8766b013-7e8b-461a-8307-8e5f677b7880",
+      "name": "Call: CCO Quality Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        28064
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const httpRequest = async ({method='GET', url, headers={}, body, timeout=60000}) => {\n  try {\n    const res = await this.helpers.httpRequest({ method, url, headers, body, timeout, json: false });\n    if (typeof res === 'string') { try { return JSON.parse(res); } catch(_) { return res; } }\n    return res;\n  } catch (err) {\n    const b = err && err.response && err.response.body;\n    if (b !== undefined) { if (typeof b==='string'){ try { return JSON.parse(b); } catch(_) { return b; } } return b; }\n    throw err;\n  }\n};\nconst crypto    = require('crypto');\nconst brandData  = $('Prepare Brand Data3').last().json;\nconst qcResult   = $input.first().json;\nconst secret     = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId  = crypto.randomUUID();\nconst timestamp  = new Date().toISOString();\n// Join post content_type (from DeepSeek/Match Chain) so triggers 3 (healthcare\n// edu/testimonial) can fire. CCO supplies score + flags + issues; posts supply content_type.\nlet _postsForCt = [];\ntry { _postsForCt = $('Call: Match Chain').last().json?.result?.posts || $('Call: DeepSeek Generate').last().json?.result?.posts || []; } catch(_) {}\nconst _ctById = {};\nfor (const pp of _postsForCt) { if (pp && pp.post_id) _ctById[pp.post_id] = pp.content_type || null; }\nconst ccoResults = (qcResult.result||[]).map(p => ({\n  post_id:p.post_id, score:p.score||0,\n  brave_route_flag:p.brave_route_flag||false, negpat_flag:p.negpat_flag||'NONE',\n  cultural_flag:p.cultural_flag||false, dialect_flag:p.dialect_flag||false,\n  issues:Array.isArray(p.issues)?p.issues:[],\n  content_type:_ctById[p.post_id]||null\n}));\nconst body = JSON.stringify({\n  flow_id:'N8N-A01', brand_id:brandData.brand_id,\n  payload:{ request_type:'calendar_scheduled',\n    trigger_payload:{ month:brandData.month_key, batch_id:brandData.batch_id },\n    cco_results:ccoResults,\n    occasion_flags:(brandData.occasions&&brandData.occasions.length>0)?brandData.occasions:['none'] }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\n\nlet resp, lastErr;\nfor (let attempt = 0; attempt < 2; attempt++) {\n  try {\n    resp = await httpRequest({\n      method:'POST', url:'' + 'https://unwieldable-mavis-unbacked.ngrok-free.dev' + '/api/agents/ceo/confidence-gate',\n      headers:{'content-type':'application/json','x-n8n-signature':signature,\n               'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp},\n      body, timeout:45000\n    });\n    lastErr = null; break;\n  } catch(err) { lastErr = err; if (attempt < 1) await new Promise(r => setTimeout(r, 3000)); }\n}\nif (lastErr) throw lastErr; // → continueErrorOutput → Build S03 alert1\n\nreturn [{ json: resp }];"
+      },
+      "id": "eaa0cf20-ade7-44c3-8df5-4ca47dc26812",
+      "name": "Call: CEO Confidence Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -752,
+        27024
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://redzmrlzhxkkpgcokgvl.supabase.co/rest/v1/calendars?on_conflict=brand_id,month",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ brand_id: $('Prepare Brand Data3').last().json.brand_id, month: $('Prepare Brand Data3').last().json.month_key, status: 'draft' }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "68a32c3d-2749-4abd-9505-462c2f2d8114",
+      "name": "HTTP: Upsert Calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -528,
+        26752
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "brand_profiles",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "brand_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare Brand Data3').last().json.brand_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "total_calendars_generated",
+              "fieldValue": "={{ ($('Prepare Brand Data3').last().json.total_calendars || 0) + 1 }}"
+            },
+            {
+              "fieldId": "updated_at",
+              "fieldValue": "={{ $now }}"
+            }
+          ]
+        }
+      },
+      "id": "cbe09108-f98a-4c19-91ba-60e84efd7180",
+      "name": "Supabase: Update Calendar Count",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        26176
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const httpRequest = async ({method='GET', url, headers={}, body, timeout=60000}) => {\n  try {\n    const res = await this.helpers.httpRequest({ method, url, headers, body, timeout, json: false });\n    if (typeof res === 'string') { try { return JSON.parse(res); } catch(_) { return res; } }\n    return res;\n  } catch (err) {\n    const b = err && err.response && err.response.body;\n    if (b !== undefined) { if (typeof b==='string'){ try { return JSON.parse(b); } catch(_) { return b; } } return b; }\n    throw err;\n  }\n};\nconst crypto    = require('crypto');\nconst brandData  = $('Prepare Brand Data3').last().json;\nconst ceoResult  = $('Call: CEO Route & Classify3').last().json?.result || {};\nconst secret     = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst requestId  = crypto.randomUUID();\nconst timestamp  = new Date().toISOString();\nlet postsGenerated = 0;\ntry { postsGenerated = $('Merge Posts Data1').all().length; } catch(_) {}\nconst body = JSON.stringify({\n  flow_id:'N8N-A01', brand_id:brandData.brand_id,\n  payload:{\n    batch_id:brandData.batch_id, month:brandData.month_key, outcome:'calendar_generated',\n    pipeline:ceoResult.decision?.pipeline||'A', confidence_mode:ceoResult.decision?.confidence_mode||'Standard',\n    agents_dispatched:['CEO','COO','DeepSeek','MatchChain','CCO'], posts_generated:postsGenerated,\n    cost_constraint:ceoResult.decision?.cost_status||'normal',\n    n8n_execution_id:$execution.id,\n    workflow_trigger:$('Prepare Batch Config').first().json.batch_type==='MONTHLY'?'cron_monthly':'cron_weekly'\n  }\n});\nconst signature = crypto.createHmac('sha256', secret).update(body).digest('hex');\n\nlet resp, lastErr;\nfor (let attempt = 0; attempt < 2; attempt++) {\n  try {\n    resp = await httpRequest({\n      method:'POST', url:'' + 'https://unwieldable-mavis-unbacked.ngrok-free.dev' + '/api/agents/ceo/batch-complete',\n      headers:{'content-type':'application/json','x-n8n-signature':signature,\n               'x-n8n-request-id':requestId,'x-n8n-timestamp':timestamp},\n      body, timeout:45000\n    });\n    lastErr = null; break;\n  } catch(err) { lastErr = err; if (attempt < 1) await new Promise(r => setTimeout(r, 2000)); }\n}\nif (lastErr) throw lastErr; // → continueErrorOutput → Build S03 alert1\n\nreturn [{ json: resp }];"
+      },
+      "id": "d1f08253-697e-429b-b086-16e077caba3e",
+      "name": "Call: CEO Batch Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        26688
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "routing_decisions",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').last().json?.result?.routing_decision?.brand_id) ?? $('Prepare Brand Data3').last().json.brand_id }}"
+            },
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').last().json?.result?.routing_decision?.flow_id) ?? 'N8N-A01' }}"
+            },
+            {
+              "fieldId": "request_type",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').last().json?.result?.routing_decision?.request_type) ?? 'batch_completion' }}"
+            },
+            {
+              "fieldId": "pipeline_assigned",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').last().json?.result?.routing_decision?.pipeline_assigned) ?? 'shard-0' }}"
+            },
+            {
+              "fieldId": "agents_dispatched",
+              "fieldValue": "={{ JSON.stringify(($('Call: CEO Batch Complete').last().json?.result?.routing_decision?.agents_dispatched) ?? ['CEO','COO','DeepSeek','MatchChain','CCO']) }}"
+            },
+            {
+              "fieldId": "constraints_applied",
+              "fieldValue": "={{ JSON.stringify(($('Call: CEO Batch Complete').last().json?.result?.routing_decision?.constraints_applied) ?? {}) }}"
+            },
+            {
+              "fieldId": "outcome",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').last().json?.result?.routing_decision?.outcome) ?? 'calendar_generated' }}"
+            },
+            {
+              "fieldId": "confidence_mode",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').last().json?.result?.routing_decision?.confidence_mode) ?? $('Call: CEO Route & Classify3').last().json?.result?.decision?.confidence_mode ?? 'Standard' }}"
+            },
+            {
+              "fieldId": "timestamp",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').last().json?.result?.routing_decision?.timestamp) ?? $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "30172866-da69-46b9-81c4-40dd8534b01b",
+      "name": "Supabase: Insert Routing Decision",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        27744
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "memory_controller_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').last().json?.result?.memory_nominations?.[0]?.brand_id) ?? $('Prepare Brand Data3').last().json.brand_id }}"
+            },
+            {
+              "fieldId": "nomination_type",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').last().json?.result?.memory_nominations?.[0]?.nomination_type) ?? 'confidence_upgrade' }}"
+            },
+            {
+              "fieldId": "nomination_data",
+              "fieldValue": "={{ JSON.stringify(($('Call: CEO Batch Complete').last().json?.result?.memory_nominations?.[0]?.nomination_data) ?? {}) }}"
+            },
+            {
+              "fieldId": "nominated_by",
+              "fieldValue": "={{ ($('Call: CEO Batch Complete').last().json?.result?.memory_nominations?.[0]?.nominated_by) ?? 'CEO' }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "id": "1618c3a2-18a0-4e9b-b546-390b1215746b",
+      "name": "Supabase: Insert Memory Nominations",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2064,
+        28144
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const brandData=$('Prepare Brand Data3').last().json;\nlet confMode=null;\ntry{confMode=$('Call: CEO Route & Classify3').last().json.result?.decision?.confidence_mode;}catch(_){}\nconst baseSummary={brand_id:brandData.brand_id,brand_name_ar:brandData.brand_name_ar,client_slug:brandData.client_slug,client_email:brandData.client_email,month:brandData.month,month_key:brandData.month_key,batch_id:brandData.batch_id,batch_shard:brandData.batch_shard,completed_at:new Date().toISOString()};\nif(confMode==='Blocked') return [{json:{...baseSummary,status:'blocked',skip_reason:'confidence_mode_blocked',posts_generated:0,posts_clean:0,posts_watermarked:0,posts_held:0,visual_fallbacks:0}}];\nif(!brandData.arabic_dialect) return [{json:{...baseSummary,status:'skipped',skip_reason:'dialect_not_confirmed',posts_generated:0,posts_clean:0,posts_watermarked:0,posts_held:0,visual_fallbacks:0}}];\nconst allPosts=$('Merge Posts Data1').all().map(i=>i.json||{});\nlet visualPosts=[];\ntry{visualPosts=$('Merge Visual Results1').all().map(i=>i.json||{});}catch(_){}\nconst visualFailures=visualPosts.filter(p=>p.visual_failed).length;\nreturn [{json:{...baseSummary,status:'complete',posts_generated:allPosts.length,posts_clean:allPosts.filter(p=>p.route==='CLEAN').length,posts_watermarked:allPosts.filter(p=>p.route==='WATERMARK').length,posts_held:allPosts.filter(p=>p.route==='HOLD').length,visual_fallbacks:visualFailures}}];"
+      },
+      "id": "e313ea7f-4474-46ed-aea6-7f88240d3049",
+      "name": "Brand Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        28912
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto=require('crypto');\nconst SECRET='c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst makeUUID=()=>'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);});\nconst isWorkflowLevel=!!($json.execution||$json.workflow);\nlet brand_id=null,brand_name_ar=null;\ntry{const bd=$('Prepare Brand Data3').last().json;brand_id=bd.brand_id??null;brand_name_ar=bd.brand_name_ar??null;}catch(_){}\nlet payload,source;\nif(isWorkflowLevel){\n  source='workflow_error';const e=$json;\n  payload={anomaly_id:makeUUID(),anomaly_type:'batch_calendar_failed',severity:'error',source_flow:'N8N-A01',brand_id,message:e.execution?.error?.message||'A01 batch calendar flow failed',details:{failed_node:e.execution?.lastNodeExecuted??null,error_name:e.execution?.error?.name??null,execution_id:e.execution?.id??null},timestamp:new Date().toISOString()};\n}else{\n  source='per_brand';const errInfo=$json.error||$json;const failed=errInfo.node?.name||errInfo.nodeName||$execution.lastNodeExecuted||null;\n  payload={anomaly_id:makeUUID(),anomaly_type:'agent_call_failed',severity:'warning',source_flow:'N8N-A01',brand_id,brand_name_ar,message:errInfo.message||'AI agent HTTP call failed after retries',details:{failed_node:failed,error_name:errInfo.name||errInfo.errorName||null,http_code:errInfo.httpCode||errInfo.statusCode||null,execution_id:$execution.id},timestamp:new Date().toISOString()};\n}\nconst body=JSON.stringify(payload);\nconst sig=crypto.createHmac('sha256',SECRET).update(body).digest('hex');\nreturn [{ json:{ _body:body,_headers:{'content-type':'application/json','x-n8n-signature':sig,'x-n8n-request-id':`${$execution.id}-${source}-a01`,'x-n8n-timestamp':new Date().toISOString()},brand_id,failed_node:payload.details.failed_node,error_name:payload.details.error_name||null,error_message:payload.message,http_code:payload.details.http_code||null,source } }];"
+      },
+      "id": "f78aa4a4-9f18-42d4-a600-f6aa93a68ba7",
+      "name": "Build S03 alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        27376
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogzstudios.app.n8n.cloud/webhook-test/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "19ae740b-9c33-4085-8465-0f3ca6d32bd3",
+      "name": "POST · S03 anomaly-alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2000,
+        27376
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "usage_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-A01"
+            },
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id || null }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "={{ $json.failed_node || 'unknown' }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "failed"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify({ error_name: $json.error_name, error_message: $json.error_message, http_code: $json.http_code, source: $json.source }) }}"
+            }
+          ]
+        }
+      },
+      "id": "19257e9b-dd55-436e-904d-7e12ad9cb872",
+      "name": "Supabase: Log Usage (failed)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2224,
+        27376
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "zGEPPO9147anUhbO",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// COO timed out or errored — build a minimal caption_context from brand_profiles data.\n// This lets DeepSeek still run with a reduced (but valid) context instead of skipping the brand.\nconst brandData = $('Prepare Brand Data3').last().json;\n\nconst fallbackContext = [\n  `Brand: ${brandData.brand_name_ar} (${brandData.brand_name_en || brandData.brand_name_ar})`,\n  `Sector: ${brandData.sector || 'F&B'}`,\n  `Dialect: ${brandData.arabic_dialect || 'saudi'}`,\n  `City: ${brandData.city || 'Riyadh'}`,\n  `Channel: ${brandData.primary_channel || 'Instagram'}`,\n  `Religious Sensitivity: ${brandData.religious_sensitivity || 'High'}`,\n  `Price Position: ${brandData.price_position || 'mid_market'}`,\n  `Month: ${brandData.month} ${brandData.year}`,\n  `Occasions: ${(brandData.occasions||[]).join(', ') || 'none'}`,\n  `Themes: ${(brandData.occasion_themes||[]).slice(0,5).join(', ')}`,\n  `Avoid: ${(brandData.occasion_avoid||[]).join(', ') || 'none'}`,\n  '',\n  'Tone: Warm, authentic, culturally resonant. Use appropriate Arabic dialect.',\n  'Content mix: 30% emotional, 20% lifestyle, 20% offer, 10% educational, 10% testimonial, 10% announcement.',\n  'Hashtags: Use 5-8 per post, mix Arabic and English, brand-specific + trending Saudi F&B tags.',\n  'Always: Proper Arabic grammar, no romanized Arabic, culturally appropriate imagery descriptions.',\n].join('\\n');\n\nreturn [{ json: {\n  result: {\n    caption_context: fallbackContext,\n    dialect_confirmed: true,\n    watermark_flag: false,\n    _coo_fallback: true\n  }\n} }];"
+      },
+      "id": "833d2483-5067-47cb-815f-60e13fce3442",
+      "name": "COO Fallback: Use Brand Bio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2800,
+        28576
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Assemble the calendar_posts insert array from ALL Skeleton items.\n// MUST be a Code node — an HTTP-node body expression does not reliably see\n// $input.all() across items (it rendered []). Dedup by position, drop\n// out-of-range, output ONE item carrying the array in `_rows`.\nconst rows = $input.all().map(i => i.json);\nconst byPos = new Map();\nlet _dropped = 0;\nfor (const r of rows) {\n  const pos = Number(r.position);\n  // Reject orphans: a row with no calendar_id (skeleton ran with no calendar) or\n  // position 0/out-of-range is corrupt — inserting it creates the null-calendar,\n  // position-0 ghost posts (e.g. a stale DeepSeek 'supercar' template). Drop them.\n  if (!r.calendar_id) { _dropped++; continue; }\n  if (!Number.isInteger(pos) || pos < 1 || pos > 50) { _dropped++; continue; }\n  if (byPos.has(pos)) continue;\n  byPos.set(pos, {\n    post_id:r.post_id, calendar_id:r.calendar_id, brand_id:r.brand_id, position:pos,\n    chain_id:r.chain_id, caption_ar:r.caption_ar, hashtags:r.hashtags, content_type:r.content_type,\n    posting_time:r.posting_time, image_prompt_en:r.image_prompt_en, confidence_score:r.confidence_score,\n    cco_score:r.cco_score, watermark:false, visual_failed:false, status:r.status,\n    hold_reason:r.hold_reason, route_decision:r.route_decision,\n    // format = image|video — REQUIRED so the V01 Worker knows which posts are video\n    // (the image/video division). Default 'image' so it is never null.\n    format: (r.format==='video'||r.format==='image') ? r.format : 'image',\n    format_tier: (r.format==='video') ? 'video' : 'image',\n    // requires_human_review is a real column; the human_gate_triggers/detail live in\n    // qa_review_queue.flags (written by the Worker), NOT on calendar_posts — do not\n    // insert them here or the bulk insert 400s on unknown columns.\n    requires_human_review: r.requires_human_review || false,\n    // Persist pillar scores in JSONB flags column so QA panel shows Brand Fit + Occasion.\n    flags: r.flags || undefined });\n}\nconst arr = Array.from(byPos.values());\nreturn [{ json: { _rows: arr, _count: arr.length, _dropped } }];\n"
+      },
+      "id": "b8ecb5a4-065e-44a0-9b44-5a1656704109",
+      "name": "Prep Insert Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        26240
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -4272,
+        27568
+      ],
+      "id": "d5800343-057c-43a5-996c-26e0362f79b7",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── VERIFY MONTH COMMITTED — INTELLIGENT 3-MONTH ROLLING GATE ─────────────────\n// Runs once per loop pass (one month). It is NOT a dumb row-counter: it KNOWS the\n// 3-month-rolling rule and checks that THIS month is the RIGHT KIND of month before\n// letting the loop advance to the next offset.\n//\n// THE RULE (3-month rolling):\n//   • offset 0 (current month)  → PARTIAL is allowed. User may onboard mid-month,\n//       so only today→month-end working days remain. Expect ≥ 1 post, no upper need.\n//   • offset 1 & 2 (next months)→ MUST be a FULL month. A full working month (Sat/Sun\n//       off) has ~20-23 posts. If a future month came out PARTIAL (< FULL_MIN), that is\n//       WRONG (it should be a full calendar) → flag 'should_be_full' so it is caught &\n//       regenerated, NOT silently passed.\n//\n// Two independent checks, per month:\n//   1. COMMITTED?  db_count >= expected(skeleton)  — did the posts actually land?\n//   2. RIGHT SHAPE? for offset>0, db_count >= FULL_MIN — is a future month actually full?\n// Pass only when BOTH hold. Otherwise flag + CONTINUE (never deadlock; later months\n// still run; the alert names exactly what's wrong so it can be re-run).\nconst SUPA = 'https://redzmrlzhxkkpgcokgvl.supabase.co';\nconst KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo';\nconst FULL_MIN = 18;   // a real FULL working month (≥4 weeks × ~5/wk, Sat/Sun off) ≈ 20-23.\n                       //  set to 18 to tolerate a 30-day month / a couple of dropped days.\n\n// ── 1. This month's identity + offset (authoritative from Prepare Brand Data). ──\nfunction tryNode(names, pick){ for (const nm of names){ try{ const v=pick(nm); if(v!==undefined&&v!==null) return v; }catch(_){} } return null; }\nconst PBD = ['Prepare Brand Data3','Prepare Brand Data','Prepare Brand Data1'];\nconst month_offset = (() => {\n  const v = tryNode(PBD, nm => $(nm).last().json.month_offset);\n  return (typeof v === 'number') ? v : 0;\n})();\nconst month_key  = tryNode(PBD, nm => $(nm).last().json.month_key);\nconst is_partial = !!tryNode(PBD, nm => $(nm).last().json.is_partial);\n\n// ── 2. Expected = rows Skeleton actually built for THIS month (its own target). ──\nconst inItems = $input.all() || [];\nlet rows = [];\nfor (const it of inItems){ const j=it.json||{}; if (Array.isArray(j._rows)&&j._rows.length){ rows=j._rows; break; } }\nlet expected = rows.length;\nlet calendarId = rows.length ? (rows[0].calendar_id||null) : null;\nlet brand_id   = rows.length ? (rows[0].brand_id||null)   : null;\nconst SK = ['Skeleton Builder','Skeleton Builder1','Skeleton Builder3'];\nif (!expected)   expected   = tryNode(SK, nm => ($(nm).all()||[]).length) || 0;\nif (!calendarId) calendarId = tryNode(SK, nm => $(nm).last().json.calendar_id);\nif (!brand_id)   brand_id   = tryNode(SK, nm => $(nm).last().json.brand_id);\n\n// ── 3. What actually landed in the DB for THIS calendar? ──\nlet db_count = 0, query_ok = false;\nif (calendarId) {\n  try {\n    const res = await this.helpers.httpRequest({\n      method:'GET',\n      url: SUPA + '/rest/v1/calendar_posts?calendar_id=eq.' + calendarId + '&select=post_id',\n      headers: { apikey: KEY, Authorization: 'Bearer ' + KEY },\n      json:false, timeout:15000,\n    });\n    let arr = res; if (typeof res==='string'){ try{arr=JSON.parse(res);}catch(_){arr=[];} }\n    db_count = Array.isArray(arr) ? arr.length : 0;\n    query_ok = true;\n  } catch(e){ query_ok = false; }\n}\n\n// ── 4. THE INTELLIGENT VERDICT ──\n// committed: the posts the skeleton built actually reached the DB.\nconst committed = query_ok && expected > 0 && db_count >= expected;\n// right_shape: future months (offset>0) must be FULL. Current month (offset 0) may be partial.\nconst must_be_full = month_offset > 0;\nconst is_full_enough = db_count >= FULL_MIN;\nconst right_shape = must_be_full ? is_full_enough : true;\n\nconst verified = committed && right_shape;\nlet fail_reason = null;\nif (!query_ok)            fail_reason = 'verify_query_failed';\nelse if (!committed)      fail_reason = 'posts_not_committed';        // db < skeleton\nelse if (!right_shape)    fail_reason = 'future_month_is_partial';    // offset>0 but < FULL_MIN\nconst month_short = !verified;\n\n// ── 5. Pass through + rich metadata so IF/alert can act and a re-run knows what to do. ──\nconst meta = {\n  brand_id, month_key, month_offset, calendar_id: calendarId,\n  expected, db_count, query_ok,\n  expected_kind: must_be_full ? 'full' : 'partial',\n  full_min: FULL_MIN, committed, right_shape, fail_reason,\n  // explicit instruction for a regeneration: future months must be FULL, not partial.\n  remediation: (fail_reason === 'future_month_is_partial')\n    ? ('Month ' + (month_key||'?') + ' (offset ' + month_offset + ') must be a FULL calendar (>=' + FULL_MIN + ' posts) but only ' + db_count + ' were built — re-run this month as a FULL (non-partial) calendar.')\n    : (fail_reason === 'posts_not_committed')\n    ? ('Month ' + (month_key||'?') + ' built ' + expected + ' posts but only ' + db_count + ' reached the DB — re-run this month.')\n    : null,\n};\nconst passthrough = inItems.length\n  ? inItems.map(it => ({ json: { ...it.json, _month_verified: verified, _month_short: month_short, _verify: meta } }))\n  : [{ json: { _month_verified: verified, _month_short: month_short, _verify: meta } }];\nreturn passthrough;\n"
+      },
+      "id": "90f8192f-479f-4f65-b173-3cf1cac090d3",
+      "name": "Verify Month Committed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        26224
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "month-short-cond-0001",
+              "leftValue": "={{ $json._month_short }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c4c480d0-8d22-4168-9cd6-96e42308f43f",
+      "name": "IF: Month Short?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        26448
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shape a month-shortfall anomaly for the existing Build S03 alert path.\n// Now carries the INTELLIGENT verdict: which month, its offset, whether it was\n// supposed to be partial or full, and the exact remediation (regenerate full).\nconst v = ($json._verify) || {};\nconst kind = v.expected_kind || '?';\nconst msg = v.remediation || ('A01 month gate failed: brand ' + (v.brand_id||'?') + ' month ' + (v.month_key||'?')\n  + ' (offset ' + (v.month_offset==null?'?':v.month_offset) + ', expected ' + kind + ') — expected ' + (v.expected||0)\n  + ', DB has ' + (v.db_count||0) + ' [' + (v.fail_reason||'unknown') + ']. Loop continued; this month needs a re-run.');\nreturn [{ json: {\n  error: { node: { name: 'Verify Month Committed' } },\n  node_name: 'Verify Month Committed',\n  error_message: msg,\n  _month_shortfall: v,\n}}];\n"
+      },
+      "id": "869aaa38-1494-4779-8a83-fcab7d1e4cac",
+      "name": "Build Month Shortfall",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        26384
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// FULLY-STRICT gate: a month that was SKIPPED (brand blocked OR dialect not confirmed)\n// is treated as a FAILED month — the loop must NOT advance. Shape an S03 anomaly and\n// dead-end here (no path back to Brand Summary), so the 3-month run halts and the\n// admin is told exactly which month/brand failed and why.\nlet brand_id=null, month_key=null, reason='month_skipped';\nfor (const nm of ['Prepare Brand Data3','Prepare Brand Data']) {\n  try { const j=$(nm).last().json; brand_id=j.brand_id||brand_id; month_key=j.month_key||month_key; } catch(_){}\n}\n// infer reason from which upstream node fed us\ntry { if ($('IF: Brand Blocked?3').last().json) reason='brand_blocked'; } catch(_){}\ntry { const q=$('Supabase: Log to QA Queue').last().json; if(q) reason='dialect_not_confirmed'; } catch(_){}\nreturn [{ json: {\n  error: { node: { name: 'Strict Month Gate' } },\n  node_name: 'Strict Month Gate',\n  error_message: 'A01 STRICT GATE: month ' + (month_key||'?') + ' for brand ' + (brand_id||'?')\n    + ' was SKIPPED (' + reason + ') — loop STOPPED, later months NOT generated. Fix and re-run.',\n  brand_id, _skip:{ brand_id, month_key, reason },\n}}];\n"
+      },
+      "id": "a01-strict-skip-stop-0001",
+      "name": "Build Skip Stop",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1932,
+        29112
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Cost ceiling pre-flight — reads brand_cost_config.cost_blocked (O(1) single row).\n// Maintained in real-time by fn_cost_ceiling_enforcer DB trigger on usage_logs.\n// Placed after Calendar Lease insert, before Prepare Brand Data.\nconst SUPABASE_URL         = 'https://redzmrlzhxkkpgcokgvl.supabase.co';\nconst SUPABASE_SERVICE_KEY = $env.SUPABASE_SERVICE_ROLE_KEY;\n\nconst brand_id = $json.brand_id\n  ?? $('Prepare Batch Config').first().json.target_brand_id\n  ?? null;\n\nif (!brand_id) {\n  return { ...$json, cost_allowed: true, cost_status: 'unknown', cost_context: {} };\n}\n\nlet costRow = null;\ntry {\n  const res = await $helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/brand_cost_config?brand_id=eq.${brand_id}&select=cost_blocked,current_month_cost_usd,monthly_ceiling_usd,halt_at_pct,alert_at_pct`,\n    headers: {\n      apikey: SUPABASE_SERVICE_KEY,\n      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,\n    },\n    json: true,\n  });\n  costRow = Array.isArray(res) ? res[0] : null;\n} catch (e) {\n  console.error('[cost-check] fetch failed:', e.message);\n  // Non-fatal: allow generation so a DB hiccup never blocks the batch.\n  return { ...$json, cost_allowed: true, cost_status: 'fetch_error', cost_context: {} };\n}\n\nif (!costRow) {\n  return { ...$json, cost_allowed: true, cost_status: 'no_config', cost_context: {} };\n}\n\nconst spend_pct = costRow.monthly_ceiling_usd > 0\n  ? Math.round((costRow.current_month_cost_usd / costRow.monthly_ceiling_usd) * 100)\n  : 0;\n\nconst cost_status = costRow.cost_blocked\n  ? 'breached'\n  : spend_pct >= costRow.alert_at_pct\n    ? 'approaching'\n    : 'normal';\n\nconst cost_context = {\n  brand_id,\n  cost_blocked:            costRow.cost_blocked,\n  current_month_spend_usd: costRow.current_month_cost_usd,\n  monthly_ceiling_usd:     costRow.monthly_ceiling_usd,\n  spend_pct,\n  cost_status,\n};\n\nreturn { ...$json, cost_allowed: !costRow.cost_blocked, cost_status, cost_context };"
+      },
+      "id": "a01-cost-check-node-0001",
+      "name": "Check: Cost Ceiling",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4096,
+        27800
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "id": "cost-allowed",
+              "leftValue": "={{ $json.cost_allowed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a01-cost-if-node-0001",
+      "name": "IF: Cost Allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -3952,
+        27800
+      ]
+    }
+  ],
+  "connections": {
+    "Build Brand-Months2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Rolling Offset": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batch Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skeleton Builder": {
+      "main": [
+        [
+          {
+            "node": "Prep Insert Body",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bulk Insert calendar_posts": {
+      "main": [
+        [
+          {
+            "node": "Verify Month Committed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron: Nightly Shard (Sun–Thu 23:00 AST)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batch Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron: 1st of Month — Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "Set Rolling Offset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: openclaw-batch-calendar": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batch Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Batch Config": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Log Batch Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Log Batch Start": {
+      "main": [
+        [
+          {
+            "node": "IF: Monthly or Weekly?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Monthly or Weekly?": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Fetch All Active Brands",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: Fetch Brands by Shard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch All Active Brands": {
+      "main": [
+        [
+          {
+            "node": "Merge Brand Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch Brands by Shard": {
+      "main": [
+        [
+          {
+            "node": "Merge Brand Sources",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Brand Sources": {
+      "main": [
+        [
+          {
+            "node": "Build Brand-Months2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert Calendar Lease3": {
+      "main": [
+        [
+          {
+            "node": "Check: Cost Ceiling",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Brand Data3": {
+      "main": [
+        [
+          {
+            "node": "Call: CEO Route & Classify3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: CEO Route & Classify3": {
+      "main": [
+        [
+          {
+            "node": "IF: Brand Blocked?3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: Plan Slots3": {
+      "main": [
+        [
+          {
+            "node": "Call: COO Build CaptionContext3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Brand Blocked?3": {
+      "main": [
+        [
+          {
+            "node": "Build Skip Stop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call: Plan Slots3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: COO Build CaptionContext3": {
+      "main": [
+        [
+          {
+            "node": "IF: Dialect Confirmed?3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "COO Fallback: Use Brand Bio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Dialect Confirmed?3": {
+      "main": [
+        [
+          {
+            "node": "Call: DeepSeek Generate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: Log to QA Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Log to QA Queue": {
+      "main": [
+        [
+          {
+            "node": "Build Skip Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: DeepSeek Generate": {
+      "main": [
+        [
+          {
+            "node": "Call: Match Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: Match Chain": {
+      "main": [
+        [
+          {
+            "node": "Call: CCO Quality Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: CCO Quality Check": {
+      "main": [
+        [
+          {
+            "node": "Call: CEO Confidence Gate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: CEO Confidence Gate": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Upsert Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Upsert Calendar": {
+      "main": [
+        [
+          {
+            "node": "Skeleton Builder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Update Calendar Count": {
+      "main": [
+        [
+          {
+            "node": "Call: CEO Batch Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call: CEO Batch Complete": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert Routing Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert Routing Decision": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert Memory Nominations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert Memory Nominations": {
+      "main": [
+        [
+          {
+            "node": "Brand Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brand Summary": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build S03 alert": {
+      "main": [
+        [
+          {
+            "node": "POST · S03 anomaly-alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · S03 anomaly-alert": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Log Usage (failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "COO Fallback: Use Brand Bio": {
+      "main": [
+        [
+          {
+            "node": "IF: Dialect Confirmed?3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Insert Body": {
+      "main": [
+        [
+          {
+            "node": "Bulk Insert calendar_posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Kick V01 Worker (final)2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: Insert Calendar Lease3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Month Committed": {
+      "main": [
+        [
+          {
+            "node": "IF: Month Short?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Month Short?": {
+      "main": [
+        [
+          {
+            "node": "Build Month Shortfall",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: Update Calendar Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Month Shortfall": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Skip Stop": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check: Cost Ceiling": {
+      "main": [
+        [
+          {
+            "node": "IF: Cost Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Cost Allowed?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Brand Data3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "bffa1653da7ca4a85edadda52cdbd0237713917d77d290c02ed1648550f98b48"
+  }
+}

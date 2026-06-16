@@ -1,0 +1,37 @@
+{
+  "name": "@repo/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Supabase access — typed clients + queries",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./schema": "./src/schema/database.types.ts",
+    "./client": "./src/client/index.ts",
+    "./queries/brands": "./src/queries/brands.ts",
+    "./queries/brand-dna": "./src/queries/brand-dna.ts",
+    "./queries/calendars": "./src/queries/calendars.ts",
+    "./queries/admin": "./src/queries/admin.ts",
+    "./queries/snapshots": "./src/queries/snapshots.ts",
+    "./queries/occasions": "./src/queries/occasions.ts",
+    "./queries/copilot-context": "./src/queries/copilot-context.ts",
+    "./queries/copilot-threads": "./src/queries/copilot-threads.ts",
+    "./copilot-pg": "./src/copilot-pg.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "lint": "echo no-lint"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.45.4",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.5.0"
+  }
+}

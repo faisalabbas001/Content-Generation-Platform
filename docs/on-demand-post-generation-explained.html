@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OGz Studios — On-Demand Post Generation Explained</title>
+<style>
+  :root{
+    --ink:#1a202c; --muted:#4a5568; --faint:#718096;
+    --accent:#7c3aed; --accent-soft:#f3effe;
+    --green:#15803d; --green-soft:#ecfdf5;
+    --amber:#b45309; --amber-soft:#fffbeb;
+    --red:#b91c1c; --red-soft:#fef2f2;
+    --line:#e2e8f0; --surface:#f8fafc;
+  }
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  *{ box-sizing:border-box; }
+  body{
+    font-family:"Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color:var(--ink); font-size:11pt; line-height:1.62; margin:0;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  h1,h2,h3,h4{ line-height:1.25; }
+  h2{
+    font-size:18pt; color:var(--accent); margin:0 0 4px 0;
+    padding-top:6px; border-bottom:2px solid var(--accent); padding-bottom:6px;
+  }
+  h3{ font-size:13.5pt; color:var(--ink); margin:22px 0 6px; }
+  h4{ font-size:11.5pt; color:var(--muted); margin:16px 0 4px; text-transform:uppercase; letter-spacing:.04em; }
+  p{ margin:7px 0; }
+  strong{ color:var(--ink); font-weight:700; }
+  .lead{ color:var(--muted); font-size:11.5pt; }
+  ul,ol{ margin:7px 0 7px 0; padding-left:20px; }
+  li{ margin:4px 0; }
+  code{ font-family:"Consolas","SF Mono",monospace; font-size:9.5pt; background:#f1f0fb; color:#5b21b6; padding:1px 5px; border-radius:4px; }
+  .section{ page-break-before:always; padding-top:4px; }
+  .ref{
+    font-size:8.8pt; color:var(--faint); background:var(--surface);
+    border-left:3px solid var(--accent); padding:7px 11px; margin:10px 0;
+    border-radius:0 5px 5px 0;
+  }
+  .ref b{ color:var(--muted); }
+  .callout{ border-radius:7px; padding:11px 14px; margin:12px 0; font-size:10.3pt; }
+  .callout.green{ background:var(--green-soft); border:1px solid #bbf7d0; }
+  .callout.amber{ background:var(--amber-soft); border:1px solid #fde68a; }
+  .callout.red{ background:var(--red-soft); border:1px solid #fecaca; }
+  .callout.violet{ background:var(--accent-soft); border:1px solid #ddd6fe; }
+  .callout .tag{ display:block; font-weight:700; margin-bottom:3px; }
+  .callout.green .tag{ color:var(--green); }
+  .callout.amber .tag{ color:var(--amber); }
+  .callout.red .tag{ color:var(--red); }
+  .callout.violet .tag{ color:var(--accent); }
+  table{ border-collapse:collapse; width:100%; margin:12px 0; font-size:9.6pt; }
+  th,td{ border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+  th{ background:var(--accent); color:#fff; font-weight:600; }
+  tr:nth-child(even) td{ background:var(--surface); }
+  .pill{ display:inline-block; padding:1px 8px; border-radius:99px; font-size:8.5pt; font-weight:700; }
+  .pill.q{ background:#e2e8f0; color:#475569; }
+  .pill.g{ background:#dbeafe; color:#1d4ed8; }
+  .pill.d{ background:#dcfce7; color:#15803d; }
+  .pill.h{ background:#fef3c7; color:#b45309; }
+  .pill.f{ background:#fee2e2; color:#b91c1c; }
+  .flow{ counter-reset:step; margin:12px 0; }
+  .flow .step{ position:relative; padding:8px 0 8px 38px; border-left:2px solid var(--accent); margin-left:13px; }
+  .flow .step:before{
+    counter-increment:step; content:counter(step);
+    position:absolute; left:-14px; top:7px; width:26px; height:26px;
+    background:var(--accent); color:#fff; border-radius:50%;
+    text-align:center; line-height:26px; font-weight:700; font-size:10pt;
+  }
+  .flow .step b{ display:block; }
+  .cover{ height:100vh; display:flex; flex-direction:column; justify-content:center; }
+  .cover .badge{ display:inline-block; background:var(--accent-soft); color:var(--accent); font-weight:700; padding:5px 14px; border-radius:99px; font-size:10pt; letter-spacing:.05em; width:fit-content; }
+  .cover h1{ font-size:34pt; margin:18px 0 6px; color:var(--ink); }
+  .cover .sub{ font-size:15pt; color:var(--muted); margin:0; }
+  .cover .meta{ margin-top:42px; color:var(--faint); font-size:10pt; border-top:1px solid var(--line); padding-top:16px; }
+  .toc{ font-size:11pt; }
+  .toc a{ color:var(--ink); text-decoration:none; }
+  .toc li{ margin:6px 0; }
+  .small{ font-size:9.5pt; color:var(--faint); }
+  .kv{ width:100%; }
+  .kv td:first-child{ width:30%; font-weight:600; color:var(--muted); background:var(--surface); }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ COVER ════════════════ -->
+<div class="cover">
+  <span class="badge">OGz STUDIOS · SYSTEM GUIDE</span>
+  <h1>On-Demand Post Generation</h1>
+  <p class="sub">How a single post is created, reviewed, approved, rejected &amp; emailed — explained in plain language</p>
+  <div class="meta">
+    <strong>Scope:</strong> The client page <code>/{brand}/on-demand/new</code> and the admin review screen <code>/admin/qa?tab=on_demand</code><br>
+    <strong>Covers:</strong> the generation pipeline · every database table &amp; field · hold / approve / reject · regeneration · chain selection · email notifications<br>
+    <strong>Audience:</strong> non-technical — written so anyone on the team can follow it<br>
+    <strong>Prepared:</strong> 13 June 2026 · based on a direct reading of the live source code (file references included throughout)
+  </div>
+</div>
+
+<!-- ════════════════ TOC ════════════════ -->
+<div class="section">
+  <h2>What's inside</h2>
+  <ol class="toc">
+    <li><a href="#big">1 — The big picture (in one minute)</a></li>
+    <li><a href="#page">2 — The client page: <code>/{brand}/on-demand/new</code></a></li>
+    <li><a href="#pipeline">3 — What happens after “Generate” (the AI pipeline)</a></li>
+    <li><a href="#chain">4 — How chain selection works</a></li>
+    <li><a href="#outcomes">5 — The three outcomes: Delivered, Held, Failed</a></li>
+    <li><a href="#tables">6 — The database: every table &amp; field, and why</a></li>
+    <li><a href="#admin">7 — The admin review screen: <code>/admin/qa?tab=on_demand</code></a></li>
+    <li><a href="#regen">8 — Regeneration (client side &amp; admin side)</a></li>
+    <li><a href="#approve">9 — Approve, reject &amp; hold — what each button really does</a></li>
+    <li><a href="#email">10 — How email notifications work</a></li>
+    <li><a href="#refs">11 — Reference map (where everything lives in the code)</a></li>
+  </ol>
+</div>
+
+<!-- ════════════════ 1 BIG PICTURE ════════════════ -->
+<div class="section" id="big">
+  <h2>1 — The big picture (in one minute)</h2>
+  <p class="lead">A brand owner wants one custom post — right now, not as part of the monthly calendar. That is an <strong>on-demand post</strong>.</p>
+
+  <p>The journey is simple to describe:</p>
+  <div class="flow">
+    <div class="step"><b>The client describes what they want</b> on the on-demand page and clicks <em>Generate</em>.</div>
+    <div class="step"><b>The request is saved</b> to a table called <code>on_demand_requests</code> and handed to the automation engine (<strong>n8n</strong>).</div>
+    <div class="step"><b>A chain of AI “agents” builds the post</b> — a Saudi-dialect caption, an image (or video), quality checks, and a safety decision.</div>
+    <div class="step"><b>One of three things happens:</b> the post is <span class="pill d">delivered</span> straight to the client, <span class="pill h">held</span> for a human to review, or it <span class="pill f">failed</span>.</div>
+    <div class="step"><b>If it was held,</b> an OGz admin reviews it on the QA screen and either approves (releases it) or rejects it.</div>
+    <div class="step"><b>An email is sent</b> to the brand owner at the moment their post genuinely becomes available.</div>
+  </div>
+
+  <div class="callout violet">
+    <span class="tag">The one rule that shapes everything</span>
+    The company has a hard rule: <strong>the CEO agent always decides first.</strong> Every single generation — calendar or on-demand — is routed through the CEO agent before anything else runs. This is why you will see “CEO” as the very first step of the pipeline.
+  </div>
+</div>
+
+<!-- ════════════════ 2 THE PAGE ════════════════ -->
+<div class="section" id="page">
+  <h2>2 — The client page: <code>/{brand}/on-demand/new</code></h2>
+  <p>This is the screen at <code>http://localhost:3000/shawarmahousesa-7psz/on-demand/new</code> (the first part of the URL is the brand’s unique slug). It has two parts side by side.</p>
+
+  <h3>2.1 — The “Brand Context” card (left, read-only)</h3>
+  <p>Before the form, the page shows a small card listing facts it already knows about the brand, pulled automatically from the brand’s profile (its “BrandDNA”):</p>
+  <ul>
+    <li><strong>Sector</strong> (e.g. food &amp; beverage)</li>
+    <li><strong>Dialect</strong> — which Arabic dialect captions should use</li>
+    <li><strong>City</strong>, <strong>Channel</strong> (e.g. Instagram), and the brand <strong>Voice</strong></li>
+  </ul>
+  <p>The client cannot edit these — they are shown so the client understands the “defaults” the AI will use. A small <code>&lt; 5 min</code> badge sets the expectation that the post arrives quickly.</p>
+
+  <h3>2.2 — The form (right)</h3>
+  <p>Deliberately, the form asks the client for almost nothing — only two real choices:</p>
+  <ol>
+    <li><strong>Output type</strong> — a simple <em>Image</em> or <em>Video</em> toggle.</li>
+    <li><strong>The prompt</strong> — a single text box where the client describes the post they want, in plain English. It must be between <strong>10 and 5,000 characters</strong>.</li>
+  </ol>
+
+  <div class="callout amber">
+    <span class="tag">Hard Rule #3 — Arabic is never typed into the prompt</span>
+    The prompt box is locked to left-to-right (English) input. Arabic text is <strong>never</strong> sent to the image generator. Instead, the Arabic caption is laid <em>on top</em> of the finished image afterwards. This guide notes this rule again later because it appears in several places.
+  </div>
+
+  <h3>2.3 — What the client doesn’t fill in (but the system does)</h3>
+  <p>Everything else is filled in automatically so the client isn’t overwhelmed. When the form is submitted it quietly attaches sensible values:</p>
+  <table class="kv">
+    <tr><td>Content type</td><td><code>educational</code> (a safe default that doesn’t force a particular style)</td></tr>
+    <tr><td>Objective</td><td><code>awareness</code></td></tr>
+    <tr><td>Platform</td><td>taken from the brand’s primary channel (e.g. Instagram)</td></tr>
+    <tr><td>Canvas / shape</td><td>derived from the platform (square for Instagram, “snap” for Snapchat)</td></tr>
+    <tr><td>Colour palette</td><td>the brand’s primary colour</td></tr>
+    <tr><td>Posting time / month</td><td>“now” / the current month</td></tr>
+  </table>
+  <p>The same prompt text is used for both the <strong>style descriptor</strong> and the <strong>hero concept</strong> the AI works from.</p>
+
+  <h3>2.4 — What happens the instant the client clicks “Generate”</h3>
+  <div class="flow">
+    <div class="step"><b>The form sends the request</b> to the address <code>POST /api/posts/on-demand</code>.</div>
+    <div class="step"><b>The system checks the client owns this brand</b> (security), then validates every field.</div>
+    <div class="step"><b>A row is created in <code>on_demand_requests</code></b> with status <span class="pill q">queued</span>. This gives the request a permanent ID before anything else runs.</div>
+    <div class="step"><b>The system signs the request</b> with a secret key and fires it to the n8n automation (the “N8N-A02” workflow), flipping the status to <span class="pill g">generating</span>.</div>
+    <div class="step"><b>It immediately replies “accepted”</b> (it does <em>not</em> wait for the post to finish). The page now starts polling for progress.</div>
+  </div>
+  <p>If the automation engine can’t be reached, the request is marked <span class="pill f">failed</span>, an anomaly record is logged for the team, and the client sees a friendly error.</p>
+
+  <h3>2.5 — The live progress bar</h3>
+  <p>While the post is being built, the page checks the status every <strong>2.5 seconds</strong> and shows a four-stage tracker:</p>
+  <p><strong>Validating → Connecting → Generating → Finalizing.</strong></p>
+  <p>Behind “Generating”, the page shows exactly which agent is working right now, because the automation reports its real step: <em>analysing brand context (CEO) → building caption context (COO) → writing the Arabic caption → quality checks → creating the image → saving</em>. If it takes unusually long (over 2 minutes for an image, 5 minutes for a video), a gentle “this is still working — check back later” message appears, but the work keeps running.</p>
+
+  <div class="ref"><b>Reference:</b> page <code>apps/web/src/app/[slug]/on-demand/new/page.tsx</code> · form <code>on-demand-form.tsx</code> · entry point <code>apps/web/src/app/api/posts/on-demand/route.ts</code> · progress polling <code>apps/web/src/app/api/posts/on-demand/[requestId]/status/route.ts</code></div>
+</div>
+
+<!-- ════════════════ 3 PIPELINE ════════════════ -->
+<div class="section" id="pipeline">
+  <h2>3 — What happens after “Generate” (the AI pipeline)</h2>
+  <p>Once n8n picks up the request, it runs a fixed sequence of specialist “agents”. Each agent is a small AI service that does one job. Think of it as an assembly line:</p>
+
+  <div class="flow">
+    <div class="step"><b>CEO — classify &amp; route</b><br><span class="small">The CEO agent looks at the brand and the request and decides how to handle it (Hard Rule #1: the CEO always goes first).</span></div>
+    <div class="step"><b>COO — compile caption context</b><br><span class="small">Gathers the brand’s tone, dialect and rules so the caption sounds right.</span></div>
+    <div class="step"><b>DeepSeek — generate</b><br><span class="small">Writes the Arabic caption and the English “visual brief” (the description the image model will use).</span></div>
+    <div class="step"><b>CEO — match chain</b><br><span class="small">Reads what the post is actually about and picks the best visual “chain” (style template + image model). Covered in Section 4.</span></div>
+    <div class="step"><b>CCO — quality check (QC)</b><br><span class="small">Scores the result: brand relevance, prompt match, brand consistency, overall quality.</span></div>
+    <div class="step"><b>CEO — confidence gate</b><br><span class="small">The safety decision. Outputs one of three verdicts: <code>clean</code>, <code>watermark</code>, or <code>hold</code>.</span></div>
+    <div class="step"><b>Image / video generation (FAL AI)</b><br><span class="small">The picture or clip is created. The Arabic caption is then laid on top using image software — never baked into the AI prompt (Hard Rule #3).</span></div>
+    <div class="step"><b>Upload to storage</b><br><span class="small">The finished file is downloaded and re-uploaded to the company’s own Supabase storage (Hard Rule #4 — the temporary generator URL is never saved).</span></div>
+    <div class="step"><b>Callback</b><br><span class="small">n8n calls back to <code>/api/webhooks/n8n</code> with the message <code>on_demand_complete</code> so the website knows it’s done.</span></div>
+  </div>
+
+  <div class="callout violet">
+    <span class="tag">Two hard rules you’ll see in the artwork</span>
+    <strong>Arabic overlay (Rule #3):</strong> the admin screen actually shows a “clean version (no Arabic overlay)” alongside the final image to prove the rule was followed.<br>
+    <strong>Own storage (Rule #4):</strong> only the company’s storage links are ever written to the database.
+  </div>
+
+  <div class="ref"><b>Reference:</b> the agent services live under <code>apps/web/src/app/api/agents/*</code> — e.g. <code>ceo/classify</code>, <code>coo/compile-caption-context</code>, <code>deepseek/generate</code>, <code>ceo/match-chain</code>, <code>cco/qc</code>, <code>ceo/confidence-gate</code>. The orchestration sequence is described at the top of <code>api/posts/on-demand/route.ts</code>.</div>
+</div>
+
+<!-- ════════════════ 4 CHAIN SELECTION ════════════════ -->
+<div class="section" id="chain">
+  <h2>4 — How chain selection works</h2>
+  <p class="lead">A “chain” is a <strong>reusable visual recipe</strong>: a style template plus the specific image/video model and settings used to produce it. Example chains: a “Hot Food Hero” chain for steaming dishes, a “Booking CTA” chain for call-to-action posts.</p>
+
+  <h3>4.1 — Why the chain is picked <em>after</em> the caption is written</h3>
+  <p>The system deliberately does <strong>not</strong> guess the chain up front. It waits until DeepSeek has written what the post is actually about, then chooses the chain that best fits that real content. Picking a chain before seeing the content would be “blind”.</p>
+
+  <h3>4.2 — The two related steps</h3>
+  <table>
+    <tr><th>Step</th><th>What it decides</th><th>When</th></tr>
+    <tr><td><b>Select-chains</b><br>(monthly calendars)</td><td>Only the <em>format</em> (image vs video) and the <em>content type</em> for each slot — <strong>not</strong> the chain itself.</td><td>Before generation</td></tr>
+    <tr><td><b>Match-chain</b><br>(the real chain picker)</td><td>Reads each finished post’s actual caption + content and selects the single best-matching chain from the database.</td><td>After generation, before quality scoring</td></tr>
+  </table>
+  <p>For an on-demand post, the client just types a free-text prompt and the system picks the chain (and the image model) automatically from that prompt — the client never chooses a chain.</p>
+
+  <h3>4.3 — The clever part: the rules live in the data, not the code</h3>
+  <div class="callout green">
+    <span class="tag">Self-extending design</span>
+    The chain picker has <strong>no hard-coded list of chains</strong>. Instead, every chain is a row in the database with its own description — its <em>name</em>, <em>purpose</em>, <em>intent</em>, <em>style affinity</em>, and <em>anti-patterns</em> (what it should NOT be used for). The AI reads those descriptions and reasons about the best match. This means an admin can <strong>add a brand-new chain simply by adding a database row</strong> — it becomes selectable instantly, with no code changes.
+  </div>
+  <p>If the AI picker ever fails, the system falls back to a deterministic scoring method so a post is never left without a chain. The chosen chain’s ID and its prompt template are stored with the post and shown on the admin screen.</p>
+
+  <div class="ref"><b>Reference:</b> <code>apps/web/src/app/api/agents/ceo/match-chain/route.ts</code> (the post-generation picker) and <code>ceo/select-chains/route.ts</code> (format/content-type planner). The note “selection logic lives in the DATA, not here” is in the match-chain system prompt.</div>
+</div>
+
+<!-- ════════════════ 5 OUTCOMES ════════════════ -->
+<div class="section" id="outcomes">
+  <h2>5 — The three outcomes: Delivered, Held, Failed</h2>
+  <p>The CEO confidence gate (Section 3) decides which of these happens. The outcome is recorded in the <code>status</code> field of the request.</p>
+
+  <div class="callout green">
+    <span class="tag"><span class="pill d">delivered</span> — straight to the client</span>
+    The post passed all checks. It is written into <code>calendar_posts</code> and becomes visible to the client on their on-demand list and detail page. <strong>An email is sent immediately.</strong> A <code>clean</code> verdict means no watermark; a <code>watermark</code> verdict means the image is delivered with a watermark applied.
+  </div>
+
+  <div class="callout amber">
+    <span class="tag"><span class="pill h">held</span> — sent for human review</span>
+    The CEO gate (or a brand-safety trigger) decided a human must look first. A row is created in the <code>qa_review_queue</code> and the request status becomes <code>held</code>. The post does <strong>not</strong> appear to the client yet, and — importantly — <strong>no “your post is ready” email is sent at this stage.</strong> That email only fires later, if and when an admin approves it.
+  </div>
+
+  <div class="callout red">
+    <span class="tag"><span class="pill f">failed</span> — something went wrong</span>
+    The automation couldn’t finish (a timeout, an unreachable service, a quality failure, or a hard safety block). The status becomes <code>failed</code> and a plain-language reason is shown to the client, who can edit the prompt and try again. The raw technical reason is kept for support but never shown directly to the client.
+  </div>
+
+  <h4>The safety net</h4>
+  <p>When n8n calls back with <code>on_demand_complete</code>, the website performs a careful “safety-net” update: it only flips a request to <span class="pill d">delivered</span> if it was still <span class="pill g">generating</span>. This guarantees it can <strong>never accidentally overwrite a “held” post</strong> and email the client about something a human hasn’t approved yet.</p>
+
+  <div class="ref"><b>Reference:</b> outcome handling in <code>apps/web/src/app/api/webhooks/n8n/route.ts</code> (search for <code>on_demand_complete</code>); the status values are defined by the <code>on_demand_status_type</code> enum in <code>supabase/migrations/0044_on_demand_requests.sql</code>.</div>
+</div>
+
+<!-- ════════════════ 6 DATABASE ════════════════ -->
+<div class="section" id="tables">
+  <h2>6 — The database: every table &amp; field, and why</h2>
+  <p>Five tables do the heavy lifting. Here is each one in plain terms, with what every field is for.</p>
+
+  <h3>6.1 — <code>on_demand_requests</code> — the client’s brief &amp; the request’s life story</h3>
+  <p><strong>Why it exists:</strong> the normal product is a monthly calendar of ~20 posts. An on-demand post is a single, one-off request with a custom brief that doesn’t fit the monthly structure — so it gets its own table. This table captures the brief, tracks the request end-to-end, and links to the post that eventually gets produced.</p>
+  <table>
+    <tr><th>Field</th><th>Plain-English meaning</th></tr>
+    <tr><td><code>request_id</code></td><td>The unique ID for this request (the page URL uses it).</td></tr>
+    <tr><td><code>brand_id</code></td><td>Which brand this belongs to.</td></tr>
+    <tr><td><code>content_type</code>, <code>objective</code></td><td>What kind of post and its goal (e.g. educational / awareness).</td></tr>
+    <tr><td><code>media_type</code></td><td>Image or video (added later, defaults to image for old rows).</td></tr>
+    <tr><td><code>platform</code>, <code>canvas</code></td><td>Where it’s for (Instagram, Snapchat…) and its shape/aspect ratio.</td></tr>
+    <tr><td><code>posting_time</code>, <code>month</code>, <code>posts_per_week</code></td><td>Scheduling hints.</td></tr>
+    <tr><td><code>occasion_name</code>, <code>occasion_lead_weeks</code>, <code>occasion_priority</code></td><td>Optional event the post ties to (e.g. National Day).</td></tr>
+    <tr><td><code>hashtags</code></td><td>Requested hashtags.</td></tr>
+    <tr><td><code>style_descriptor</code>, <code>hero_concept</code></td><td>The visual brief — comes from the client’s prompt (English only, Rule #3).</td></tr>
+    <tr><td><code>negative_prompt</code></td><td>What the image should avoid.</td></tr>
+    <tr><td><code>cultural_guidance</code></td><td>Cultural notes for the post.</td></tr>
+    <tr><td><code>color_palette</code></td><td>Brand colours to use (hex codes).</td></tr>
+    <tr><td><code>image_model_pref</code></td><td>Preferred image engine, or <code>auto</code> to let the system choose.</td></tr>
+    <tr><td><code>first_ever_post</code></td><td>Flags a brand’s very first output (auto-held for an extra quality check).</td></tr>
+    <tr><td><code>overlay_brand_name_ar</code></td><td>Whether to overlay the Arabic brand name on the image.</td></tr>
+    <tr><td><code>status</code></td><td>The life story: <code>queued → generating → delivered / held / failed</code>.</td></tr>
+    <tr><td><code>current_step</code></td><td>The live pipeline step (ceo, coo, caption, qc, image, upload, done) — powers the progress bar.</td></tr>
+    <tr><td><code>confidence_mode</code></td><td>The confidence mode the CEO chose for this run.</td></tr>
+    <tr><td><code>post_id</code></td><td>Once finished, points to the <code>calendar_posts</code> row that was created.</td></tr>
+    <tr><td><code>n8n_request_id</code></td><td>Correlation ID so n8n’s callbacks match the right request.</td></tr>
+    <tr><td><code>failure_reason</code></td><td>Why it failed, if it did.</td></tr>
+    <tr><td><code>submitted_by</code></td><td>Which user submitted it.</td></tr>
+    <tr><td><code>created_at</code>, <code>updated_at</code>, <code>delivered_at</code></td><td>Timestamps.</td></tr>
+  </table>
+  <p class="small"><strong>Security:</strong> a client can only read and insert their own brand’s requests; clients can never update the status directly — only the automation (using a service-role key) can. This is enforced by database rules (RLS).</p>
+
+  <h3>6.2 — <code>calendar_posts</code> — the actual finished post</h3>
+  <p>This is the shared table for <em>every</em> post, whether it came from a monthly calendar or from an on-demand request. On-demand changes added a few things:</p>
+  <table>
+    <tr><th>Field</th><th>Plain-English meaning</th></tr>
+    <tr><td><code>calendar_id</code></td><td>Made optional — on-demand posts have no monthly calendar.</td></tr>
+    <tr><td><code>on_demand_request_id</code></td><td>Links the post back to its on-demand brief.</td></tr>
+    <tr><td><code>route_decision</code></td><td>The CEO gate verdict made explicit: <code>clean</code>, <code>watermark</code>, or <code>hold</code>.</td></tr>
+    <tr><td><code>revision_count</code></td><td>How many times the client has regenerated this post (capped at 3).</td></tr>
+    <tr><td><code>storage_url</code>, <code>clean_storage_url</code></td><td>The final image/video, and the “no Arabic overlay” clean version.</td></tr>
+    <tr><td><code>caption_ar</code>, <code>hashtags</code></td><td>The Arabic caption and tags.</td></tr>
+    <tr><td><code>confidence_score</code>, <code>watermark</code></td><td>Quality score and whether a watermark was applied.</td></tr>
+    <tr><td><code>status</code></td><td>Where the post is in its own approval life (e.g. <code>pending</code> when released to the client).</td></tr>
+  </table>
+  <p class="small"><strong>Built-in safeguard:</strong> a rule guarantees every post belongs to <em>exactly one</em> parent — either a monthly calendar or an on-demand request, never both and never neither.</p>
+
+  <h3>6.3 — <code>admin_regenerations</code> — the admin’s private “draft lane”</h3>
+  <p><strong>Why it exists:</strong> when an <em>admin</em> regenerates a post, the new version must <strong>not</strong> be shown to the client until the admin approves it. So admin regenerations live in their own table as “drafts” and never touch the live post until promoted.</p>
+  <table>
+    <tr><th>Field</th><th>Plain-English meaning</th></tr>
+    <tr><td><code>regen_id</code></td><td>Unique ID of this draft version.</td></tr>
+    <tr><td><code>post_id</code>, <code>request_id</code>, <code>brand_id</code></td><td>Which post / request / brand this draft is for.</td></tr>
+    <tr><td><code>version</code></td><td>Version number (v1, v2, …) for this post.</td></tr>
+    <tr><td><code>media_type</code>, <code>storage_url</code>, <code>clean_storage_url</code></td><td>The draft’s media files.</td></tr>
+    <tr><td><code>caption_ar</code>, <code>hashtags</code>, <code>confidence_score</code>, <code>watermark</code></td><td>The draft’s caption, tags and scores.</td></tr>
+    <tr><td><code>prompt_override</code></td><td>If the admin edited the prompt, the custom prompt used.</td></tr>
+    <tr><td><code>image_model</code></td><td>Which model produced this draft.</td></tr>
+    <tr><td><code>status</code></td><td><code>draft</code> → <code>approved</code> / <code>rejected</code> / <code>superseded</code> (replaced by another approved version).</td></tr>
+    <tr><td><code>created_by</code>, <code>reviewed_by</code>, <code>created_at</code>, <code>reviewed_at</code></td><td>Who made/decided it and when.</td></tr>
+  </table>
+  <p class="small"><strong>Security:</strong> this table is <strong>admin-only</strong> at the database level — clients have no access whatsoever, so admin drafts can never leak.</p>
+
+  <h3>6.4 — <code>qa_review_queue</code> — the “needs a human” list</h3>
+  <p>When a post is <span class="pill h">held</span>, a row is added here. This is what populates the admin QA screen.</p>
+  <table>
+    <tr><th>Field</th><th>Plain-English meaning</th></tr>
+    <tr><td><code>queue_id</code></td><td>Unique ID of the review item.</td></tr>
+    <tr><td><code>post_id</code>, <code>brand_id</code></td><td>Which post and brand.</td></tr>
+    <tr><td><code>status</code></td><td><code>pending</code> → <code>approved</code> / <code>rejected</code>.</td></tr>
+    <tr><td><code>trigger_reason</code></td><td>Why it was held (the hold reasons — see Section 7.4).</td></tr>
+    <tr><td><code>cco_score</code>, <code>flags</code></td><td>The quality score and detailed flags (brand relevance, prompt match, etc.).</td></tr>
+    <tr><td><code>resolved_at</code>, <code>reviewed_at</code></td><td>When it was decided.</td></tr>
+  </table>
+
+  <h3>6.5 — Supporting tables</h3>
+  <ul>
+    <li><strong><code>usage_logs</code></strong> — an audit trail; every webhook callback and every admin approve/reject is recorded here.</li>
+    <li><strong><code>anomaly_records</code></strong> — logged when something abnormal happens (e.g. the automation engine is unreachable).</li>
+    <li><strong><code>brand_profiles</code></strong> — the brand’s identity and the owner’s account, used to find the email address.</li>
+    <li><strong><code>calendars</code></strong> — monthly calendars (used to look up the month for emails when relevant).</li>
+  </ul>
+
+  <div class="ref"><b>Reference:</b> <code>supabase/migrations/0044_on_demand_requests.sql</code> (requests table + calendar_posts changes), <code>0047_revision_count.sql</code> (revision_count), <code>0074_on_demand_current_step.sql</code> (current_step), <code>0075_on_demand_media_type.sql</code> (media_type), <code>0099_admin_regenerations.sql</code> (admin draft lane). Types in <code>packages/db/src/types.ts</code> and queries in <code>packages/db/src/queries/on-demand.ts</code> &amp; <code>admin-regenerations.ts</code>.</div>
+</div>
+
+<!-- ════════════════ 7 ADMIN ════════════════ -->
+<div class="section" id="admin">
+  <h2>7 — The admin review screen: <code>/admin/qa?tab=on_demand</code></h2>
+  <p>This is the OGz team’s quality-assurance (QA) desk at <code>http://localhost:3000/admin/qa?tab=on_demand</code>.</p>
+
+  <h3>7.1 — The two tabs</h3>
+  <p>The QA page has two tabs, each showing a count of items waiting:</p>
+  <ul>
+    <li><strong>Calendar</strong> — held posts from monthly calendars.</li>
+    <li><strong>On-Demand</strong> — held posts from on-demand requests (the focus of this guide).</li>
+  </ul>
+  <p>The On-Demand tab shows a <strong>paginated grid of brand cards</strong> (10 per page) — one card per brand that has on-demand activity. A small “new” badge signals fresh arrivals. Clicking a brand opens that brand’s on-demand items, and clicking an item opens the full <strong>inspection page</strong>.</p>
+
+  <h3>7.2 — The inspection page layout</h3>
+  <p>The inspection page is a two-column workspace built to give a reviewer everything in one place.</p>
+
+  <h4>Left column — four tabs</h4>
+  <table>
+    <tr><th>Tab</th><th>What it shows</th></tr>
+    <tr><td><b>Preview</b></td><td>The generated image or video, the “clean version” (no Arabic overlay, proving Rule #3), the Arabic caption (shown right-to-left), the hashtags, and a strip of regenerated versions.</td></tr>
+    <tr><td><b>DeepSeek Data</b></td><td>Everything the AI produced: the client’s original prompt, the English image prompt (with a green “Arabic-clean” badge or a red warning if Arabic slipped in), the negative prompt, the chain template and chain ID, cultural guidance, a metadata grid (content type, format, platform, route decision, watermark, model, confidence mode, occasion), the colour palette, and the request ID.</td></tr>
+    <tr><td><b>CCO / Flags</b></td><td>The quality scores and a detailed breakdown of every hold reason, plus the raw flag values.</td></tr>
+    <tr><td><b>Revision History</b></td><td>Every admin regeneration draft for this post, each with its version, time, image, caption, scores and status.</td></tr>
+  </table>
+
+  <h4>Right column — facts &amp; actions</h4>
+  <ul>
+    <li><strong>IDs card:</strong> Post ID, Queue ID, Request ID, and created date.</li>
+    <li><strong>Score cards:</strong> CCO Score, Visual QC, Brand Relevance, Prompt Match, Brand Consistency. A dash (“—”) means that check didn’t run — scores are never invented.</li>
+    <li><strong>Quick meta:</strong> Route, Chain, Format, Platform, Watermark, Model — colour-coded (green = clean, amber = watermark, red = hold).</li>
+    <li><strong>Hold reasons summary:</strong> badges showing why it was held.</li>
+    <li><strong>Action suite:</strong> the Regenerate button and the Approve / Reject buttons.</li>
+  </ul>
+
+  <h3>7.3 — Selecting a regenerated version</h3>
+  <p>When a reviewer clicks a draft version in the history strip, the <em>entire</em> page re-renders to show that version — its image, caption, prompts and model — so they can compare versions exactly as they’d see the original. (The original AI quality scores don’t apply to a draft, so those simply show “—” for a selected draft.)</p>
+
+  <h3>7.4 — The hold reasons (why a post is sent for review)</h3>
+  <p>Each hold reason has a clear label and explanation on screen. The full set:</p>
+  <table>
+    <tr><th>Reason</th><th>What it means</th></tr>
+    <tr><td>First-ever output</td><td>The brand’s very first post — held for an initial quality audit.</td></tr>
+    <tr><td>CCO brave-route flag</td><td>The culture agent flagged the content as culturally risky.</td></tr>
+    <tr><td>Health claim</td><td>A healthcare/testimonial claim needing compliance review.</td></tr>
+    <tr><td>Finance claim</td><td>A financial benefit claim that must be verified.</td></tr>
+    <tr><td>Government sector</td><td>All government-sector content is held by policy.</td></tr>
+    <tr><td>High religious sensitivity</td><td>A religious reference for a high-sensitivity brand.</td></tr>
+    <tr><td>Dialect unconfirmed</td><td>The Arabic dialect couldn’t be confirmed automatically.</td></tr>
+    <tr><td>Conflict record</td><td>The brand has an unresolved conflict on file.</td></tr>
+    <tr><td>Revision limit reached</td><td>The maximum number of revision cycles was hit.</td></tr>
+    <tr><td>CCO low score (&lt;50)</td><td>Quality scored below the threshold.</td></tr>
+    <tr><td>Hard block</td><td>Matched a prohibited pattern — <strong>cannot be approved at all</strong>.</td></tr>
+    <tr><td>Method drift</td><td>The post deviated from the approved brand method.</td></tr>
+    <tr><td>CEO hold</td><td>The CEO routing layer flagged it on brand-risk grounds.</td></tr>
+    <tr><td>Admin hold</td><td>An admin manually placed it on hold.</td></tr>
+  </table>
+  <div class="callout red">
+    <span class="tag">Hard Block is special</span>
+    If a post is a <strong>Hard Block</strong>, the page shows a red banner and the <em>Approve button is disabled</em> — there is no way for an admin to release a hard-blocked post.
+  </div>
+
+  <div class="ref"><b>Reference:</b> tab page <code>apps/web/src/app/admin/qa/page.tsx</code> · brand list <code>on-demand-qa-list.tsx</code> · inspection screen <code>admin/qa/on-demand/[brandId]/on-demand-inspection-page.tsx</code> · the hold-reason labels are the <code>TRIGGER_LABELS</code> / <code>TRIGGER_DETAILS</code> maps in that file. Data via <code>adminQ.getQaOnDemandGroups()</code>.</div>
+</div>
+
+<!-- ════════════════ 8 REGENERATION ════════════════ -->
+<div class="section" id="regen">
+  <h2>8 — Regeneration (client side &amp; admin side)</h2>
+  <p>Both the client and the admin can ask the system to “try again”. They use the <strong>same automation workflow (N8N-B03)</strong>, but with one crucial difference — a <code>target</code> flag — that completely changes the outcome.</p>
+
+  <h3>8.1 — Client regeneration (target = user)</h3>
+  <p>On their on-demand detail page, a client can click <strong>Regenerate</strong> (optionally with a custom prompt). Then:</p>
+  <ul>
+    <li>The system first checks the post hasn’t already been regenerated <strong>3 times</strong> (the cap). If it has, it stops and says so.</li>
+    <li>N8N-B03 runs the full pipeline and <strong>overwrites the live post in place</strong>, bumping <code>revision_count</code> by one.</li>
+    <li>Because the live post changed, the new image is immediately visible to the client, and a “your image is ready” email is sent.</li>
+  </ul>
+  <p>A regeneration can itself come back <span class="pill h">held</span> (sent to admin review) or <span class="pill f">rejected</span> (blocked by the brand-safety gate) — the client sees a clear message for each case.</p>
+
+  <h3>8.2 — Admin regeneration (target = admin)</h3>
+  <p>On the inspection page, an admin clicks <strong>Regenerate</strong> and chooses one of two options in a modal:</p>
+  <ul>
+    <li><strong>Use Existing Prompt</strong> — re-run with the same prompt.</li>
+    <li><strong>Edit &amp; Regenerate</strong> — refine the prompt first (English only).</li>
+  </ul>
+  <p>The critical difference: the admin’s result does <strong>not</strong> overwrite the live post. Instead it is saved as a new <strong>draft</strong> in <code>admin_regenerations</code> — invisible to the client — and appears in the version-history strip. The admin can generate several drafts and compare them. A live progress tracker (Queuing → Connecting → Running AI generation → Saving draft) mirrors the real pipeline step by polling the admin status endpoint.</p>
+
+  <div class="callout violet">
+    <span class="tag">Why two completely separate paths?</span>
+    The client’s own regeneration history (live post + <code>revision_count</code>) is kept entirely independent from the admin’s draft history. This way an admin can experiment freely without ever disturbing what the client currently sees.
+  </div>
+
+  <div class="ref"><b>Reference:</b> client path <code>apps/web/src/app/[slug]/on-demand/actions.ts → requestRegenerate</code> · admin path <code>apps/web/src/app/actions/admin-regenerate.ts → requestAdminRegenerate</code> · admin button UI <code>admin/qa/admin-regenerate-button.tsx</code> · admin progress endpoint <code>api/admin/on-demand/[requestId]/status/route.ts</code> · workflow <code>n8n/flows/N8N-B03_ Revision Request Handler.json</code>.</div>
+</div>
+
+<!-- ════════════════ 9 APPROVE/REJECT ════════════════ -->
+<div class="section" id="approve">
+  <h2>9 — Approve, reject &amp; hold — what each button really does</h2>
+  <p>The inspection page has <strong>two different kinds</strong> of approve/reject. It’s important not to confuse them.</p>
+
+  <h3>9.1 — Approving / rejecting the held item itself</h3>
+  <p>These are the big Approve / Reject buttons in the bottom-right action suite. They decide the fate of the original held post:</p>
+  <ul>
+    <li><strong>Approve</strong> releases the held post to the client and resolves the queue item. (Disabled for a Hard Block.)</li>
+    <li><strong>Reject</strong> declines it. Both actions ask for confirmation and are recorded in the audit log.</li>
+  </ul>
+
+  <h3>9.2 — Approving / rejecting an admin draft version</h3>
+  <p>Inside the version-history strip, each admin draft has its own <strong>“Approve this version”</strong> and <strong>“Reject”</strong> controls. Approving a draft is the moment a private draft becomes the live post. Here is exactly what “approve a draft” does, step by step:</p>
+  <div class="flow">
+    <div class="step"><b>Promote the draft into the live post.</b> The draft’s image, caption, hashtags, score and watermark are copied into <code>calendar_posts</code>, and the post’s status is set to <code>pending</code>.</div>
+    <div class="step"><b>Reveal the request.</b> The <code>on_demand_requests</code> row is marked <code>delivered</code> so the client can see it.</div>
+    <div class="step"><b>Tidy the drafts.</b> This draft is marked <code>approved</code>; any other open drafts for the same post are marked <code>superseded</code>.</div>
+    <div class="step"><b>Close the queue item.</b> The matching <code>qa_review_queue</code> row is marked <code>approved</code> and leaves the queue.</div>
+    <div class="step"><b>Record &amp; notify.</b> The decision is written to the audit log, and the “post approved” email is sent to the client.</div>
+  </div>
+  <div class="callout green">
+    <span class="tag">Important nuance: “admin approval = release, not final approval”</span>
+    When an admin approves, the post is released to the client with status <code>pending</code> — meaning the <strong>client</strong> then approves it (or requests a revision) from their own calendar. Admin approval makes it visible; the client still has the final say on their own content.
+  </div>
+  <p><strong>Rejecting a draft</strong> simply marks that draft <code>rejected</code>. It stays in the history for the record, and nothing the client sees changes — they keep seeing the last approved asset.</p>
+
+  <div class="ref"><b>Reference:</b> held-item actions <code>apps/web/src/app/actions/qa.ts → approveQaItem / rejectQaItem</code> · draft actions <code>apps/web/src/app/actions/admin-regenerate.ts → approveAdminRegeneration / rejectAdminRegeneration</code>.</div>
+</div>
+
+<!-- ════════════════ 10 EMAIL ════════════════ -->
+<div class="section" id="email">
+  <h2>10 — How email notifications work</h2>
+  <p>Emails are sent through a shared helper called <code>notify()</code>, which uses <strong>Resend</strong> as the email provider. The system is careful to email the client only at the <em>genuine</em> moment a post becomes available — never before.</p>
+
+  <h3>10.1 — When an email is (and isn’t) sent</h3>
+  <table>
+    <tr><th>Event</th><th>Email sent?</th><th>Which template</th></tr>
+    <tr><td>Post delivered straight away</td><td><b>Yes</b> — immediately</td><td><code>post_approved</code></td></tr>
+    <tr><td>Post <span class="pill h">held</span> for review</td><td><b>No</b> — held posts wait for an admin</td><td>—</td></tr>
+    <tr><td>Admin approves a held post / draft</td><td><b>Yes</b> — at the moment of approval</td><td><code>post_approved</code></td></tr>
+    <tr><td>Client regeneration succeeds</td><td><b>Yes</b> — “new image is ready”</td><td><code>post_approved</code></td></tr>
+    <tr><td>Post failed</td><td>No email — shown on screen instead</td><td>—</td></tr>
+  </table>
+  <p>Notice the same <code>post_approved</code> (“your post is ready”) template is reused across all the “it’s available now” moments, so the client gets one consistent message.</p>
+
+  <h3>10.2 — How the right person is found</h3>
+  <p>To send the email, the system looks up the brand to find the owner’s account, then resolves that account’s email address. The email is personalised with the <strong>brand name</strong>, the post’s <strong>position</strong>, and the <strong>month</strong> (taken from the post’s calendar, or from the request’s posting time for on-demand posts).</p>
+
+  <div class="callout amber">
+    <span class="tag">A subtle but important technical choice</span>
+    These emails are sent “awaited” (the code waits for the send to complete) rather than fire-and-forget. On serverless infrastructure, a fire-and-forget send can be killed before it finishes, leaving the notification stuck. The <code>notify()</code> helper also never throws an error, so a hiccup in email can never break the post itself.
+  </div>
+
+  <h3>10.3 — Internal alerts (not to clients)</h3>
+  <p>Separately, when an anomaly is routed for human attention, the relevant internal “copilot” (tech, management, or production) receives a direct alert email so the team can act quickly. These go to staff, not clients.</p>
+
+  <div class="ref"><b>Reference:</b> delivery email <code>api/webhooks/n8n/route.ts → fireNotifyOnDemandDelivered</code> · client-regeneration email <code>[slug]/on-demand/actions.ts → fireNotifyOnDemandRegenerated</code> · admin-approval email <code>actions/admin-regenerate.ts → fireNotifyApproved</code> · the <code>notify()</code> helper and templates live in <code>@repo/email</code>.</div>
+</div>
+
+<!-- ════════════════ 11 REFERENCE MAP ════════════════ -->
+<div class="section" id="refs">
+  <h2>11 — Reference map (where everything lives)</h2>
+  <p>For anyone who wants to trace a behaviour back to the code, here is the full map.</p>
+
+  <h4>Client experience</h4>
+  <table>
+    <tr><th>What</th><th>File</th></tr>
+    <tr><td>On-demand “new” page</td><td><code>apps/web/src/app/[slug]/on-demand/new/page.tsx</code></td></tr>
+    <tr><td>The form &amp; progress UI</td><td><code>apps/web/src/app/[slug]/on-demand/new/on-demand-form.tsx</code></td></tr>
+    <tr><td>Submit endpoint</td><td><code>apps/web/src/app/api/posts/on-demand/route.ts</code></td></tr>
+    <tr><td>Progress polling</td><td><code>apps/web/src/app/api/posts/on-demand/[requestId]/status/route.ts</code></td></tr>
+    <tr><td>Client regenerate action</td><td><code>apps/web/src/app/[slug]/on-demand/actions.ts</code></td></tr>
+  </table>
+
+  <h4>Admin experience</h4>
+  <table>
+    <tr><th>What</th><th>File</th></tr>
+    <tr><td>QA tabs page</td><td><code>apps/web/src/app/admin/qa/page.tsx</code></td></tr>
+    <tr><td>On-demand brand list</td><td><code>apps/web/src/app/admin/qa/on-demand-qa-list.tsx</code></td></tr>
+    <tr><td>Inspection page</td><td><code>apps/web/src/app/admin/qa/on-demand/[brandId]/on-demand-inspection-page.tsx</code></td></tr>
+    <tr><td>Admin regenerate button</td><td><code>apps/web/src/app/admin/qa/admin-regenerate-button.tsx</code></td></tr>
+    <tr><td>Version-history strip</td><td><code>apps/web/src/app/admin/qa/admin-regen-history.tsx</code></td></tr>
+    <tr><td>Admin regenerate / approve / reject</td><td><code>apps/web/src/app/actions/admin-regenerate.ts</code></td></tr>
+    <tr><td>Held-item approve / reject</td><td><code>apps/web/src/app/actions/qa.ts</code></td></tr>
+    <tr><td>Admin progress polling</td><td><code>apps/web/src/app/api/admin/on-demand/[requestId]/status/route.ts</code></td></tr>
+  </table>
+
+  <h4>Automation, data &amp; rules</h4>
+  <table>
+    <tr><th>What</th><th>File</th></tr>
+    <tr><td>n8n callback receiver</td><td><code>apps/web/src/app/api/webhooks/n8n/route.ts</code></td></tr>
+    <tr><td>Regeneration workflow</td><td><code>n8n/flows/N8N-B03_ Revision Request Handler.json</code></td></tr>
+    <tr><td>Chain pickers</td><td><code>api/agents/ceo/match-chain</code>, <code>ceo/select-chains</code></td></tr>
+    <tr><td>AI agents</td><td><code>apps/web/src/app/api/agents/*</code> (ceo, coo, deepseek, cco)</td></tr>
+    <tr><td>Requests table &amp; calendar_posts changes</td><td><code>supabase/migrations/0044_on_demand_requests.sql</code></td></tr>
+    <tr><td>Revision count</td><td><code>supabase/migrations/0047_revision_count.sql</code></td></tr>
+    <tr><td>Live step / media type</td><td><code>0074_on_demand_current_step.sql</code>, <code>0075_on_demand_media_type.sql</code></td></tr>
+    <tr><td>Admin draft lane</td><td><code>supabase/migrations/0099_admin_regenerations.sql</code></td></tr>
+    <tr><td>Database types &amp; queries</td><td><code>packages/db/src/types.ts</code>, <code>queries/on-demand.ts</code>, <code>queries/admin-regenerations.ts</code></td></tr>
+    <tr><td>Company hard rules</td><td><code>CLAUDE.md</code> (Hard Rules #1–#4)</td></tr>
+  </table>
+
+  <p class="small" style="margin-top:24px; border-top:1px solid var(--line); padding-top:12px;">
+    This document was produced by reading the live source code directly. Status values, table fields, hold reasons and email behaviour reflect the code as it stands in this repository on 13 June 2026. Where the code contains a safeguard (such as the “never overwrite a held post” guard, or the disabled Approve button on a Hard Block), it has been described exactly as implemented rather than assumed.
+  </p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "@repo/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Domain model, types, schemas, confidence classifier, 11 override triggers",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schemas": "./src/schemas/index.ts",
+    "./schemas/ceo": "./src/schemas/ceo.ts",
+    "./schemas/coo": "./src/schemas/coo.ts",
+    "./schemas/cco": "./src/schemas/cco.ts",
+    "./schemas/deepseek": "./src/schemas/deepseek.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "lint": "echo no-lint"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "^5.5.0"
+  }
+}

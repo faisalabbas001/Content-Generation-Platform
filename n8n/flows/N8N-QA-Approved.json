@@ -1,0 +1,645 @@
+{
+  "name": "N8N-QA-Approved",
+  "nodes": [
+    {
+      "id": "qa-approved-webhook",
+      "name": "Webhook POST /webhook/openclaw-qa-approved",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "openclaw-qa-approved",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "openclaw-qa-approved",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "qa-approved-verify",
+      "name": "Verify HMAC + parse body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst secret = process.env.N8N_WEBHOOK_SECRET;\nconst body   = $input.first().json.body ?? $input.first().json;\nconst sig    = $input.first().headers?.['x-n8n-signature'] ?? '';\nif (secret) {\n  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(JSON.stringify(body)).digest('hex');\n  if (sig !== expected) throw new Error('HMAC mismatch — rejected');\n}\nconst brand_id   = body.brand_id;\nconst queue_id   = body.queue_id;\nconst request_id = body.request_id;\n// decision: the web app sends 'rejected' when an admin rejects a QA item and\n// 'approved' (or omits it) when approving. Only the approve path may generate.\nconst decision   = (body.decision ?? 'approved').toString().toLowerCase();\nif (!brand_id || !queue_id) throw new Error('Missing brand_id or queue_id');\nreturn [{ json: { brand_id, queue_id, request_id: request_id ?? null, decision } }];"
+      }
+    },
+    {
+      "id": "qa-branch-decision",
+      "name": "Branch: rejected?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-rejected",
+              "leftValue": "={{ $json.decision }}",
+              "rightValue": "rejected",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "qa-rejected-noop",
+      "name": "Rejected — skip generation",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        660,
+        220
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "qa-rejected-respond",
+      "name": "Respond 200 OK (rejected)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        880,
+        220
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"skipped\": \"rejected — no generation\" }",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "qa-fetch-queue",
+      "name": "Supabase: fetch qa_review_queue row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-rest",
+          "name": "Supabase REST (service_role)"
+        }
+      },
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "qa_review_queue",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "queue_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.queue_id }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "qa-fetch-request",
+      "name": "Supabase: fetch on_demand_requests row",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-rest",
+          "name": "Supabase REST (service_role)"
+        }
+      },
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "on_demand_requests",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Verify HMAC + parse body').first().json.request_id }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "qa-fetch-brand",
+      "name": "Supabase: fetch brand_profiles",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-rest",
+          "name": "Supabase REST (service_role)"
+        }
+      },
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "brand_profiles",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "brand_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Verify HMAC + parse body').first().json.brand_id }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "qa-prepare-calendar",
+      "name": "Prepare calendar_posts insert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const verify   = $('Verify HMAC + parse body').first().json;\nconst queueRow = $('Supabase: fetch qa_review_queue row').first().json;\nconst reqRow   = $('Supabase: fetch on_demand_requests row').first().json;\nconst brand    = $('Supabase: fetch brand_profiles').first().json;\n\n// brand_id: prefer brand fetch (most authoritative) then webhook\nconst brand_id = brand.brand_id ?? verify.brand_id;\n\n// Normalise arabic_dialect to V01 enum values.\n// DB column is arabic_dialect (not dialect).\nconst DIALECT_NORM = {\n  'msa': 'MSA_accessible', 'msa_accessible': 'MSA_accessible',\n  'msa_formal': 'MSA_formal', 'gulf': 'Gulf', 'najdi': 'Najdi',\n  'hejazi': 'Hejazi', 'mixed': 'Mixed',\n  'MSA_accessible': 'MSA_accessible', 'MSA_formal': 'MSA_formal',\n  'Gulf': 'Gulf', 'Najdi': 'Najdi', 'Hejazi': 'Hejazi', 'Mixed': 'Mixed',\n};\nconst rawDialect = brand.arabic_dialect ?? brand.dialect ?? 'MSA_accessible';\nconst dialect = DIALECT_NORM[rawDialect] ?? DIALECT_NORM[rawDialect.toLowerCase().replace(/[\\s-]/g,'_')] ?? 'MSA_accessible';\n\n// caption_ar: for CEO/CCO holds the caption was already generated by DeepSeek\n// and stored in qa_review_queue.caption_ar. For dialect holds it fires before\n// generation so caption_ar is null — fall back to the brief's hero_concept so\n// the Sharp overlay always has SOME Arabic-translatable text.\n// (V01's overlay.ts skips silently if headline_ar has no Arabic chars.)\nconst caption_ar = queueRow.caption_ar || null;\n\n// month for V01 storage key: prefer posting_time from on_demand_requests\nconst postingTime = reqRow.posting_time || new Date().toISOString();\nconst month = postingTime.slice(0, 7);\n\nreturn [{ json: {\n  brand_id:           brand_id,\n  caption_ar:         caption_ar ?? '',\n  confidence_score:   queueRow.cco_score  ?? 85,\n  watermark:          false,\n  status:             'draft',\n  on_demand_request_id: verify.request_id,\n  // V01 inputs passed through\n  __brand_id:         brand_id,\n  __queue_id:         verify.queue_id,\n  __request_id:       verify.request_id,\n  __caption_ar:       caption_ar ?? '',\n  __cco_score:        queueRow.cco_score  ?? 85,\n  __prompt_en:        reqRow.style_descriptor ?? reqRow.hero_concept ?? 'product lifestyle photography, clean background',\n  __objective:        reqRow.objective  ?? 'awareness',\n  __platform:         reqRow.platform   ?? 'Instagram',\n  __brand_name_ar:    brand.brand_name_ar ?? '',\n  __dialect:          dialect,\n  __primary_color:    brand.primary_color_hex ?? '',\n  __confidence_flag:  'clean',\n  __month:            month,\n} }];"
+      }
+    },
+    {
+      "id": "qa-insert-calendar",
+      "name": "Supabase: insert calendar_posts",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-rest",
+          "name": "Supabase REST (service_role)"
+        }
+      },
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "calendar_posts",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "caption_ar",
+              "fieldValue": "={{ $json.caption_ar }}"
+            },
+            {
+              "fieldId": "confidence_score",
+              "fieldValue": "={{ $json.confidence_score }}"
+            },
+            {
+              "fieldId": "watermark",
+              "fieldValue": "={{ $json.watermark }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "={{ $json.status }}"
+            },
+            {
+              "fieldId": "on_demand_request_id",
+              "fieldValue": "={{ $json.on_demand_request_id }}"
+            },
+            {
+              "fieldId": "position",
+              "fieldValue": "0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "qa-prepare-v01",
+      "name": "Prepare V01 inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const prep     = $('Prepare calendar_posts insert').first().json;\nconst inserted = $('Supabase: insert calendar_posts').first().json;\nconst post_id  = inserted.post_id;\nif (!post_id) throw new Error('calendar_posts insert returned no post_id');\n\nreturn [{ json: {\n  brand_id:          prep.__brand_id,\n  post_id:           post_id,\n  prompt_en:         prep.__prompt_en,\n  brand_name_ar:     prep.__brand_name_ar,\n  headline_ar:       prep.__caption_ar,\n  dialect:           prep.__dialect,\n  channel:           prep.__platform,\n  objective:         prep.__objective,\n  confidence_flag:   prep.__confidence_flag,\n  primary_color_hex: prep.__primary_color,\n  month:             prep.__month,\n  reference_image_url: null,\n  revision_count:    0,\n  chain_id:          null,\n  // carry-through for later updates\n  __queue_id:        prep.__queue_id,\n  __request_id:      prep.__request_id,\n  __post_id:         post_id,\n} }];"
+      }
+    },
+    {
+      "id": "qa-run-v01",
+      "name": "Execute N8N-V01 sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        0
+      ],
+      "parameters": {
+        "workflowId": "N8N-V01 — Visual Generation (Testing Mode)",
+        "options": {
+          "timeout": 300000
+        }
+      }
+    },
+    {
+      "id": "qa-update-calendar-image",
+      "name": "Supabase: update calendar_posts storage_url",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-rest",
+          "name": "Supabase REST (service_role)"
+        }
+      },
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "calendar_posts",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "post_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare V01 inputs').first().json.__post_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "storage_url",
+              "fieldValue": "={{ $json.storage_url }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "delivered"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "qa-update-request",
+      "name": "Supabase: update on_demand_requests delivered",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-rest",
+          "name": "Supabase REST (service_role)"
+        }
+      },
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "on_demand_requests",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare V01 inputs').first().json.__request_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "delivered"
+            },
+            {
+              "fieldId": "post_id",
+              "fieldValue": "={{ $('Prepare V01 inputs').first().json.__post_id }}"
+            },
+            {
+              "fieldId": "delivered_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "qa-update-queue",
+      "name": "Supabase: update qa_review_queue delivered",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2640,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-rest",
+          "name": "Supabase REST (service_role)"
+        }
+      },
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "qa_review_queue",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "queue_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Prepare V01 inputs').first().json.__queue_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "approved"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "qa-respond",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2860,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true }",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "qa-error-handler",
+      "name": "Error: respond 500",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        220
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": false, \"error\": \"{{ $json.message }}\" }",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "id": "qa-approved-deprecation-note",
+      "name": "Deprecation note (on-demand)",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -200
+      ],
+      "parameters": {
+        "content": "⚠️ DEPRECATED FOR ON-DEMAND (N8N-A02)\n\nAs of the Generate-Then-Review change, on-demand content is generated up-front by N8N-A02 and only HELD for moderation. Admin Approve/Reject is now a pure DB status flip in apps/web/src/app/actions/qa.ts — it NO LONGER calls this workflow and never regenerates media.\n\nThis workflow is retained only for the CALENDAR per-item QA approval path.",
+        "height": 260,
+        "width": 420,
+        "color": 4
+      }
+    }
+  ],
+  "connections": {
+    "Webhook POST /webhook/openclaw-qa-approved": {
+      "main": [
+        [
+          {
+            "node": "Verify HMAC + parse body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify HMAC + parse body": {
+      "main": [
+        [
+          {
+            "node": "Branch: rejected?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch: rejected?": {
+      "main": [
+        [
+          {
+            "node": "Rejected — skip generation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: fetch qa_review_queue row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rejected — skip generation": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 OK (rejected)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: fetch qa_review_queue row": {
+      "main": [
+        [
+          {
+            "node": "Supabase: fetch on_demand_requests row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: fetch on_demand_requests row": {
+      "main": [
+        [
+          {
+            "node": "Supabase: fetch brand_profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: fetch brand_profiles": {
+      "main": [
+        [
+          {
+            "node": "Prepare calendar_posts insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare calendar_posts insert": {
+      "main": [
+        [
+          {
+            "node": "Supabase: insert calendar_posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: insert calendar_posts": {
+      "main": [
+        [
+          {
+            "node": "Prepare V01 inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare V01 inputs": {
+      "main": [
+        [
+          {
+            "node": "Execute N8N-V01 sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute N8N-V01 sub-workflow": {
+      "main": [
+        [
+          {
+            "node": "Supabase: update calendar_posts storage_url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: update calendar_posts storage_url": {
+      "main": [
+        [
+          {
+            "node": "Supabase: update on_demand_requests delivered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: update on_demand_requests delivered": {
+      "main": [
+        [
+          {
+            "node": "Supabase: update qa_review_queue delivered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: update qa_review_queue delivered": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": ""
+  }
+}

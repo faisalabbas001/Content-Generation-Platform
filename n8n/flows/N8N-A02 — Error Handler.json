@@ -1,0 +1,100 @@
+{
+  "name": "N8N-A02 — Error Handler",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a02eh-trigger",
+      "name": "On Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fired when N8N-A02 crashes.\n// Builds HMAC-signed S03 anomaly alert.\n// No request_id available cross-workflow — Mark as failed targets all stuck rows by status.\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst e = $json;\n\nconst makeUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n  const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\n\nconst failureMsg = String(e.execution?.error?.message || 'workflow_error').slice(0, 500);\n\nconst body = JSON.stringify({\n  anomaly_id:   makeUUID(),\n  anomaly_type: 'n8n_failure',\n  severity:     'error',\n  source_flow:  'N8N-A02',\n  brand_id:     null,\n  message:      failureMsg,\n  details: {\n    failed_node:  e.execution?.lastNodeExecuted ?? null,\n    error_name:   e.execution?.error?.name      ?? null,\n    execution_id: e.execution?.id               ?? null,\n  },\n  timestamp: new Date().toISOString(),\n});\n\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn [{\n  json: {\n    _body: body,\n    _headers: {\n      'content-type':     'application/json',\n      'x-n8n-signature':  sig,\n      'x-n8n-request-id': `${$execution.id}-err-a02`,\n      'x-n8n-timestamp':  new Date().toISOString(),\n    },\n    _failure_reason: failureMsg,\n  }\n}];\n"
+      },
+      "id": "a02eh-build-alert",
+      "name": "Build S03 alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://ogztudios.app.n8n.cloud/webhook-test/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type",     "value": "={{ $json._headers['content-type'] }}" },
+            { "name": "x-n8n-signature",  "value": "={{ $json._headers['x-n8n-signature'] }}" },
+            { "name": "x-n8n-request-id", "value": "={{ $json._headers['x-n8n-request-id'] }}" },
+            { "name": "x-n8n-timestamp",  "value": "={{ $json._headers['x-n8n-timestamp'] }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json._body }}",
+        "options": {},
+        "onError": "continueRegularOutput"
+      },
+      "id": "a02eh-post-s03",
+      "name": "POST · S03 anomaly-alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 160]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "on_demand_requests",
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "generating"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status",         "fieldValue": "failed" },
+            { "fieldId": "failure_reason", "fieldValue": "={{ $json._failure_reason }}" }
+          ]
+        }
+      },
+      "id": "a02eh-mark-failed",
+      "name": "Mark as failed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [690, 440],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-rest",
+          "name": "Supabase REST (service_role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "On Error": {
+      "main": [[
+        { "node": "Build S03 alert", "type": "main", "index": 0 }
+      ]]
+    },
+    "Build S03 alert": {
+      "main": [[
+        { "node": "POST · S03 anomaly-alert", "type": "main", "index": 0 },
+        { "node": "Mark as failed",           "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,760 @@
+﻿{
+  "name": "N8N-A05: Upgrade Readiness Scorer",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 1 * *"
+            }
+          ]
+        }
+      },
+      "id": "node-1-cron",
+      "name": "Cron: 1st of Month 6 AM AST",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst currentMonth = now.getMonth();\nconst currentYear = now.getFullYear();\nconst monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];\nconst lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);\nconst offerValidUntil = lastDayOfMonth.toISOString().split('T')[0];\n\nreturn {\n  check_month: monthNames[currentMonth],\n  check_year: currentYear,\n  batch_id: `upgrade-readiness-${currentYear}-${currentMonth + 1}`,\n  generated_at: now.toISOString(),\n  offer_valid_until: offerValidUntil,\n  weights: {\n    frequency:    0.25,\n    quality:      0.30,\n    completeness: 0.20,\n    loyalty:      0.15,\n    coo:          0.10,\n  },\n};"
+      },
+      "id": "node-2-prepare-config",
+      "name": "Prepare Run Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "brand_profiles",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "field": "tier",
+              "operator": "eq",
+              "value": "free"
+            }
+          ]
+        },
+        "sort": [
+          {
+            "field": "created_at",
+            "direction": "DESC"
+          }
+        ],
+        "options": {}
+      },
+      "id": "node-3-fetch-free-brands",
+      "name": "Supabase: Fetch Free Tier Brands",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {
+          "parallelProcessing": true
+        }
+      },
+      "id": "node-4-loop-brands",
+      "name": "Loop Brands (10 Parallel)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const brand = $input.first().json;\nconst config = $('Prepare Run Config').first().json;\nconst daysSinceSignup = Math.floor((Date.now() - new Date(brand.created_at).getTime()) / (1000 * 60 * 60 * 24));\n\nreturn {\n  brand_id:           brand.brand_id,\n  brand_name_ar:      brand.brand_name_ar,\n  brand_name_en:      brand.brand_name_en || brand.brand_name_ar,\n  sector:             brand.sector,\n  city:               brand.city_primary,\n  tier:               brand.tier,\n  total_calendars:    brand.total_calendars_generated || 0,\n  completeness_score: brand.completeness_score || 0,\n  days_since_signup:  daysSinceSignup,\n  dialect:            brand.arabic_dialect,\n  primary_channel:    brand.primary_channel,\n  batch_id:           config.batch_id,\n  offer_valid_until:  config.offer_valid_until,\n  weights:            config.weights,\n};"
+      },
+      "id": "node-5-prepare-brand-metrics",
+      "name": "Prepare Brand Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "calendar_posts",
+        "filters": {
+          "conditions": [
+            {
+              "field": "brand_id",
+              "operator": "eq",
+              "value": "={{ $json.brand_id }}"
+            },
+            {
+              "field": "status",
+              "operator": "neq",
+              "value": "held"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 20
+      },
+      "id": "node-6-fetch-posts",
+      "name": "Supabase: Fetch Brand Posts",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/brand_performance_log?brand_id=eq.' + $('Prepare Brand Metrics').first().json.brand_id + '&evaluation_type=eq.upgrade_readiness&offer_status=eq.pending' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"offer_status\":\"expired\"}",
+        "options": {
+          "timeout": 10000,
+          "neverError": true
+        }
+      },
+      "id": "node-7-expire-old-offers",
+      "name": "HTTP: Expire Old Pending Offers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const brand = $('Prepare Brand Metrics').first().json;\nconst posts = $('Supabase: Fetch Brand Posts').all();\nconst w = brand.weights;\n\n// Frequency Score (25%) — calendars generated (0 cal=0, 1=40, 2=65, 3=80, 4+=100)\nconst calMap = [0, 40, 65, 80, 100];\nconst frequencyScore = calMap[Math.min(brand.total_calendars, 4)];\n\n// Quality Score (30%) — avg confidence_score across published posts\nconst avgConfidence = posts.length > 0\n  ? posts.reduce((s, p) => s + (p.json.confidence_score || 70), 0) / posts.length\n  : 50;\nconst qualityScore = Math.min(Math.round(avgConfidence), 100);\n\n// Completeness Score (20%) — brand DNA completeness (stored as 0-100)\nconst completenessScore = Math.min(Math.round(brand.completeness_score || 0), 100);\n\n// Loyalty Score (15%) — days since account creation\nconst d = brand.days_since_signup;\nlet loyaltyScore;\nif (d >= 365)      loyaltyScore = 100;\nelse if (d >= 180) loyaltyScore = 80;\nelse if (d >= 90)  loyaltyScore = 60;\nelse if (d >= 30)  loyaltyScore = 30;\nelse               loyaltyScore = 0;\n\n// COO Score (10%) — proxy: has published posts + complete DNA\nconst hasPublishedPosts = posts.length > 0 ? 1 : 0;\nconst hasCompleteDna = (brand.completeness_score || 0) >= 70 ? 1 : 0;\nconst cooScore = hasPublishedPosts * 50 + hasCompleteDna * 50;\n\n// Weighted composite (0-100)\nconst totalScore = Math.round(\n  frequencyScore    * w.frequency    +\n  qualityScore      * w.quality      +\n  completenessScore * w.completeness +\n  loyaltyScore      * w.loyalty      +\n  cooScore          * w.coo\n);\n\n// Readiness tier — drives offer personalisation, NOT a gate. All brands proceed.\nlet readinessTier;\nif (totalScore >= 75)      readinessTier = 'highly_ready';\nelse if (totalScore >= 55) readinessTier = 'ready';\nelse if (totalScore >= 35) readinessTier = 'potential';\nelse                       readinessTier = 'not_ready';\n\nconst avgPostScore = posts.length > 0\n  ? posts.reduce((s, p) => s + (p.json.confidence_score || 70), 0) / posts.length\n  : 0;\n\nreturn {\n  brand_id:           brand.brand_id,\n  sector:             brand.sector ?? null,\n  brand_name_ar:      brand.brand_name_ar,\n  brand_name_en:      brand.brand_name_en,\n  total_calendars:    brand.total_calendars,\n  completeness_score: brand.completeness_score,\n  days_since_signup:  brand.days_since_signup,\n  posts_count:        posts.length,\n  avg_post_score:     Math.round(avgPostScore * 100) / 100,\n  batch_id:           brand.batch_id,\n  offer_valid_until:  brand.offer_valid_until,\n  scores: {\n    frequency:    frequencyScore,\n    quality:      qualityScore,\n    completeness: completenessScore,\n    loyalty:      loyaltyScore,\n    coo:          cooScore,\n  },\n  total_score:    totalScore,\n  readiness_tier: readinessTier,\n};"
+      },
+      "id": "node-8-calculate-score",
+      "name": "Calculate Upgrade Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1650,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const scored = $input.first().json;\nconst tier = scored.readiness_tier;\nconst cal = scored.total_calendars;\n\n// Bilingual upgrade recommendation personalised by readiness tier\nconst recommendations = {\n  highly_ready: {\n    en: `Your brand is generating consistent, high-quality content — you're ready to go pro. Upgrade now and publish automatically to Instagram with ${cal} calendar${cal === 1 ? '' : 's'} already built.`,\n    ar: `علامتك التجارية تنتج محتوى متسقًا وعالي الجودة — أنت جاهز للانطلاق باحترافية. رقّي الآن وانشر تلقائيًا على إنستغرام مع ${cal} تقويم${cal === 1 ? '' : 'ات'} جاهز.`,\n  },\n  ready: {\n    en: `Great momentum! You've built ${cal} calendar${cal === 1 ? '' : 's'} with solid quality. Upgrade to auto-publish, unlock all 20 posts per calendar, and get priority support.`,\n    ar: `زخم رائع! لقد بنيت ${cal} تقويم${cal === 1 ? '' : 'ات'} بجودة متينة. رقّي للنشر التلقائي وفتح جميع المنشورات وأولوية الدعم.`,\n  },\n  potential: {\n    en: cal > 0\n      ? `You're on the right track with ${cal} calendar${cal === 1 ? '' : 's'} generated. Upgrade now to unlock auto-publishing and accelerate your content journey.`\n      : 'Your brand foundations are set. Upgrade now to unlock auto-publishing and start your content journey.',\n    ar: cal > 0\n      ? `أنت على المسار الصحيح مع ${cal} تقويم${cal === 1 ? '' : 'ات'}. رقّي الآن لفتح النشر التلقائي وتسريع رحلة المحتوى الخاصة بك.`\n      : 'أسس علامتك التجارية جاهزة. رقّي الآن لفتح النشر التلقائي وابدأ رحلة المحتوى الخاصة بك.',\n  },\n  not_ready: {\n    en: 'Welcome to OGz Studios! Generate your first calendar and unlock auto-publishing, unlimited downloads, and premium AI content — all in one plan.',\n    ar: 'مرحبًا في OGz Studios! أنشئ تقويمك الأول وافتح النشر التلقائي والتنزيلات غير المحدودة والمحتوى المتميز — كل ذلك في خطة واحدة.',\n  },\n};\n\n// Tier-based offer matrix — discount depth rewards usage history\nconst offers = {\n  highly_ready: { en: '20% off your first 3 months', ar: 'خصم 20% على أول 3 أشهر' },\n  ready:        { en: '20% off your first month',    ar: 'خصم 20% على أول شهر' },\n  potential:    { en: '15% off your first month',    ar: 'خصم 15% على أول شهر' },\n  not_ready:    { en: '10% off your first month',    ar: 'خصم 10% على أول شهر' },\n};\n\nconst rec   = recommendations[tier];\nconst offer = offers[tier];\n\nconst metricsPayload = JSON.stringify({\n  total_calendars:       scored.total_calendars,\n  avg_post_score:        scored.avg_post_score,\n  completeness_score:    scored.completeness_score,\n  days_since_signup:     scored.days_since_signup,\n  posts_count:           scored.posts_count,\n  features_to_highlight: ['auto_publishing', 'unlimited_posts', 'unlimited_calendars', 'priority_support'],\n});\n\nconst scoresPayload = JSON.stringify(scored.scores);\n\nreturn {\n  brand_id:                   scored.brand_id,\n  evaluation_type:            'upgrade_readiness',\n  readiness_tier:             tier,\n  total_score:                scored.total_score,\n  scores:                     scoresPayload,\n  metrics:                    metricsPayload,\n  upgrade_recommendation:     rec.en,\n  upgrade_recommendation_ar:  rec.ar,\n  suggested_offer:            offer.en,\n  suggested_offer_ar:         offer.ar,\n  offer_valid_until:          scored.offer_valid_until,\n  offer_status:               'pending',\n  batch_id:                   scored.batch_id,\n  evaluated_at:               new Date().toISOString(),\n};"
+      },
+      "id": "node-9-generate-offer",
+      "name": "Generate Offer Copy",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1850,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "brand_performance_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "evaluation_type",
+              "fieldValue": "={{ $json.evaluation_type }}"
+            },
+            {
+              "fieldId": "readiness_tier",
+              "fieldValue": "={{ $json.readiness_tier }}"
+            },
+            {
+              "fieldId": "total_score",
+              "fieldValue": "={{ $json.total_score }}"
+            },
+            {
+              "fieldId": "scores",
+              "fieldValue": "={{ $json.scores }}"
+            },
+            {
+              "fieldId": "metrics",
+              "fieldValue": "={{ $json.metrics }}"
+            },
+            {
+              "fieldId": "upgrade_recommendation",
+              "fieldValue": "={{ $json.upgrade_recommendation }}"
+            },
+            {
+              "fieldId": "upgrade_recommendation_ar",
+              "fieldValue": "={{ $json.upgrade_recommendation_ar }}"
+            },
+            {
+              "fieldId": "suggested_offer",
+              "fieldValue": "={{ $json.suggested_offer }}"
+            },
+            {
+              "fieldId": "suggested_offer_ar",
+              "fieldValue": "={{ $json.suggested_offer_ar }}"
+            },
+            {
+              "fieldId": "offer_valid_until",
+              "fieldValue": "={{ $json.offer_valid_until }}"
+            },
+            {
+              "fieldId": "offer_status",
+              "fieldValue": "={{ $json.offer_status }}"
+            },
+            {
+              "fieldId": "batch_id",
+              "fieldValue": "={{ $json.batch_id }}"
+            },
+            {
+              "fieldId": "evaluated_at",
+              "fieldValue": "={{ $json.evaluated_at }}"
+            }
+          ]
+        }
+      },
+      "id": "node-10-log-performance",
+      "name": "Supabase: Log Performance",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2050,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const scored  = $('Calculate Upgrade Score').first().json;\nconst offerData = $('Generate Offer Copy').first().json;\n\nreturn {\n  brand_id:           scored.brand_id,\n  flow_id:            'N8N-A05',\n  request_type:       'upgrade_readiness',\n  pipeline_assigned:  'marketing_pipeline',\n  agents_dispatch:    { coo: false, ceo: false },\n  constraints_applied: {\n    evaluation_type: 'upgrade_readiness',\n    readiness_tier:  scored.readiness_tier,\n    total_score:     scored.total_score,\n    all_free_brands: true,\n  },\n  confidence_mode: 'Standard',\n  outcome: JSON.stringify({\n    brand_name_ar:  scored.brand_name_ar,\n    brand_name_en:  scored.brand_name_en,\n    sector:         scored.sector ?? null,\n    readiness_tier: scored.readiness_tier,\n    total_score:    scored.total_score,\n    metrics: {\n      completeness_score: scored.completeness_score,\n      total_calendars:    scored.total_calendars,\n      avg_post_score:     scored.avg_post_score,\n      posts_count:        scored.posts_count,\n      days_since_signup:  scored.days_since_signup,\n      scores:             scored.scores,\n    },\n    batch_id:       scored.batch_id,\n    evaluated_at:   offerData.evaluated_at,\n  }),\n  timestamp:       offerData.evaluated_at,\n};"
+      },
+      "id": "node-11-prepare-routing",
+      "name": "Prepare Routing Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2250,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "routing_decisions",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "={{ $json.flow_id }}"
+            },
+            {
+              "fieldId": "request_type",
+              "fieldValue": "={{ $json.request_type }}"
+            },
+            {
+              "fieldId": "pipeline_assigned",
+              "fieldValue": "={{ $json.pipeline_assigned }}"
+            },
+            {
+              "fieldId": "agents_dispatch",
+              "fieldValue": "={{ JSON.stringify($json.agents_dispatch) }}"
+            },
+            {
+              "fieldId": "constraints_applied",
+              "fieldValue": "={{ JSON.stringify($json.constraints_applied) }}"
+            },
+            {
+              "fieldId": "confidence_mode",
+              "fieldValue": "={{ $json.confidence_mode }}"
+            },
+            {
+              "fieldId": "outcome",
+              "fieldValue": "={{ $json.outcome }}"
+            },
+            {
+              "fieldId": "timestamp",
+              "fieldValue": "={{ $json.timestamp }}"
+            }
+          ]
+        }
+      },
+      "id": "node-12-insert-routing",
+      "name": "Supabase: Insert Routing Decision",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2450,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const allBrands = $input.all();\nconst config = $('Prepare Run Config').first().json;\n\nconst tierCounts = { highly_ready: 0, ready: 0, potential: 0, not_ready: 0 };\nallBrands.forEach(b => {\n  const outcome = b.json.outcome || '';\n  const tier = outcome.replace('offer_generated_', '');\n  if (tier in tierCounts) tierCounts[tier]++;\n});\n\nreturn {\n  batch_id:          config.batch_id,\n  check_month:       config.check_month,\n  check_year:        config.check_year,\n  total_free_brands: allBrands.length,\n  offers_generated:  allBrands.length,\n  tier_distribution: tierCounts,\n  offer_valid_until: config.offer_valid_until,\n  generated_at:      new Date().toISOString(),\n};"
+      },
+      "id": "node-13-final-report",
+      "name": "Generate Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const report = $input.first().json;\nreturn {\n  flow_id:      'N8N-A05',\n  anomaly_type: 'upgrade_readiness_report',\n  details:      report,\n  severity:     report.offers_generated > 0 ? 'INFO' : 'LOW',\n  brand_id:     null,\n  created_at:   new Date().toISOString(),\n};"
+      },
+      "id": "node-14-prepare-report-log",
+      "name": "Prepare Report Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "anomaly_records",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "source_flow",
+              "fieldValue": "N8N-A05"
+            },
+            {
+              "fieldId": "anomaly_type",
+              "fieldValue": "={{ $json.anomaly_type }}"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={{ $json.details }}"
+            },
+            {
+              "fieldId": "severity",
+              "fieldValue": "={{ $json.severity }}"
+            }
+          ]
+        }
+      },
+      "id": "node-15-insert-report",
+      "name": "Supabase: Insert Report",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3050,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  flow_id:       'N8N-A05',\n  error_type:    'UPGRADE_READINESS_BATCH_FAILED',\n  error_message: $input.first().json.message || 'Unknown error',\n  batch_id:      $('Prepare Run Config').first().json.batch_id,\n  timestamp:     new Date().toISOString(),\n};"
+      },
+      "id": "node-21-error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "anomaly_records",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "source_flow",
+              "fieldValue": "N8N-A05"
+            },
+            {
+              "fieldId": "anomaly_type",
+              "fieldValue": "={{ $json.error_type }}"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={{ $json }}"
+            },
+            {
+              "fieldId": "severity",
+              "fieldValue": "HIGH"
+            }
+          ]
+        }
+      },
+      "id": "node-22-log-error",
+      "name": "Supabase: Log Anomaly",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        850,
+        500
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "1",
+          "name": "Supabase Service Role"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "a05-error-trigger",
+      "name": "On Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst e = $json;\n\nconst makeUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n  const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\n\nconst body = JSON.stringify({\n  anomaly_id:   makeUUID(),\n  anomaly_type: 'upgrade_readiness_failed',\n  severity:     'error',\n  source_flow:  'N8N-A05',\n  brand_id:     null,\n  message:      e.execution?.error?.message || 'A05 upgrade readiness flow failed',\n  details: {\n    failed_node:  e.execution?.lastNodeExecuted ?? null,\n    error_name:   e.execution?.error?.name      ?? null,\n    execution_id: e.execution?.id               ?? null,\n  },\n  timestamp: new Date().toISOString(),\n});\n\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  _body: body,\n  _headers: {\n    'content-type':     'application/json',\n    'x-n8n-signature':  sig,\n    'x-n8n-request-id': `${$execution.id}-err-a05`,\n    'x-n8n-timestamp':  new Date().toISOString(),\n  },\n};"
+      },
+      "id": "a05-error-build",
+      "name": "Build S03 alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogzstudios.app.n8n.cloud/webhook-test/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": {
+          "timeout": 10000
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "a05-error-post",
+      "name": "POST · S03 anomaly-alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        650,
+        900
+      ]
+    }
+  ],
+  "connections": {
+    "Cron: 1st of Month 6 AM AST": {
+      "main": [
+        [
+          {
+            "node": "Prepare Run Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Run Config": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Fetch Free Tier Brands",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch Free Tier Brands": {
+      "main": [
+        [
+          {
+            "node": "Loop Brands (10 Parallel)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Brands (10 Parallel)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Brand Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Brand Metrics": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Fetch Brand Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Fetch Brand Posts": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Expire Old Pending Offers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Expire Old Pending Offers": {
+      "main": [
+        [
+          {
+            "node": "Calculate Upgrade Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Upgrade Score": {
+      "main": [
+        [
+          {
+            "node": "Generate Offer Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Offer Copy": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Log Performance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Log Performance": {
+      "main": [
+        [
+          {
+            "node": "Prepare Routing Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Routing Decision": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert Routing Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert Routing Decision": {
+      "main": [
+        [
+          {
+            "node": "Loop Brands (10 Parallel)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Final Report": {
+      "main": [
+        [
+          {
+            "node": "Prepare Report Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Report Log": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Log Anomaly",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On Error": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build S03 alert": {
+      "main": [
+        [
+          {
+            "node": "POST · S03 anomaly-alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "N8N-S03",
+    "timezone": "Asia/Riyadh"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "3.0.0",
+  "id": "N8N-A05",
+  "active": true
+}

@@ -1,0 +1,280 @@
+{
+  "name": "N8N-S03: CEO Anomaly Router",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "s03-00-errtrigger",
+      "name": "On Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [250, 700]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// Workflow-level unhandled error — sign a callback so server logs it\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst err = $input.first().json;\n\nconst body = JSON.stringify({\n  event_type: 'anomaly_routed',\n  flow_id: 'N8N-S03',\n  brand_id: null,\n  payload: {\n    anomaly_id:   'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);}),\n    anomaly_type: 'n8n_failure',\n    severity:     'critical',\n    source_flow:  'N8N-S03',\n    message:      `Unhandled error in \"${err.node?.name || 'unknown'}\": ${err.message || 'unknown'}`,\n    target_copilot: 'tech',\n    human_gate: false,\n    is_blocked: false,\n    ceo_error: true\n  }\n});\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  _body: body,\n  _headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': `${$execution.id}-wferr-s03`,\n    'x-n8n-timestamp': new Date().toISOString()\n  }\n};"
+      },
+      "id": "s03-00-sign-wferr",
+      "name": "Sign: Workflow Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 700]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type",     "value": "={{ $json._headers['content-type'] }}" },
+            { "name": "x-n8n-signature",  "value": "={{ $json._headers['x-n8n-signature'] }}" },
+            { "name": "x-n8n-request-id", "value": "={{ $json._headers['x-n8n-request-id'] }}" },
+            { "name": "x-n8n-timestamp",  "value": "={{ $json._headers['x-n8n-timestamp'] }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "s03-00-http-wferr",
+      "name": "HTTP: Callback (workflow error)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [650, 700]
+    },
+
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "anomaly-alert",
+        "responseMode": "responseNode"
+      },
+      "id": "s03-01-webhook",
+      "name": "Webhook: Anomaly Alert",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// Webhook v2 wraps POST body under .body\nconst raw = $input.first().json;\nconst p = raw.body ?? raw;\n// Ensure anomaly_id is always a valid UUID — the anomaly_records PK is uuid type.\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nconst makeUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n  const r = Math.random() * 16 | 0;\n  return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\nconst rawId = p.anomaly_id || '';\nreturn {\n  anomaly_id:   UUID_RE.test(rawId) ? rawId : makeUUID(),\n  anomaly_type: p.anomaly_type || p.error_type || 'UNKNOWN',\n  severity:     (p.severity    || 'warning').toLowerCase(),\n  source_flow:  p.source_flow  || p.flow_id || p.source || 'unknown',\n  brand_id:     p.brand_id     || null,\n  message:      p.message      || p.error_message || 'No message',\n  details:      p.details      || p.event_data    || {},\n  timestamp:    p.timestamp    || new Date().toISOString()\n};"
+      },
+      "id": "s03-02-parse",
+      "name": "Parse Anomaly",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// Sign anomaly_received callback — server writes anomaly_records immediately\nconst crypto = require('crypto');\nconst a = $input.first().json;\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\n\nconst body = JSON.stringify({\n  event_type: 'anomaly_routed',\n  flow_id: 'N8N-S03',\n  brand_id: a.brand_id || null,\n  payload: {\n    anomaly_id:         a.anomaly_id,\n    anomaly_type:       a.anomaly_type,\n    severity:           a.severity,\n    source_flow:        a.source_flow,\n    message:            a.message,\n    details:            a.details,\n    target_copilot:     null,\n    human_gate:         false,\n    is_blocked:         false,\n    reasoning:          'initial_record',\n    human_gate_reasons: [],\n    timestamp:          a.timestamp\n  }\n});\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  anomaly: a,\n  _body: body,\n  _headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': `${$execution.id}-recv-s03`,\n    'x-n8n-timestamp': new Date().toISOString()\n  }\n};"
+      },
+      "id": "s03-03-sign-recv",
+      "name": "Sign: Record Anomaly",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type",     "value": "={{ $json._headers['content-type'] }}" },
+            { "name": "x-n8n-signature",  "value": "={{ $json._headers['x-n8n-signature'] }}" },
+            { "name": "x-n8n-request-id", "value": "={{ $json._headers['x-n8n-request-id'] }}" },
+            { "name": "x-n8n-timestamp",  "value": "={{ $json._headers['x-n8n-timestamp'] }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": { "timeout": 10000, "retryOnFail": true, "maxRetries": 2, "retryDelay": 2000 }
+      },
+      "id": "s03-04-http-recv",
+      "name": "HTTP: Record Anomaly",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [850, 300],
+      "onError": "continueRegularOutput"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst anomaly = $('Parse Anomaly').first().json;\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\n\nconst ceoPayload = {\n  flow_id: 'N8N-S03',\n  brand_id: anomaly.brand_id,\n  payload: {\n    request_type: 'anomaly_alert',\n    occasion_flags: [anomaly.anomaly_type.toLowerCase()],\n    trigger_payload: {\n      anomaly_id:   anomaly.anomaly_id,\n      anomaly_type: anomaly.anomaly_type,\n      severity:     anomaly.severity,\n      source_flow:  anomaly.source_flow,\n      brand_id:     anomaly.brand_id,\n      message:      anomaly.message,\n      details:      anomaly.details,\n      timestamp:    anomaly.timestamp\n    }\n  }\n};\n\nconst body = JSON.stringify(ceoPayload);\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  anomaly,\n  _ceo_body: body,\n  _ceo_headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': `${$execution.id}-ceo-s03`,\n    'x-n8n-timestamp': new Date().toISOString()\n  }\n};"
+      },
+      "id": "s03-05-sign-ceo",
+      "name": "Sign CEO Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/agents/ceo/classify",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type",     "value": "={{ $json._ceo_headers['content-type'] }}" },
+            { "name": "x-n8n-signature",  "value": "={{ $json._ceo_headers['x-n8n-signature'] }}" },
+            { "name": "x-n8n-request-id", "value": "={{ $json._ceo_headers['x-n8n-request-id'] }}" },
+            { "name": "x-n8n-timestamp",  "value": "={{ $json._ceo_headers['x-n8n-timestamp'] }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._ceo_body }}",
+        "options": { "timeout": 40000, "retryOnFail": true, "maxRetries": 2, "retryDelay": 3000 }
+      },
+      "id": "s03-06-ceo",
+      "name": "HTTP: CEO Classify Anomaly",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1250, 300],
+      "onError": "continueErrorOutput"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// CEO succeeded — build enriched anomaly_routed callback\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst ceoResult = $input.first().json;\nconst anomaly = $('Parse Anomaly').first().json;\n\nconst ceoData = Array.isArray(ceoResult) ? ceoResult[0] : ceoResult;\nconst decision = ceoData?.result?.decision || ceoData?.decision || {};\n\nconst humanGate = decision.human_gate_required === true;\nconst isBlocked = decision.confidence_mode === 'Blocked';\n\nconst routingMap = {\n  tech:       ['ceo_call_failed','coo_call_failed','n8n_failure','supabase_error',\n               'api_error','extraction_failed','revision_failed','correction_failed',\n               'pipeline_degraded','weavy_timeout','ai_provider_error','timeout'],\n  management: ['cost_ceiling_alert','cost_ceiling_approaching','cost_ceiling_breached',\n               'upgrade_readiness_report','growth_opportunity',\n               'maintenance_report','cost_spike'],\n  production: ['quality_regression','dialect_not_confirmed','hard_block',\n               'correction_rejected','held_post','content_quality_low']\n};\nlet targetCopilot = decision.target_copilot || null;\nif (!targetCopilot || targetCopilot === 'auto') {\n  const at = (anomaly.anomaly_type || '').toLowerCase();\n  for (const [c, types] of Object.entries(routingMap)) {\n    if (types.some(t => at.includes(t) || t.includes(at))) { targetCopilot = c; break; }\n  }\n  targetCopilot = targetCopilot || 'tech';\n}\n\nconst body = JSON.stringify({\n  event_type: 'anomaly_routed',\n  flow_id: 'N8N-S03',\n  brand_id: anomaly.brand_id || null,\n  payload: {\n    anomaly_id:         anomaly.anomaly_id,\n    anomaly_type:       anomaly.anomaly_type,\n    severity:           anomaly.severity,\n    source_flow:        anomaly.source_flow,\n    message:            anomaly.message,\n    details:            anomaly.details,\n    target_copilot:     targetCopilot,\n    human_gate:         humanGate,\n    is_blocked:         isBlocked,\n    reasoning:          decision.reasoning || '',\n    human_gate_reasons: decision.human_gate_reasons || [],\n    confidence_mode:    decision.confidence_mode || 'Standard',\n    timestamp:          anomaly.timestamp\n  }\n});\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  anomaly, decision,\n  target_copilot: targetCopilot,\n  human_gate: humanGate,\n  is_blocked: isBlocked,\n  confidence_mode: decision.confidence_mode || 'Standard',\n  needs_qa: (humanGate || isBlocked) && !!anomaly.brand_id,\n  _body: body,\n  _headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': `${$execution.id}-routed-s03`,\n    'x-n8n-timestamp': new Date().toISOString()\n  }\n};"
+      },
+      "id": "s03-07-eval",
+      "name": "Evaluate CEO Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 180]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// CEO HTTP failed — sign a minimal anomaly_routed callback\nconst crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst anomaly = $('Parse Anomaly').first().json;\n\nconst body = JSON.stringify({\n  event_type: 'anomaly_routed',\n  flow_id: 'N8N-S03',\n  brand_id: anomaly.brand_id || null,\n  payload: {\n    anomaly_id:         anomaly.anomaly_id,\n    anomaly_type:       anomaly.anomaly_type,\n    severity:           anomaly.severity,\n    source_flow:        anomaly.source_flow,\n    message:            anomaly.message,\n    details:            anomaly.details,\n    target_copilot:     'tech',\n    human_gate:         false,\n    is_blocked:         false,\n    reasoning:          'CEO classify failed after retries — recorded without classification',\n    human_gate_reasons: [],\n    ceo_error:          true,\n    timestamp:          anomaly.timestamp\n  }\n});\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  anomaly,\n  target_copilot: 'tech',\n  human_gate: false,\n  is_blocked: false,\n  confidence_mode: 'Standard',\n  needs_qa: false,\n  ceo_error: true,\n  _body: body,\n  _headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': `${$execution.id}-ceoerr-s03`,\n    'x-n8n-timestamp': new Date().toISOString()\n  }\n};"
+      },
+      "id": "s03-07e-eval-err",
+      "name": "Eval: CEO Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 420]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type",     "value": "={{ $json._headers['content-type'] }}" },
+            { "name": "x-n8n-signature",  "value": "={{ $json._headers['x-n8n-signature'] }}" },
+            { "name": "x-n8n-request-id", "value": "={{ $json._headers['x-n8n-request-id'] }}" },
+            { "name": "x-n8n-timestamp",  "value": "={{ $json._headers['x-n8n-timestamp'] }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": { "timeout": 15000, "retryOnFail": true, "maxRetries": 1 }
+      },
+      "id": "s03-08-http-routed",
+      "name": "HTTP: Callback (routed)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1650, 180],
+      "onError": "continueRegularOutput"
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://vagrancy-pupil-spiritism.ngrok-free.dev/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type",     "value": "={{ $json._headers['content-type'] }}" },
+            { "name": "x-n8n-signature",  "value": "={{ $json._headers['x-n8n-signature'] }}" },
+            { "name": "x-n8n-request-id", "value": "={{ $json._headers['x-n8n-request-id'] }}" },
+            { "name": "x-n8n-timestamp",  "value": "={{ $json._headers['x-n8n-timestamp'] }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._body }}",
+        "options": { "timeout": 15000, "retryOnFail": true, "maxRetries": 1 }
+      },
+      "id": "s03-08e-http-err",
+      "name": "HTTP: Callback (CEO error)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1650, 420],
+      "onError": "continueRegularOutput"
+    },
+
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ received: true, anomaly_id: $('Parse Anomaly').first().json.anomaly_id, target_copilot: $json.target_copilot, human_gate: $json.human_gate, is_blocked: $json.is_blocked, confidence_mode: $json.confidence_mode, qa_queued: $json.needs_qa }) }}",
+        "options": {}
+      },
+      "id": "s03-09-respond",
+      "name": "Respond: success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 180]
+    },
+
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ received: true, anomaly_id: $('Parse Anomaly').first().json.anomaly_id, target_copilot: 'tech', ceo_error: true, note: 'Anomaly recorded, CEO classification failed' }) }}",
+        "options": {}
+      },
+      "id": "s03-09e-respond-err",
+      "name": "Respond: CEO error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 420]
+    }
+  ],
+
+  "connections": {
+    "On Error":                    { "main": [[{ "node": "Sign: Workflow Error",          "type": "main", "index": 0 }]] },
+    "Sign: Workflow Error":        { "main": [[{ "node": "HTTP: Callback (workflow error)","type": "main", "index": 0 }]] },
+    "Webhook: Anomaly Alert":      { "main": [[{ "node": "Parse Anomaly",                 "type": "main", "index": 0 }]] },
+    "Parse Anomaly":               { "main": [[{ "node": "Sign: Record Anomaly",          "type": "main", "index": 0 }]] },
+    "Sign: Record Anomaly":        { "main": [[{ "node": "HTTP: Record Anomaly",          "type": "main", "index": 0 }]] },
+    "HTTP: Record Anomaly":        { "main": [[{ "node": "Sign CEO Request",              "type": "main", "index": 0 }]] },
+    "Sign CEO Request":            { "main": [[{ "node": "HTTP: CEO Classify Anomaly",    "type": "main", "index": 0 }]] },
+    "HTTP: CEO Classify Anomaly":  {
+      "main": [
+        [{ "node": "Evaluate CEO Decision", "type": "main", "index": 0 }],
+        [{ "node": "Eval: CEO Failed",      "type": "main", "index": 0 }]
+      ]
+    },
+    "Evaluate CEO Decision":       { "main": [[{ "node": "HTTP: Callback (routed)",    "type": "main", "index": 0 }]] },
+    "Eval: CEO Failed":            { "main": [[{ "node": "HTTP: Callback (CEO error)", "type": "main", "index": 0 }]] },
+    "HTTP: Callback (routed)":     { "main": [[{ "node": "Respond: success",           "type": "main", "index": 0 }]] },
+    "HTTP: Callback (CEO error)":  { "main": [[{ "node": "Respond: CEO error",         "type": "main", "index": 0 }]] }
+  },
+
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "Asia/Riyadh",
+    "errorWorkflow": "N8N-S03"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.8.0",
+  "id": "N8N-S03",
+  "active": true
+}

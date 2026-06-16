@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OpenClaw — Phase 1–3 Implementation Gap Analysis</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: #1c2530; font-size: 10.5px; line-height: 1.5; margin: 0;
+  }
+  h1, h2, h3, h4 { color: #0e2a47; margin: 0 0 6px; line-height: 1.25; }
+  h2 { font-size: 18px; border-bottom: 3px solid #00b4d8; padding-bottom: 5px; margin-top: 26px; }
+  h3 { font-size: 14px; margin-top: 18px; color: #115e8b; }
+  h4 { font-size: 11.5px; margin-top: 12px; color: #1c2530; }
+  p { margin: 0 0 8px; }
+  ul { margin: 4px 0 8px; padding-left: 18px; }
+  li { margin-bottom: 3px; }
+  code { background: #eef3f7; padding: 1px 4px; border-radius: 3px; font-family: "Consolas", monospace; font-size: 9.3px; color: #0b3a5b; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 9.3px; }
+  th { background: #0e2a47; color: #fff; text-align: left; padding: 6px 7px; vertical-align: top; }
+  td { border: 1px solid #d4dde5; padding: 5px 7px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f6f9fb; }
+  .cover { height: 247mm; display: flex; flex-direction: column; justify-content: center; text-align: center; page-break-after: always; }
+  .cover .kicker { color: #00b4d8; letter-spacing: 3px; font-size: 12px; font-weight: 700; }
+  .cover h1 { font-size: 40px; color: #0e2a47; margin: 14px 0 6px; }
+  .cover .sub { font-size: 16px; color: #4a5a6a; font-weight: 400; }
+  .cover .meta { margin-top: 40px; font-size: 11px; color: #4a5a6a; }
+  .cover .meta table { width: 70%; margin: 18px auto; font-size: 11px; }
+  .cover .meta td { border: none; border-bottom: 1px solid #e0e6ec; padding: 7px 10px; }
+  .cover .meta td:first-child { font-weight: 700; color: #0e2a47; width: 38%; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 8.6px; font-weight: 700; white-space: nowrap; color: #fff; }
+  .b-done { background: #1f9d55; }
+  .b-part { background: #d98a00; }
+  .b-miss { background: #c0392b; }
+  .b-dev  { background: #7d3cb5; }
+  .b-na   { background: #6b7785; }
+  .legend { background: #f0f6fa; border: 1px solid #cfe0ec; border-radius: 6px; padding: 8px 12px; font-size: 9.5px; }
+  .callout { border-left: 5px solid #00b4d8; background: #f0f9fc; padding: 9px 13px; margin: 10px 0; border-radius: 0 5px 5px 0; }
+  .warn { border-left: 5px solid #c0392b; background: #fdf0ee; padding: 9px 13px; margin: 10px 0; border-radius: 0 5px 5px 0; }
+  .pagebreak { page-break-before: always; }
+  .small { font-size: 9px; color: #6b7785; }
+  .summary-grid { display: flex; gap: 10px; margin: 10px 0; }
+  .summary-card { flex: 1; border: 1px solid #d4dde5; border-radius: 7px; padding: 10px; text-align: center; }
+  .summary-card .ph { font-size: 11px; font-weight: 700; color: #0e2a47; }
+  .summary-card .pct { font-size: 26px; font-weight: 800; margin: 4px 0; }
+  .summary-card .lbl { font-size: 8.5px; color: #6b7785; }
+  .footer-note { font-size: 8.5px; color: #8a96a3; border-top: 1px solid #e0e6ec; padding-top: 6px; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="kicker">OGz STUDIOS · OPENCLAW · weiBlocks</div>
+  <h1>Phase 1–3 Implementation<br>Gap Analysis Report</h1>
+  <div class="sub">Client Requirements vs. Current Codebase — Evidence-Based Audit</div>
+  <div class="meta">
+    <table>
+      <tr><td>Project</td><td>OpenClaw — AI Content Platform (OGz Studios, Riyadh)</td></tr>
+      <tr><td>Repository</td><td>OGz-Studios monorepo (branch: faisal-dev8)</td></tr>
+      <tr><td>Requirement sources</td><td>OpenClaw_TechDoc_v1.0 (43 pp) · OGZ_Simple "What We Built" (18 pp)</td></tr>
+      <tr><td>Scope of audit</td><td>Phase 1, Phase 2, Phase 3</td></tr>
+      <tr><td>Report date</td><td>13 June 2026</td></tr>
+      <tr><td>Method</td><td>Full read of both docs + direct inspection of source, migrations, n8n flows</td></tr>
+    </table>
+  </div>
+  <div class="small" style="margin-top:30px;">CONFIDENTIAL — Prepared for internal review · Findings cite exact file paths as evidence</div>
+</div>
+
+<!-- ============ 1. EXEC SUMMARY ============ -->
+<h2>1. Executive Summary</h2>
+<p>
+This report compares the two client requirement documents against the actual state of the OpenClaw
+codebase. The <strong>OpenClaw_TechDoc_v1.0</strong> is treated as the authoritative contractual baseline — it
+explicitly states it is the <em>"single source of truth for OpenClaw Phase 1 architecture"</em> (§14.3) and defines the
+Phase Roadmap (§1.3). The <strong>OGZ_Simple</strong> document is a later "What We Built" narrative (June 2026, v2.0) describing an
+<em>evolved</em> creative direction (5 Creative-Director brains, a 3-model cross-compare, 94 visual chains, fal.ai); it is
+used here as a secondary reference and a source of intent for several Phase 2/3 items.
+</p>
+
+<div class="summary-grid">
+  <div class="summary-card"><div class="ph">PHASE 1</div><div class="pct" style="color:#1f9d55;">~90%</div><div class="lbl">Core build essentially complete; gaps in payments, analytics, secret-handling</div></div>
+  <div class="summary-card"><div class="ph">PHASE 2</div><div class="pct" style="color:#d98a00;">~30%</div><div class="lbl">Postiz partly wired; CIO, Meta Insights, Business OAuth missing</div></div>
+  <div class="summary-card"><div class="ph">PHASE 3</div><div class="pct" style="color:#d98a00;">~40%</div><div class="lbl">Video chains built ahead of schedule; CARO QC &amp; deep competitor analysis missing</div></div>
+</div>
+
+<p><strong>Headline findings:</strong></p>
+<ul>
+  <li><strong>Phase 1 is functionally delivered.</strong> All 31 BrandDNA / system tables, RLS &amp; append-only policies, PDPL cascade, all 7 client screens, all 9 admin views, 3 Copilots, the full CEO→COO→DeepSeek→CCO→CEO AI chain, the 11 human-override triggers, the Memory Controller, and all 11 canonical n8n flows exist with evidence.</li>
+  <li><strong>Two large architectural deviations from the TechDoc</strong> (both deliberate, documented in code): (1) the visual layer uses <strong>fal.ai</strong>, not the spec's <strong>Weavy.ai</strong>; (2) the CEO/COO agents run on <strong>OpenAI / DeepSeek</strong>, not the spec's <strong>Claude Sonnet 4.6 / Haiku 4.5</strong> (Anthropic budget). Functionality is preserved; the contract text is not.</li>
+  <li><strong>Genuine Phase 1 gaps:</strong> Stripe payments (stub returning HTTP 501), PostHog analytics (empty package), and a hard-coded-secrets problem in the n8n flows that violates security requirement SEC-02.</li>
+  <li><strong>The OGZ_Simple "5 Creative Director brains / cross-compare / ALLaM 34B" system is not implemented</strong> as described; the code instead uses a deterministic <code>composition_matrix</code> of 6 creative methods plus a visual-chain library.</li>
+</ul>
+
+<div class="legend">
+  <strong>Status legend:</strong>
+  &nbsp;<span class="badge b-done">COMPLETE</span> built &amp; evidenced &nbsp;
+  <span class="badge b-part">PARTIAL</span> present but incomplete &nbsp;
+  <span class="badge b-miss">MISSING</span> not implemented &nbsp;
+  <span class="badge b-dev">DEVIATION</span> built differently than spec &nbsp;
+  <span class="badge b-na">N/A&nbsp;NOW</span> not expected in this phase
+</div>
+
+<!-- ============ 2. METHOD ============ -->
+<h2>2. Methodology &amp; Evidence Basis</h2>
+<p>Conclusions are drawn only from (a) the two requirement PDFs and (b) direct inspection of the repository. The audit covered:</p>
+<ul>
+  <li><strong>Database:</strong> <code>supabase/migrations/*</code> (111 migrations), <code>packages/db</code>, <code>sql/</code>.</li>
+  <li><strong>Frontend:</strong> <code>apps/web/src/app</code> (75 page routes, 70+ API routes), layouts, i18n.</li>
+  <li><strong>AI agents:</strong> <code>packages/ai/src/providers</code>, <code>packages/memory</code>, <code>prompts/</code>.</li>
+  <li><strong>Orchestration:</strong> <code>n8n/flows</code> (17 flow exports), <code>packages/n8n</code>.</li>
+  <li><strong>Integrations &amp; services:</strong> <code>packages/{image,scraping,payments,email,vectors,analytics,compliance,pdpl}</code>, <code>services/{cio-analyzer,generation-worker,pdpl-janitor}</code>.</li>
+  <li><strong>Project record:</strong> <code>CHANGELOG.md</code>, which documents the deliberate architectural decisions cited below.</li>
+</ul>
+<div class="callout">
+  <strong>Note on the two documents.</strong> The TechDoc (April 2026) specifies Weavy.ai, Claude-based C-suite, DeepSeek captions and a single-caption pipeline. The OGZ_Simple deck (June 2026) describes a re-architected creative engine (fal.ai, 5 CD brains, 3-model comparison, 94 chains). The codebase sits <em>between</em> the two: it kept the TechDoc's governance/data architecture but adopted the OGZ_Simple visual stack (fal.ai + chain library) and a budget-driven model swap. Several "gaps" below are therefore really <em>deviations</em> where the implementation followed the newer direction rather than the older contract.
+</div>
+
+<!-- ============ 3. PHASE 1 ============ -->
+<h2 class="pagebreak">3. Phase 1 — Detailed Findings</h2>
+<p class="small">TechDoc §1.3 Phase 1 scope: <em>Onboarding, calendar generation, download delivery, admin panel, 3 Copilots, Arabic QC. Agents: CEO, COO, CCO, DeepSeek.</em> Plus the full Phase-1 tech stack (§2.1), 7-layer architecture (§3), BrandDNA schema (§4), 11 n8n flows (§5), AI integration specs (§6), DB/RLS (§7), 7 client screens + admin (§8), security checklist SEC-01..10 (§9).</p>
+
+<h3>3.1 Database &amp; BrandDNA Schema — <span class="badge b-done">COMPLETE</span></h3>
+<table>
+  <tr><th style="width:26%">Requirement (TechDoc §4, §7)</th><th style="width:14%">Status</th><th>Evidence / Notes</th></tr>
+  <tr><td>Layer 1 private-brand tables (11)</td><td><span class="badge b-done">COMPLETE</span></td><td>brand_profiles, audience_profiles, visual_style_profiles, channel_profiles, evidence_bundles, source_records, negative_patterns, override_rules, onboarding_responses, brand_performance_log, brand_snapshots — <code>supabase/migrations/0001_init.sql</code></td></tr>
+  <tr><td>Layer 2 sector intelligence (3)</td><td><span class="badge b-done">COMPLETE</span></td><td>sector_baselines, sector_question_weights, sector_trends — <code>0001_init.sql:97–121</code></td></tr>
+  <tr><td>Layer 3 global intelligence</td><td><span class="badge b-done">COMPLETE</span></td><td>content_performance_patterns, onboarding_intelligence, visual_performance_global, occasion_intelligence. <code>negative_pattern_library</code> replaced by <code>global_negative_patterns</code> (0041/0042) — equivalent.</td></tr>
+  <tr><td>Append-only audit tables</td><td><span class="badge b-done">COMPLETE</span></td><td>routing_decisions &amp; branddna_event_log with <code>no_update</code>/<code>no_delete</code> RLS policies — <code>0001_init.sql:579–600</code></td></tr>
+  <tr><td>Memory Controller queue + governance tables</td><td><span class="badge b-done">COMPLETE</span></td><td>memory_controller_queue, confidence_classifications, qa_review_queue, usage_logs, anomaly_records, calendars/calendar_posts, deletion_audit_log</td></tr>
+  <tr><td>RLS on ALL tables + client isolation</td><td><span class="badge b-done">COMPLETE</span></td><td>Per-table policies; client read via <code>brand_id = auth.uid()</code> join — <code>0001_init.sql:492–625</code></td></tr>
+  <tr><td>PDPL two-phase cascade delete + audit log</td><td><span class="badge b-done">COMPLETE</span></td><td><code>cascade_delete_brand()</code> anonymises append-only tables, deletes Layer 1, logs Phase 1 — <code>0005_pdpl_cascade.sql</code>. (Phase-2 external cleanup janitor is stubbed — see 3.6.)</td></tr>
+  <tr><td>Critical indexes</td><td><span class="badge b-done">COMPLETE</span></td><td>11 indexes incl. brand_id, shard, qa-queue, event-log — <code>0001_init.sql:475–486</code></td></tr>
+</table>
+<p class="small">The schema has grown well beyond the spec (22+ extra tables for chains, competitors, copilot threads, method profiles, occasion events, on-demand requests) — none of the spec tables are missing.</p>
+
+<h3>3.2 Frontend — Client Platform &amp; Admin — <span class="badge b-done">COMPLETE</span> (2 partials)</h3>
+<table>
+  <tr><th style="width:24%">Screen / View (TechDoc §8.4)</th><th style="width:14%">Status</th><th>Evidence / Notes</th></tr>
+  <tr><td>1. Sign Up (email + Google OAuth, RTL, slug)</td><td><span class="badge b-done">COMPLETE</span></td><td><code>app/[slug]/auth/page.tsx</code>, <code>(auth)/*</code>, <code>/api/auth/callback</code></td></tr>
+  <tr><td>2. Onboarding 15-question form</td><td><span class="badge b-part">PARTIAL</span></td><td>Original single-page form replaced by a multi-stage <em>onboarding-start → extraction → review</em> flow; <code>app/[slug]/onboarding/page.tsx</code> now redirects. Functionally present but the "15 questions all-at-once" UX described in §8.4 was re-architected.</td></tr>
+  <tr><td>3. Processing (realtime, 10-min timeout)</td><td><span class="badge b-done">COMPLETE</span></td><td>Supabase realtime subscription to brand_snapshots — <code>app/[slug]/processing/page.tsx</code></td></tr>
+  <tr><td>4. Brand Snapshot</td><td><span class="badge b-done">COMPLETE</span></td><td>Voice, visual style, audience, completeness, dialect, occasions — <code>app/[slug]/snapshot/page.tsx</code></td></tr>
+  <tr><td>5. Calendar Dashboard (8 free, 9–20 blurred, download, watermark badge)</td><td><span class="badge b-done">COMPLETE</span></td><td><code>app/[slug]/calendar/[month]/page.tsx</code> + 3-month rolling view</td></tr>
+  <tr><td>6. Brand Profile (completeness, correction form)</td><td><span class="badge b-done">COMPLETE</span></td><td>Field-by-field confidence badges, correction form, event log — <code>app/[slug]/profile/page.tsx</code></td></tr>
+  <tr><td>7. Upgrade Flow (Stripe Checkout)</td><td><span class="badge b-part">PARTIAL</span></td><td>Plan cards render (Free / Starter / Pro) but Stripe Checkout is not wired; webhook returns 501 — see 3.6. UI-only.</td></tr>
+  <tr><td>Admin panel — 9 views</td><td><span class="badge b-done">COMPLETE</span></td><td>Client list, QA queue, Cost monitor, Anomalies, Routing log, BrandDNA inspector, Flow status, Sector baselines, Occasion calendar — all under <code>app/admin/*</code> (plus ~20 extra admin views)</td></tr>
+  <tr><td>3 Admin Copilots (management / tech / production)</td><td><span class="badge b-done">COMPLETE</span></td><td>SSE streaming, RLS-scoped context, rate-limited — <code>app/admin/copilot/*</code>, <code>/api/copilot/[role]/route.ts</code></td></tr>
+  <tr><td>Arabic RTL by default + locale toggle</td><td><span class="badge b-done">COMPLETE</span></td><td><code>&lt;html dir=rtl lang=ar&gt;</code> in <code>app/layout.tsx</code>; cookie-persisted toggle; Arabic fonts loaded</td></tr>
+</table>
+
+<h3>3.3 AI C-Suite &amp; Governance — <span class="badge b-done">COMPLETE</span> · <span class="badge b-dev">MODEL DEVIATION</span></h3>
+<table>
+  <tr><th style="width:14%">Agent</th><th style="width:18%">Spec model (§2.1)</th><th style="width:18%">Actual model</th><th>Status &amp; evidence</th></tr>
+  <tr><td>CEO — routing, gating, governance</td><td>Claude Sonnet 4.6</td><td>OpenAI GPT-5 / 4o / 5-nano</td><td><span class="badge b-dev">DEVIATION</span> Logic complete (classify, confidence gate, dispatch, nominations) — <code>packages/ai/src/providers/ceo.ts</code>. Comment: "Migrated from Claude … Anthropic over budget."</td></tr>
+  <tr><td>COO — BrandDNA, CaptionContext, scoring</td><td>Claude Haiku 4.5</td><td>DeepSeek chat / OpenAI fallback</td><td><span class="badge b-dev">DEVIATION</span> All 4 jobs implemented — <code>coo.ts</code>. Same budget migration note.</td></tr>
+  <tr><td>CCO — Arabic QC, flags, 0–100 score</td><td>GPT-5 (4o fallback)</td><td>OpenAI GPT-5 / 4o</td><td><span class="badge b-done">COMPLETE</span> Matches spec — <code>cco.ts</code></td></tr>
+  <tr><td>DeepSeek — 20 Arabic captions</td><td>DeepSeek V3</td><td>deepseek-chat</td><td><span class="badge b-done">COMPLETE</span> — <code>deepseek.ts</code></td></tr>
+  <tr><td>Memory Controller — sole BrandDNA writer</td><td>—</td><td>—</td><td><span class="badge b-done">COMPLETE</span> Queue drain, field whitelist, PII scrubber, idempotency, event-log audit — <code>packages/memory/src/{index,process}.ts</code></td></tr>
+  <tr><td>11 Human-Override Triggers + Confidence Gate</td><td>—</td><td>—</td><td><span class="badge b-done">COMPLETE</span> All 11 coded as deterministic post-LLM checks — <code>packages/ai/src/human-overrides.ts</code></td></tr>
+  <tr><td>3 Copilots (Sonnet 4.6)</td><td>Claude Sonnet 4.6</td><td>claude-sonnet-4-6</td><td><span class="badge b-done">COMPLETE</span> — <code>copilot.ts</code></td></tr>
+</table>
+<div class="warn">
+  <strong>Hard-rule compliance (TechDoc §1.4):</strong> Memory Controller as sole writer ✅; Arabic never in image prompts ✅ (regex guard throws in <code>packages/image/src/visual-prompt.ts</code>); CDN URLs never stored ✅ (download→Supabase in <code>storage.ts</code>); only <code>@repo/ai/prompts</code> reads <code>*_SYSTEM_PROMPT</code> ✅. <strong>The governance contract is intact</strong> — only the underlying model vendors changed.
+</div>
+
+<h3>3.4 n8n Orchestration — <span class="badge b-done">COMPLETE</span> · <span class="badge b-part">PRODUCTION-READINESS GAPS</span></h3>
+<table>
+  <tr><th style="width:14%">Flow</th><th style="width:14%">Status</th><th>Evidence / Notes (all in <code>n8n/flows/</code>)</th></tr>
+  <tr><td>A01 batch calendar</td><td><span class="badge b-done">COMPLETE</span></td><td>Full chain + V01 sub-flow; retry/backoff, usage_logs, S03 error route</td></tr>
+  <tr><td>A02 on-demand single post</td><td><span class="badge b-part">PARTIAL</span></td><td>Flow exists but filename/name/webhook path say <strong>"Testing Mode"</strong> (<code>/webhook-test/openclaw-a02</code>) — must be promoted to production</td></tr>
+  <tr><td>A03 onboarding + 3 extractors</td><td><span class="badge b-done">COMPLETE</span></td><td>Apify IG + website + Google Places</td></tr>
+  <tr><td>A04 brand correction</td><td><span class="badge b-done">COMPLETE</span></td><td>CEO classify → Memory Controller nomination</td></tr>
+  <tr><td>A05 monthly upgrade readiness</td><td><span class="badge b-done">COMPLETE</span></td><td>COO upgrade scoring</td></tr>
+  <tr><td>B03 revision request</td><td><span class="badge b-done">COMPLETE</span></td><td>CEO→COO→DeepSeek→CCO→CEO</td></tr>
+  <tr><td>V01 visual chain + Sharp overlay</td><td><span class="badge b-dev">DEVIATION</span></td><td>Implemented via <strong>fal.ai</strong> (<code>fal-ai/flux-pro/v1.1-ultra</code>), not Weavy.ai. Sharp Arabic overlay + watermark present. + parallel <code>V01-Worker</code>.</td></tr>
+  <tr><td>D02 maintenance + CIO trigger</td><td><span class="badge b-done">COMPLETE</span></td><td>1st-of-month maintenance; CIO call is Phase-2 (correctly stubbed)</td></tr>
+  <tr><td>S01 pipeline health (15 min)</td><td><span class="badge b-done">COMPLETE</span></td><td>→ Tech Copilot</td></tr>
+  <tr><td>S02 cost ceiling 70/90/100%</td><td><span class="badge b-done">COMPLETE</span></td><td>→ Management Copilot</td></tr>
+  <tr><td>S03 anomaly router</td><td><span class="badge b-done">COMPLETE</span></td><td>Routes anomalies to correct Copilot</td></tr>
+  <tr><td>Extra flows (A06 extraction, A07 competitor, P01 IG publisher, QA-Approved, A02 error handler)</td><td><span class="badge b-na">EXTRA</span></td><td>Beyond the 11; A07/P01 support Phase 2/3 work</td></tr>
+</table>
+<div class="warn">
+  <strong>Security gap — SEC-02 violation.</strong> Multiple n8n flow exports contain <strong>hard-coded secrets</strong> (OpenAI keys, Supabase service keys, webhook secrets) and temporary <strong>ngrok URLs</strong> inside code nodes. TechDoc §9 SEC-02 requires "Zero API keys in source code". <code>packages/n8n</code> is an empty placeholder. These must be moved to n8n credentials/env and the tunnels replaced with production URLs before launch.
+</div>
+
+<h3>3.5 Integrations — Phase 1 Stack (TechDoc §2.1)</h3>
+<table>
+  <tr><th style="width:16%">Layer</th><th style="width:16%">Spec</th><th style="width:14%">Status</th><th>Evidence</th></tr>
+  <tr><td>Visual generation</td><td>Weavy.ai REST API</td><td><span class="badge b-dev">DEVIATION</span></td><td><strong>fal.ai</strong> used exclusively — <code>packages/image/src/fal-client.ts</code>, <code>generate.ts</code>. No Weavy client exists. Model routing Nano-Banana/Flux preserved conceptually.</td></tr>
+  <tr><td>Image processing</td><td>Sharp overlay/watermark/safe-zone</td><td><span class="badge b-done">COMPLETE</span></td><td>Dialect-aware Arabic fonts, "Beta AI Draft" watermark — <code>packages/image/src/overlay.ts</code></td></tr>
+  <tr><td>Storage discipline</td><td>Supabase only, no CDN URLs in DB</td><td><span class="badge b-done">COMPLETE</span></td><td><code>packages/image/src/storage.ts</code> — path <code>clients/{brand_id}/calendars/...</code></td></tr>
+  <tr><td>Scraping</td><td>Apify IG + website + Google Places</td><td><span class="badge b-done">COMPLETE</span></td><td><code>packages/scraping/src/{instagram,website,places}.ts</code></td></tr>
+  <tr><td>Email</td><td>Resend + Arabic templates</td><td><span class="badge b-done">COMPLETE</span></td><td>DB-driven templates, RTL, retry — <code>packages/email/src/notify.ts</code></td></tr>
+  <tr><td>Vector DB</td><td>Qdrant per-brand namespaces</td><td><span class="badge b-done">COMPLETE</span></td><td><code>packages/vectors/src/index.ts</code> — <code>brand_{id}</code> collections</td></tr>
+  <tr><td>Payments</td><td>Stripe Checkout, SAR</td><td><span class="badge b-miss">MISSING</span></td><td><strong>Stub.</strong> <code>packages/payments</code> empty; webhook returns HTTP 501 (Sprint S6.05) — <code>api/webhooks/stripe/route.ts</code></td></tr>
+  <tr><td>Analytics</td><td>PostHog funnel tracking</td><td><span class="badge b-miss">MISSING</span></td><td><strong>Empty package</strong> — <code>packages/analytics/src/index.ts</code> = "re-export here when modules exist"</td></tr>
+  <tr><td>Compliance gate</td><td>(supports Arabic QC)</td><td><span class="badge b-done">COMPLETE</span></td><td>Deterministic pre-gen gate, religious/cultural blocks — <code>packages/compliance/src/</code></td></tr>
+</table>
+
+<h3>3.6 Phase 1 — Confirmed Gaps &amp; Incomplete Items</h3>
+<table>
+  <tr><th style="width:22%">Item</th><th style="width:13%">Status</th><th>Gap description &amp; impact</th></tr>
+  <tr><td>Stripe payments / Upgrade flow</td><td><span class="badge b-miss">MISSING</span></td><td>No Checkout session creation, no webhook signature verification, no tier-update on payment. The whole monetisation path (Screen 7 + tier unlock for posts 9–20) is non-functional. Blocks revenue and SEC-10 (Stripe webhook verification) cannot be tested.</td></tr>
+  <tr><td>PostHog analytics</td><td><span class="badge b-miss">MISSING</span></td><td>No event tracking / funnel / upgrade triggers. TechDoc lists PostHog in the Phase 1 stack. No instrumentation exists.</td></tr>
+  <tr><td>Hard-coded secrets in n8n (SEC-02)</td><td><span class="badge b-part">RISK</span></td><td>Live API keys + ngrok tunnels embedded in flow JSON. Security non-compliance; tunnels will break in production.</td></tr>
+  <tr><td>A02 on-demand flow in Testing Mode</td><td><span class="badge b-part">PARTIAL</span></td><td>Not on a production webhook path / name.</td></tr>
+  <tr><td>Onboarding form UX re-architected</td><td><span class="badge b-part">PARTIAL</span></td><td>Delivered as a multi-stage flow rather than the single 15-question page in §8.4. Verify this matches client acceptance criteria.</td></tr>
+  <tr><td>PDPL external-cleanup janitor</td><td><span class="badge b-part">PARTIAL</span></td><td>SQL Phase-1 cascade exists; the Phase-2 async Qdrant/Storage cleanup worker (<code>services/pdpl-janitor</code>) throws "implement in sprint S8.08". SEC-05 only partially closed.</td></tr>
+  <tr><td>Model vendor vs. contract (CEO/COO)</td><td><span class="badge b-dev">DEVIATION</span></td><td>Running on OpenAI/DeepSeek instead of Claude Sonnet/Haiku. Needs client sign-off or revert; affects §13.1 acceptance and prompt-caching economics.</td></tr>
+  <tr><td>Weavy vs. fal.ai</td><td><span class="badge b-dev">DEVIATION</span></td><td>Entire visual stack switched providers. Update the contract/ADR (CHANGELOG) so milestone acceptance reflects fal.ai.</td></tr>
+</table>
+
+<!-- ============ 4. PHASE 2 ============ -->
+<h2 class="pagebreak">4. Phase 2 — Detailed Findings</h2>
+<p class="small">TechDoc §1.3 Phase 2 scope: <em>Postiz auto-publishing, Meta Insights API, CIO (Gemini 2.5 Pro) pattern analysis, client OAuth.</em> Status in spec: "Architecture Ready" (not built in Phase 1).</p>
+<table>
+  <tr><th style="width:24%">Requirement</th><th style="width:14%">Status</th><th>Evidence / Notes</th></tr>
+  <tr><td>Postiz auto-publishing</td><td><span class="badge b-part">PARTIAL</span></td><td>OAuth connect, integration detect, channel sync and a signed webhook all exist — <code>api/postiz/{connect,detect,sync-channels,webhook}/route.ts</code> — and an <code>N8N-P01-instagram-publisher</code> flow exists. <strong>But</strong> the approved-post → scheduled-publish pipeline is not yet wired end-to-end. Connection layer done; publishing automation incomplete.</td></tr>
+  <tr><td>CIO — Gemini 2.5 Pro pattern analysis</td><td><span class="badge b-miss">MISSING</span></td><td><code>services/cio-analyzer/src/index.ts</code> throws "Phase 2 placeholder". No Gemini integration. D02 flow has the trigger hook ready. (Expected per phasing, but not started.)</td></tr>
+  <tr><td>Meta Insights API</td><td><span class="badge b-miss">MISSING</span></td><td>Zero references to Meta/Instagram Insights or Graph API in the codebase.</td></tr>
+  <tr><td>Client Google Business OAuth</td><td><span class="badge b-miss">MISSING</span></td><td>Only the public <strong>Google Places</strong> lookup exists (Phase 1 onboarding). No Business-Profile OAuth or full GBP data pull. A schema slot (<code>google_business_extraction</code>) is reserved but unused.</td></tr>
+  <tr><td>brand_performance_log ingestion (for Meta data)</td><td><span class="badge b-part">PARTIAL</span></td><td>Table exists (Phase-1 foundation), but no performance-data ingestion flow is wired.</td></tr>
+</table>
+<div class="callout">
+  <strong>Phase 2 verdict (~30%).</strong> The <em>foundations</em> the TechDoc promised (calendar platform fields, Layer 2/3 tables, D02 hook, channel_profiles) are in place, and Postiz connectivity is genuinely started. The three analytical/integration deliverables (CIO, Meta Insights, Business OAuth) are not implemented.
+</div>
+
+<!-- ============ 5. PHASE 3 ============ -->
+<h2>5. Phase 3 — Detailed Findings</h2>
+<p class="small">TechDoc §1.3 Phase 3 scope: <em>CARO Arabic QC (Jais/DeepSeek), video/motion chains, advanced competitor analysis. New agent: CARO.</em> Status in spec: "Planned".</p>
+<table>
+  <tr><th style="width:24%">Requirement</th><th style="width:14%">Status</th><th>Evidence / Notes</th></tr>
+  <tr><td>Video / motion generation chains</td><td><span class="badge b-done">COMPLETE</span></td><td><strong>Built ahead of schedule.</strong> Two-model fal.ai pipeline (Flux keyframe → Kling/Seedance animate), async submission + webhook callback, fallback to static image, <code>calendar_posts.video_status</code> tracking — <code>packages/image/src/fal-client.ts</code>, <code>api/image/generate-video</code>, <code>api/webhooks/fal-ai/video-callback</code>. Visual-chain library (<code>chains</code> table, admin chain manager, ~88+ chains) aligns with OGZ_Simple's "94 visual chains".</td></tr>
+  <tr><td>CARO Arabic QC (Jais / DeepSeek)</td><td><span class="badge b-miss">MISSING</span></td><td>No CARO agent; no Jais model. Arabic QC is still performed by the GPT-based CCO. (Spec notes CCO is model-agnostic and CARO is a swap — the swap has not been done.)</td></tr>
+  <tr><td>Advanced competitor analysis</td><td><span class="badge b-part">PARTIAL</span></td><td>Basic competitor capture exists — <code>N8N-A07-competitor-extraction</code> flow, <code>competitor_accounts/snapshots/alerts</code> tables, <code>admin/competitors</code> &amp; <code>[slug]/competitors</code> pages, scorecard ranking. The <em>advanced</em> analysis engine (positioning strategy, content-gap, sentiment shift) is not implemented.</td></tr>
+  <tr><td>Generation worker (Phase-3 scale service)</td><td><span class="badge b-na">N/A NOW</span></td><td><code>services/generation-worker</code> is a placeholder (activates at &gt;2000 brands per §11.2). Correctly deferred.</td></tr>
+</table>
+<div class="callout">
+  <strong>Phase 3 verdict (~40%).</strong> The most technically demanding Phase-3 item — video/motion generation — is effectively done. The two remaining items (CARO Arabic QC and deep competitor analysis) are missing or only superficially present.
+</div>
+
+<!-- ============ 6. CROSS-CUTTING ============ -->
+<h2 class="pagebreak">6. Cross-Cutting Discrepancies (Both Documents)</h2>
+
+<h3>6.1 The "5 Creative Director brains" engine (OGZ_Simple) is not built as described</h3>
+<p>The OGZ_Simple deck centres on a creative engine that, for every brief, generates five captions from five Saudi creative philosophies — <strong>CD-01 Firaasa, CD-02 Metaphor, CD-03 Authenticity, CD-04 Heritage, CD-05 Paradox</strong> — then a router scores and picks the best, and a <strong>3-model cross-compare</strong> (HUMAIN/ALLaM 34B vs Claude Sonnet vs GPT-4o) at <code>/cross-compare</code> feeds a learning loop toward an OGZ fine-tuned model.</p>
+<table>
+  <tr><th style="width:30%">OGZ_Simple claim</th><th style="width:13%">In code?</th><th>What actually exists</th></tr>
+  <tr><td>5 distinct CD brains (Firaasa…Paradox)</td><td><span class="badge b-dev">DIFFERENT</span></td><td>A deterministic <code>composition_matrix</code> of 6 creative methods (Authenticity, Vulnerability, Heritage, Paradox, Diagnostic, Metaphor) selected via COO tool calls — not 5 independent generative "brains". No "Firaasa" routing.</td></tr>
+  <tr><td>3-model cross-compare + <code>/cross-compare</code> UI</td><td><span class="badge b-miss">MISSING</span></td><td>No 3-model side-by-side, no <code>/cross-compare</code> page, no human-preference training-pair capture.</td></tr>
+  <tr><td>ALLaM / HUMAIN 34B Saudi model</td><td><span class="badge b-miss">MISSING</span></td><td>No ALLaM/HUMAIN integration anywhere.</td></tr>
+  <tr><td>94 visual chains (88 + 6), image+video, fal.ai</td><td><span class="badge b-part">PARTIAL</span></td><td>Visual-chain library + fal.ai exist (<code>chains</code> table, admin manager, video pipeline). The full 94-chain / 23-family catalogue should be verified for completeness against the deck.</td></tr>
+  <tr><td>"1,000 clicks → OGZ's own fine-tuned Saudi AI"</td><td><span class="badge b-miss">MISSING</span></td><td>No preference-pair logging or fine-tune pipeline. This is forward-looking roadmap, not built.</td></tr>
+</table>
+<p class="small">If OGZ_Simple represents the <em>intended</em> direction, the cross-compare/learning system and ALLaM are the largest unbuilt pieces of that vision. If the TechDoc remains the contract, these are out of Phase 1–3 scope and only the matrix/chains/fal.ai overlap matters.</p>
+
+<h3>6.2 Deliberate architecture decisions (documented in CHANGELOG)</h3>
+<ul>
+  <li><strong>fal.ai replaces Weavy.ai</strong> across the entire visual layer (image + video).</li>
+  <li><strong>CEO → OpenAI, COO → DeepSeek</strong> (from Claude Sonnet/Haiku) due to Anthropic budget; CCO/Copilots unchanged.</li>
+  <li><strong>negative_pattern_library → global_negative_patterns</strong>; <strong>leads table dropped</strong> (marketing form removed).</li>
+  <li>These are real and reasonable, but they diverge from the signed TechDoc and should be ratified as ADRs so milestone acceptance is not contested.</li>
+</ul>
+
+<!-- ============ 7. CONSOLIDATED GAP TABLE ============ -->
+<h2>7. Consolidated Gap Analysis — What Is Missing / Incomplete</h2>
+<table>
+  <tr><th style="width:8%">Phase</th><th style="width:26%">Missing / Incomplete Item</th><th style="width:12%">Severity</th><th>Why it matters</th></tr>
+  <tr><td>1</td><td>Stripe payments &amp; Upgrade Flow</td><td><span class="badge b-miss">HIGH</span></td><td>No revenue path; posts 9–20 cannot be unlocked; SEC-10 untestable</td></tr>
+  <tr><td>1</td><td>PostHog analytics instrumentation</td><td><span class="badge b-part">MED</span></td><td>No funnel/upgrade-trigger data; listed in Phase-1 stack</td></tr>
+  <tr><td>1</td><td>Hard-coded secrets &amp; ngrok URLs in n8n (SEC-02)</td><td><span class="badge b-miss">HIGH</span></td><td>Security non-compliance; tunnels break in prod</td></tr>
+  <tr><td>1</td><td>A02 on-demand flow still "Testing Mode"</td><td><span class="badge b-part">MED</span></td><td>On-demand generation not on a production trigger</td></tr>
+  <tr><td>1</td><td>CEO/COO model vendor ≠ contract</td><td><span class="badge b-dev">MED</span></td><td>Needs client sign-off vs §13.1 acceptance</td></tr>
+  <tr><td>1</td><td>Weavy → fal.ai not ratified in contract</td><td><span class="badge b-dev">LOW</span></td><td>Documentation/acceptance alignment</td></tr>
+  <tr><td>1</td><td>Onboarding 15-question UX re-architected</td><td><span class="badge b-part">LOW</span></td><td>Confirm matches client acceptance criteria</td></tr>
+  <tr><td>2</td><td>CIO (Gemini 2.5 Pro) pattern analysis</td><td><span class="badge b-miss">PHASE 2</span></td><td>Service is an empty placeholder</td></tr>
+  <tr><td>2</td><td>Meta Insights API</td><td><span class="badge b-miss">PHASE 2</span></td><td>No performance-data ingestion</td></tr>
+  <tr><td>2</td><td>Client Google Business OAuth</td><td><span class="badge b-miss">PHASE 2</span></td><td>Only public Places lookup exists</td></tr>
+  <tr><td>2</td><td>Postiz auto-publish end-to-end</td><td><span class="badge b-part">PHASE 2</span></td><td>Connectivity built; scheduled publishing not wired</td></tr>
+  <tr><td>3</td><td>CARO Arabic QC (Jais/DeepSeek)</td><td><span class="badge b-miss">PHASE 3</span></td><td>Arabic QC still on GPT-based CCO</td></tr>
+  <tr><td>3</td><td>Advanced competitor analysis engine</td><td><span class="badge b-part">PHASE 3</span></td><td>Basic capture only; no strategic analysis</td></tr>
+  <tr><td>3</td><td>(OGZ_Simple) Cross-compare + ALLaM + fine-tune loop</td><td><span class="badge b-miss">VISION</span></td><td>Largest unbuilt piece of the v2 narrative</td></tr>
+</table>
+
+<!-- ============ 8. RECOMMENDATIONS ============ -->
+<h2>8. Recommended Priorities</h2>
+<ol>
+  <li><strong>Close the Phase-1 launch blockers first:</strong> implement Stripe Checkout + webhook verification (unblocks revenue &amp; SEC-10), and remediate the hard-coded secrets / ngrok URLs in the n8n flows (SEC-02). Promote A02 to a production webhook.</li>
+  <li><strong>Ratify the deviations:</strong> add ADR entries (and obtain client sign-off) for fal.ai-vs-Weavy and the OpenAI/DeepSeek model swap, so M1/M2 acceptance is not contested under §13.</li>
+  <li><strong>Add PostHog instrumentation</strong> to complete the Phase-1 stack and enable upgrade-funnel tracking.</li>
+  <li><strong>Confirm onboarding acceptance:</strong> validate the multi-stage onboarding flow against the client's "15-question" expectation.</li>
+  <li><strong>Phase 2 sequencing:</strong> finish Postiz auto-publish, then build the CIO analyzer (Gemini) and Business-Profile OAuth / Meta Insights ingestion.</li>
+  <li><strong>Phase 3:</strong> video chains are done — focus on the CARO Arabic-QC swap and a real competitor-analysis engine. Decide explicitly whether the OGZ_Simple cross-compare/ALLaM learning loop is in scope.</li>
+</ol>
+
+<div class="footer-note">
+  OpenClaw Phase 1–3 Gap Analysis · Prepared 13 June 2026 · All status determinations are evidence-based and cite repository paths.
+  Where the two requirement documents conflict, the OpenClaw_TechDoc_v1.0 (declared "single source of truth", §14.3) governs Phase definitions; OGZ_Simple is treated as evolved intent. Percentages are indicative completion estimates, not contractual measures.
+</div>
+
+</body>
+</html>

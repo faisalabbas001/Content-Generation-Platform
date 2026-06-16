@@ -1,0 +1,98 @@
+{
+  "$schema": "../../12_data_shapes/chain_v1.schema.json",
+  "chain_ulid": "01HXZQQR4M2PVQ4VZG9YT3WQBB",
+  "chain_id_short": "tf22_03",
+  "family": "TF22",
+  "schema_version": 1,
+  "name_en": "Cinematic Slow-Dolly Subject Reveal",
+  "name_ar": "كشف موضوع بحركة كاميرا بطيئة سينمائية",
+  "purpose": "Generate a 5–8 second cinematic video clip with a slow-dolly push-in revealing a hero subject (person, product, location). Premium-feel pacing, shallow depth of field, warm grade. Designed for Pipeline B brands with signature camera-move locks.",
+  "models_used": [
+    {
+      "provider": "fal",
+      "model_id": "fal-ai/kling-video/v2.1-pro",
+      "role": "primary_video_generation"
+    },
+    {
+      "provider": "fal",
+      "model_id": "fal-ai/flux-pro/v1.1-ultra",
+      "role": "primary_image_generation",
+      "version_pinned": "v1.1"
+    }
+  ],
+  "input_schema": {
+    "hero_subject_description": {
+      "type": "string",
+      "description": "Detailed description of the hero subject (person, product, scene)",
+      "required": true,
+      "min_length": 30
+    },
+    "setting_description": {
+      "type": "string",
+      "description": "Where this happens — must align with brand cultural spec architecture",
+      "required": true
+    },
+    "duration_seconds": {
+      "type": "integer",
+      "description": "Target duration",
+      "required": true,
+      "default": 6
+    },
+    "first_frame_description": {
+      "type": "string",
+      "description": "What the first frame shows (will be generated as keyframe before video)",
+      "required": true
+    },
+    "last_frame_description": {
+      "type": "string",
+      "description": "What the last frame shows",
+      "required": true
+    },
+    "talent_reference_uri": {
+      "type": "image_uri",
+      "description": "If brand has locked talent, reference image for character consistency",
+      "required": false
+    }
+  },
+  "prompt_template": "Cinematic slow-dolly push-in, 6 seconds, {duration_seconds}s pacing register. First frame: {first_frame_description}. Last frame: {last_frame_description}. Hero subject: {hero_subject_description}. Setting: {setting_description}. Cinematography: {lighting_style_from_fingerprint}, {focal_length_from_fingerprint}, {depth_of_field_from_fingerprint}, eye-level camera, frontal angle. Color grade: {color_grade_from_fingerprint}. Motion: slow controlled dolly push-in, no handheld jitter. Subject motion: minimal, naturalistic. {cultural_constraints_injection}. No music. No text overlay (separate chain).",
+  "output_type": "video",
+  "target_dimensions": {
+    "width": 1920,
+    "height": 1080,
+    "aspect_ratio_label": "16:9",
+    "duration_seconds": 6
+  },
+  "eligibility_filters": {
+    "sectors_allowed": ["*"],
+    "sectors_excluded": ["healthcare_emergency"],
+    "occasions_allowed": ["*"],
+    "quality_tiers_allowed": ["growth", "enterprise"],
+    "min_brand_maturity_days": 14
+  },
+  "cultural_constraints": {
+    "requires_wardrobe_check": true,
+    "requires_gesture_check": true,
+    "requires_cultural_coherence_check": true,
+    "requires_arabic_text_validation": false,
+    "high_religious_sensitivity": false,
+    "high_gender_sensitivity": true,
+    "human_review_recommended_above_quality_tier": "starter"
+  },
+  "cost_estimate_usd": 1.8,
+  "latency_estimate_seconds": 75,
+  "best_for_cd_brains": ["cd_01", "cd_03", "cd_04"],
+  "anti_patterns": [
+    "Do not pair with fast-pacing register — defeats the purpose",
+    "Avoid for time-sensitive announcement content (use TF03 or TF16)",
+    "Do not use without locked first/last frame keyframes",
+    "Avoid when the brief calls for kinetic or energetic feel (use TF22_05 instead)"
+  ],
+  "notes": "This is the signature chain for Pipeline B Growth and Enterprise brands with a slow-dolly signature move. Always validate first/last frames against the brand's locked frame categories before video generation kicks off.",
+  "provenance": {
+    "source": "internal_research_corpus/OGz_2_0_ChainLibrary_v2_Complete.docx#TF22",
+    "date_added": "2026-05-13T14:30:00Z",
+    "confirmer": "Mohamed",
+    "confidence": "experimental",
+    "scope": "universal"
+  }
+}

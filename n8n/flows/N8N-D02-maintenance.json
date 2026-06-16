@@ -1,0 +1,715 @@
+﻿{
+  "name": "N8N-D02: BrandDNA Maintenance (Memory Controller compliant)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "openclaw-maintenance",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "d02-webhook",
+      "name": "Webhook · Manual Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 4 1 * *"
+            }
+          ]
+        }
+      },
+      "id": "d02-cron",
+      "name": "Cron · 1st of month 04:00 AST",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Read-only context used by every downstream node.\nconst now = new Date();\nreturn { json: {\n  flow_id: 'N8N-D02',\n  batch_id: `maintenance-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`,\n  generated_at: now.toISOString(),\n  started_at: Date.now(),\n  stale_threshold_days: 90,\n  deprecated_threshold_days: 365,\n}};"
+      },
+      "id": "d02-config",
+      "name": "Build maintenance config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "evidence_bundles",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "last_evaluated",
+              "condition": "lt",
+              "keyValue": "={{ new Date(Date.now() - $json.stale_threshold_days*24*60*60*1000).toISOString() }}"
+            }
+          ]
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "d02-fetch-stale",
+      "name": "Supabase · SELECT stale evidence_bundles",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        600,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "openclaw_supabase",
+          "name": "OGz Studios Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "calendar_posts",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "approved"
+            },
+            {
+              "keyName": "approved_at",
+              "condition": "gte",
+              "keyValue": "={{ new Date(Date.now() - 30*24*60*60*1000).toISOString() }}"
+            }
+          ]
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "d02-fetch-active-brands",
+      "name": "Fetch active brand IDs (grace period)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        800,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "openclaw_supabase",
+          "name": "OGz Studios Supabase"
+        }
+      },
+      "alwaysOutputData": true,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Build all confidence_upgrade nominations in ONE pass ──\n//\n// Grace period: brands with an approved post in the last 30 days are skipped.\n// Their evidence_bundles are still stale but the brand is actively managed —\n// downgrading them now would create false urgency in the next COO run.\n//\n// Per Hard Rule #2: we never UPDATE evidence_bundles directly. We enqueue\n// confidence_upgrade nominations and let the Memory Controller validate +\n// apply them. The downgrade rule (mirrors field_confidence_type enum):\n//   - age > 365d      → deprecated (any value)\n//   - inferred_high   → inferred_medium\n//   - inferred_medium → inferred_low\n//   - inferred_low    → inferred_low (sticks — no nomination emitted)\n//   - all others (explicitly_confirmed, rejected, deprecated) → unchanged\n\nconst bundles = $('Supabase · SELECT stale evidence_bundles').all().map(it => it.json);\n\n// Active brands = those with an approved post in the last 30 days.\n// Supabase node emits one n8n item per row.\nconst activeBrandIds = new Set(\n  $input.all().map(it => it.json?.brand_id).filter(Boolean)\n);\n\nconst now = Date.now();\n\nconst nominations = bundles\n  .filter(b => !activeBrandIds.has(b.brand_id))\n  .map(b => {\n    const lastEval = new Date(b.last_evaluated).getTime();\n    const ageDays = Math.floor((now - lastEval) / 86400000);\n    const cur = b.field_confidence;\n    let next;\n    if (ageDays > 365) next = 'deprecated';\n    else if (cur === 'inferred_high') next = 'inferred_medium';\n    else if (cur === 'inferred_medium') next = 'inferred_low';\n    else if (cur === 'inferred_low') next = 'inferred_low';\n    else next = cur; // explicitly_confirmed / rejected / deprecated → leave alone\n    return { brand_id: b.brand_id, ageDays, cur, next, field_name: b.field_name };\n  })\n  // Drop no-op rows so we don't churn the queue with rows that wouldn't change anything.\n  .filter(r => r.next !== r.cur);\n\nconst bundleCount = bundles.length;\nconst candidateCount = nominations.length;\n\n// Emit one item per nomination. Downstream Supabase node will batch-insert.\nreturn nominations.map(r => ({ json: {\n  brand_id: r.brand_id,\n  nomination_type: 'confidence_upgrade',\n  nomination_data: {\n    field_name: r.field_name,\n    new_state: r.next,\n    evidence_source_ids: [],\n    reasoning: 'D02 maintenance age decay: ' + r.ageDays + 'd since last evaluation',\n    previous_confidence: r.cur,\n  },\n  nominated_by: 'D02_maintenance',\n  _candidate_count: candidateCount,\n  _bundle_count: bundleCount,\n}}));"
+      },
+      "id": "d02-build-nominations",
+      "name": "Build all nominations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "memory_controller_queue",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "brand_id",
+              "fieldValue": "={{ $json.brand_id }}"
+            },
+            {
+              "fieldId": "nomination_type",
+              "fieldValue": "={{ $json.nomination_type }}"
+            },
+            {
+              "fieldId": "nomination_data",
+              "fieldValue": "={{ JSON.stringify($json.nomination_data) }}"
+            },
+            {
+              "fieldId": "nominated_by",
+              "fieldValue": "={{ $json.nominated_by }}"
+            }
+          ]
+        }
+      },
+      "id": "d02-enqueue",
+      "name": "Supabase · INSERT memory_controller_queue",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "openclaw_supabase",
+          "name": "OGz Studios Supabase"
+        }
+      },
+      "executeOnce": false,
+      "alwaysOutputData": true,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collapse the Supabase INSERT's per-row outputs into ONE item, then sign\n// /api/memory/process. Returning a single-item array forces every downstream\n// node to fire exactly once (instead of once per inserted nomination).\nconst crypto = require('crypto');\nconst body = JSON.stringify({ flow_id: 'N8N-D02', batch_size: 500 });\nconst ts = new Date().toISOString();\nconst reqId = crypto.randomUUID();\nconst sig = crypto.createHmac('sha256', 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887').update(body).digest('hex');\n\n// Carry the count of inserted rows for the audit/report.\nconst inserted = $input.all().length;\n\nreturn [{ json: {\n  _drain_body: body,\n  _drain_headers: {\n    'content-type': 'application/json',\n    'x-n8n-signature': sig,\n    'x-n8n-request-id': reqId,\n    'x-n8n-timestamp': ts,\n  },\n  inserted_count: inserted,\n}}];"
+      },
+      "id": "d02-sign-drain",
+      "name": "Sign · memory drain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://vagrancy-pupil-spiritism.ngrok-free.dev' + '/api/memory/process' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $json._drain_headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $json._drain_headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $json._drain_headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $json._drain_headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json._drain_body }}",
+        "options": {
+          "timeout": 60000,
+          "retry": {
+            "maxTries": 2
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "neverError": true
+        }
+      },
+      "id": "d02-drain",
+      "name": "POST · /api/memory/process",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://redzmrlzhxkkpgcokgvl.supabase.co' + '/rest/v1/copilot_threads?archived_at=is.null&updated_at=lt.' + new Date(Date.now() - 6*30*24*60*60*1000).toISOString() }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo' }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZHptcmx6aHhra3BnY29rZ3ZsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzUzMDE5MiwiZXhwIjoyMDkzMTA2MTkyfQ.JK_Vctncdz90VUxnRXVnwysl6P6XgKbJ2-a5Zf3qgpo' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ archived_at: new Date().toISOString() }) }}",
+        "options": {
+          "timeout": 15000,
+          "neverError": true
+        }
+      },
+      "id": "d02-archive-copilot",
+      "name": "HTTP: Archive Stale Copilot Threads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the maintenance report. Explicitly reference upstream nodes by name\n// because the previous node (Archive Stale Copilot Threads) returns an empty\n// body (Prefer: return=minimal), so $json cannot carry the drain result.\nconst drain = $('POST · /api/memory/process').first().json?.result || {};\nconst cfg = $('Build maintenance config').first().json;\nconst inserted = $('Sign · memory drain').first().json.inserted_count ?? 0;\nconst staleSelected = $('Supabase · SELECT stale evidence_bundles').all().length;\nconst duration_ms = cfg.started_at ? Date.now() - cfg.started_at : 0;\n\nreturn [{ json: {\n  flow_id: 'N8N-D02',\n  batch_id: cfg.batch_id,\n  bundles_evaluated: staleSelected,\n  nominations_enqueued: inserted,\n  drained_total: drain.total ?? 0,\n  drained_written: drain.written ?? 0,\n  drained_rejected: drain.rejected ?? 0,\n  copilot_threads_archived: true,\n  generated_at: cfg.generated_at,\n  duration_ms,\n}}];"
+      },
+      "id": "d02-report",
+      "name": "Build maintenance report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "routing_decisions",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-D02"
+            },
+            {
+              "fieldId": "request_type",
+              "fieldValue": "maintenance"
+            },
+            {
+              "fieldId": "outcome",
+              "fieldValue": "={{ JSON.stringify($json) }}"
+            }
+          ]
+        }
+      },
+      "id": "d02-log-decision",
+      "name": "Supabase · INSERT routing_decisions (audit)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "openclaw_supabase",
+          "name": "OGz Studios Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "usage_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-D02"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "d02_maintenance_complete"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "success"
+            },
+            {
+              "fieldId": "duration_ms",
+              "fieldValue": "={{ $('Build maintenance report').first().json.duration_ms }}"
+            },
+            {
+              "fieldId": "cost_usd",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ JSON.stringify($('Build maintenance report').first().json) }}"
+            }
+          ]
+        }
+      },
+      "id": "d02-log-usage-success",
+      "name": "Supabase · INSERT usage_logs (success)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        300
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "openclaw_supabase",
+          "name": "OGz Studios Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "d02-error-trigger",
+      "name": "On Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst SECRET = 'c56cb3e88c57ea77929fdbec379fb6ff1ab72fef61cee9084e9cb263892d8887';\nconst e = $json;\n\nconst makeUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {\n  const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);\n});\n\nconst body = JSON.stringify({\n  anomaly_id:   makeUUID(),\n  anomaly_type: 'flow_failure',\n  severity:     'critical',\n  source_flow:  'N8N-D02',\n  brand_id:     null,\n  message:      e.execution?.error?.message || 'D02 maintenance flow failed',\n  details: {\n    failed_node:  e.execution?.lastNodeExecuted ?? null,\n    error_name:   e.execution?.error?.name      ?? null,\n    execution_id: e.execution?.id               ?? null,\n  },\n  timestamp: new Date().toISOString(),\n});\n\nconst sig = crypto.createHmac('sha256', SECRET).update(body).digest('hex');\nreturn {\n  anomaly_type: 'flow_failure',\n  severity:     'critical',\n  flow_id:      'N8N-D02',\n  brand_id:     null,\n  message:      e.execution?.error?.message || 'D02 maintenance flow failed',\n  details: {\n    failed_node:  e.execution?.lastNodeExecuted ?? null,\n    error_name:   e.execution?.error?.name      ?? null,\n  },\n  timestamp: new Date().toISOString(),\n  _body: body,\n  _headers: {\n    'content-type':     'application/json',\n    'x-n8n-signature':  sig,\n    'x-n8n-request-id': `${$execution.id}-err-d02`,\n    'x-n8n-timestamp':  new Date().toISOString(),\n  },\n};"
+      },
+      "id": "d02-error-build",
+      "name": "Build S03 alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "anomaly_records",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "anomaly_type",
+              "fieldValue": "={{ $json.details.error_name ?? 'flow_failure' }}"
+            },
+            {
+              "fieldId": "severity",
+              "fieldValue": "critical"
+            },
+            {
+              "fieldId": "source_flow",
+              "fieldValue": "N8N-D02"
+            },
+            {
+              "fieldId": "message",
+              "fieldValue": "={{ $json.message }}"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={{ JSON.stringify($json.details) }}"
+            }
+          ]
+        }
+      },
+      "id": "d02-error-log-anomaly",
+      "name": "Supabase · INSERT anomaly_records",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        600,
+        700
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "openclaw_supabase",
+          "name": "OGz Studios Supabase"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ogzstudios.app.n8n.cloud/webhook-test/anomaly-alert",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $('Build S03 alert').first().json._headers['content-type'] }}"
+            },
+            {
+              "name": "x-n8n-signature",
+              "value": "={{ $('Build S03 alert').first().json._headers['x-n8n-signature'] }}"
+            },
+            {
+              "name": "x-n8n-request-id",
+              "value": "={{ $('Build S03 alert').first().json._headers['x-n8n-request-id'] }}"
+            },
+            {
+              "name": "x-n8n-timestamp",
+              "value": "={{ $('Build S03 alert').first().json._headers['x-n8n-timestamp'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Build S03 alert').first().json._body }}",
+        "options": {
+          "timeout": 10000
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "d02-error-post",
+      "name": "POST · S03 anomaly-alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        800,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "usage_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "flow_id",
+              "fieldValue": "N8N-D02"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "d02_error_exit"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "failed"
+            },
+            {
+              "fieldId": "cost_usd",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "payload",
+              "fieldValue": "={{ $('Build S03 alert').first().json._body }}"
+            }
+          ]
+        }
+      },
+      "id": "d02-log-usage-failed",
+      "name": "Supabase · INSERT usage_logs (failed)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        700
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "openclaw_supabase",
+          "name": "OGz Studios Supabase"
+        }
+      },
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook · Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build maintenance config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron · 1st of month 04:00 AST": {
+      "main": [
+        [
+          {
+            "node": "Build maintenance config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build maintenance config": {
+      "main": [
+        [
+          {
+            "node": "Supabase · SELECT stale evidence_bundles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase · SELECT stale evidence_bundles": {
+      "main": [
+        [
+          {
+            "node": "Fetch active brand IDs (grace period)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch active brand IDs (grace period)": {
+      "main": [
+        [
+          {
+            "node": "Build all nominations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build all nominations": {
+      "main": [
+        [
+          {
+            "node": "Supabase · INSERT memory_controller_queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase · INSERT memory_controller_queue": {
+      "main": [
+        [
+          {
+            "node": "Sign · memory drain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign · memory drain": {
+      "main": [
+        [
+          {
+            "node": "POST · /api/memory/process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · /api/memory/process": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Archive Stale Copilot Threads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Archive Stale Copilot Threads": {
+      "main": [
+        [
+          {
+            "node": "Build maintenance report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build maintenance report": {
+      "main": [
+        [
+          {
+            "node": "Supabase · INSERT routing_decisions (audit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase · INSERT routing_decisions (audit)": {
+      "main": [
+        [
+          {
+            "node": "Supabase · INSERT usage_logs (success)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On Error": {
+      "main": [
+        [
+          {
+            "node": "Build S03 alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build S03 alert": {
+      "main": [
+        [
+          {
+            "node": "Supabase · INSERT anomaly_records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase · INSERT anomaly_records": {
+      "main": [
+        [
+          {
+            "node": "POST · S03 anomaly-alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST · S03 anomaly-alert": {
+      "main": [
+        [
+          {
+            "node": "Supabase · INSERT usage_logs (failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

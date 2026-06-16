@@ -1,0 +1,251 @@
+/*
+ * OpenClaw — design tokens (OGz Studios theme)
+ *
+ * Single source of truth for color, typography, spacing, motion.
+ * Imported once by apps/web/src/app/globals.css.
+ *
+ * Philosophy: bold, opinionated, KSA-native. Dual accent system —
+ *   accent  = electric green  (primary actions, active, success, "LIVE")
+ *   pop      = hot magenta     (headline highlights, eyebrows, emphasis)
+ * Two full themes, switched by [data-theme] on <html>:
+ *   dark  (default) — near-black surfaces, used for the app/dashboard
+ *   light            — off-white surfaces, used for marketing
+ *
+ * Every component reads only these variables, so flipping data-theme
+ * re-skins the whole app with zero component changes.
+ *
+ * Arabic-first typography pairs:
+ *   display = Space Grotesk (Latin) + IBM Plex Sans Arabic (Arabic)
+ *   body    = Inter (Latin) + Noto Naskh Arabic (Arabic)
+ *   mono    = JetBrains Mono
+ */
+
+/* ════════════════════════════════════════════════════════════════
+   DARK THEME (default) — the app / dashboard
+   Applied on :root and [data-theme="dark"] so SSR has a value even
+   before the data-theme attribute resolves.
+   ════════════════════════════════════════════════════════════════ */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* ── Surface stack (darkest → lightest) ──────────────────── */
+  --bg:        #0a0a0a;          /* outermost background */
+  --surface-1: #0f0f0f;          /* page sections, sidebar */
+  --surface-2: #141414;          /* cards */
+  --surface-3: #1a1a1a;          /* elevated cards / hover */
+  --surface-4: #232323;          /* inputs, muted blocks */
+
+  /* ── Borders ─────────────────────────────────────────────── */
+  --border-subtle:  rgba(255, 255, 255, 0.07);
+  --border-default: rgba(255, 255, 255, 0.11);
+  --border-strong:  rgba(255, 255, 255, 0.18);
+
+  /* ── Text ────────────────────────────────────────────────── */
+  --fg:         #fafafa;
+  --fg-subtle:  #d6d6d6;
+  --fg-muted:   #9a9a9a;
+  --fg-faint:   #6b6b6b;
+
+  /* ── Accent — electric green (primary) ───────────────────── */
+  --accent:        #2bee4f;       /* electric/lime green */
+  --accent-fg:     #04210b;       /* near-black text on green */
+  --accent-soft:   rgba(43, 238, 79, 0.14);
+  --accent-strong: #22d246;
+  --accent-glow:   rgba(43, 238, 79, 0.22);
+
+  /* ── Pop — hot magenta (highlight / emphasis) ────────────── */
+  --pop:        #ec0bd4;          /* hot magenta */
+  --pop-fg:     #ffffff;
+  --pop-soft:   rgba(236, 11, 212, 0.14);
+  --pop-glow:   rgba(236, 11, 212, 0.22);
+
+  /* ── Semantic ────────────────────────────────────────────── */
+  --success:      #2bee4f;
+  --success-soft: rgba(43, 238, 79, 0.14);
+  --warning:      #f5b50b;
+  --warning-soft: rgba(245, 181, 11, 0.14);
+  --danger:       #ff3d6e;
+  --danger-soft:  rgba(255, 61, 110, 0.14);
+  --info:         #3d7bff;
+  --info-soft:    rgba(61, 123, 255, 0.14);
+
+  /* Accent border tint — used by badges/chips so they follow the theme */
+  --accent-border: rgba(43, 238, 79, 0.30);
+  --success-border: rgba(43, 238, 79, 0.30);
+  --warning-border: rgba(245, 181, 11, 0.30);
+  --danger-border:  rgba(255, 61, 110, 0.30);
+  --info-border:    rgba(61, 123, 255, 0.30);
+  --pop-border:     rgba(236, 11, 212, 0.30);
+
+  /* App background glow (radial accents behind the page) */
+  --bg-glow-1: rgba(43, 238, 79, 0.06);
+  --bg-glow-2: rgba(236, 11, 212, 0.04);
+
+  /* ── Shadows ─────────────────────────────────────────────── */
+  --shadow-1: 0 1px 0 0 rgba(255, 255, 255, 0.04) inset;
+  --shadow-2:
+    0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
+    0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 0 1px var(--accent-glow), 0 8px 32px -12px var(--accent-glow);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   LIGHT THEME — marketing pages
+   ════════════════════════════════════════════════════════════════ */
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* ── Surface stack (lightest → most contrast) ────────────── */
+  --bg:        #f5f4f2;          /* off-white page background */
+  --surface-1: #efeeec;          /* page sections */
+  --surface-2: #ffffff;          /* cards */
+  --surface-3: #ffffff;          /* elevated cards / hover */
+  --surface-4: #ebeae7;          /* inputs, muted blocks */
+
+  /* ── Borders ─────────────────────────────────────────────── */
+  --border-subtle:  rgba(10, 10, 10, 0.08);
+  --border-default: rgba(10, 10, 10, 0.12);
+  --border-strong:  rgba(10, 10, 10, 0.20);
+
+  /* ── Text ────────────────────────────────────────────────── */
+  --fg:         #0a0a0a;
+  --fg-subtle:  #2a2a2a;
+  --fg-muted:   #6b6b6b;
+  --fg-faint:   #9a9a9a;
+
+  /* ── Accent — electric green (primary) ───────────────────── */
+  --accent:        #1fd43f;       /* slightly deeper for contrast on white */
+  --accent-fg:     #04210b;
+  --accent-soft:   rgba(31, 212, 63, 0.14);
+  --accent-strong: #19b836;
+  --accent-glow:   rgba(31, 212, 63, 0.20);
+
+  /* ── Pop — hot magenta ───────────────────────────────────── */
+  --pop:        #e60ac9;
+  --pop-fg:     #ffffff;
+  --pop-soft:   rgba(230, 10, 201, 0.12);
+  --pop-glow:   rgba(230, 10, 201, 0.18);
+
+  /* ── Semantic ────────────────────────────────────────────── */
+  --success:      #16a34a;
+  --success-soft: rgba(22, 163, 74, 0.12);
+  --warning:      #d97706;
+  --warning-soft: rgba(217, 119, 6, 0.12);
+  --danger:       #e11d48;
+  --danger-soft:  rgba(225, 29, 72, 0.12);
+  --info:         #2563eb;
+  --info-soft:    rgba(37, 99, 235, 0.12);
+
+  --accent-border:  rgba(31, 212, 63, 0.35);
+  --success-border: rgba(22, 163, 74, 0.30);
+  --warning-border: rgba(217, 119, 6, 0.30);
+  --danger-border:  rgba(225, 29, 72, 0.30);
+  --info-border:    rgba(37, 99, 235, 0.30);
+  --pop-border:     rgba(230, 10, 201, 0.30);
+
+  --bg-glow-1: rgba(31, 212, 63, 0.05);
+  --bg-glow-2: rgba(230, 10, 201, 0.04);
+
+  /* ── Shadows (soft, lifted — light UI reads depth from shadow) ─ */
+  --shadow-1: 0 1px 2px 0 rgba(10, 10, 10, 0.04);
+  --shadow-2:
+    0 1px 2px 0 rgba(10, 10, 10, 0.04),
+    0 12px 32px -12px rgba(10, 10, 10, 0.12);
+  --shadow-glow: 0 0 0 1px var(--accent-glow), 0 12px 32px -12px var(--accent-glow);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SHARED — radii, typography, motion (theme-independent)
+   ════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Radii (bolder, more rounded — matches OGz cards) ─────── */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-2xl: 28px;
+
+  /* ── Typography ──────────────────────────────────────────── */
+  --font-display: var(--font-space-grotesk), var(--font-plex-arabic), system-ui, sans-serif;
+  --font-body:    var(--font-inter), var(--font-naskh-arabic), system-ui, sans-serif;
+  --font-mono:    var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --tracking-tight:  -0.02em;
+  --tracking-normal:  0;
+  --tracking-wide:    0.02em;
+  --tracking-eyebrow: 0.22em;   /* the spaced-out "01 · WHAT IT DOES" labels */
+
+  /* ── Motion ──────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --d-fast:   120ms;
+  --d-base:   180ms;
+  --d-slow:   320ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+  }
+}
+
+/* Subtle fade-up keyframe used on initial card render only */
+@keyframes oc-fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* RTL-correct utility helpers */
+[dir="rtl"] .oc-rtl-flip { transform: scaleX(-1); }
+
+/* ── Hero showcase marquees ──────────────────────────────────
+   Continuous, seamless vertical scroll. The component duplicates its
+   list and we translate by 50% so the loop wraps without a jump. */
+@keyframes oc-marquee-up {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, -50%, 0); }
+}
+@keyframes oc-marquee-down {
+  from { transform: translate3d(0, -50%, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+.oc-marquee-up   { animation: oc-marquee-up   var(--oc-marquee-duration, 30s) linear infinite; will-change: transform; }
+.oc-marquee-down { animation: oc-marquee-down var(--oc-marquee-duration, 30s) linear infinite; will-change: transform; }
+
+/* ── OGz "speaking lips" hero animation ──────────────────────
+   The lips breathe (vertical squash/stretch) while the brand colour
+   cross-fades green → magenta, mimicking a mouth talking. */
+@keyframes oc-lips-talk {
+  0%   { transform: scaleY(1);    color: var(--accent); }
+  18%  { transform: scaleY(0.62); color: var(--accent); }
+  34%  { transform: scaleY(0.92); color: var(--pop);    }
+  50%  { transform: scaleY(0.55); color: var(--pop);    }
+  66%  { transform: scaleY(0.88); color: var(--accent); }
+  82%  { transform: scaleY(0.66); color: var(--accent); }
+  100% { transform: scaleY(1);    color: var(--accent); }
+}
+.oc-lips-talk {
+  transform-origin: 50% 60%;
+  animation: oc-lips-talk var(--oc-lips-duration, 2.6s) var(--ease-out) infinite;
+  will-change: transform;
+}
+
+/* Slow drifting float for the centred logo — keeps the panel alive. */
+@keyframes oc-logo-float {
+  0%, 100% { transform: translateY(0) rotate(-1deg);   }
+  50%       { transform: translateY(-10px) rotate(1deg); }
+}
+.oc-logo-float {
+  animation: oc-logo-float var(--oc-logo-duration, 6s) ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Breathing radial glow behind the hero panel. */
+@keyframes oc-glow-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 0.9;  }
+}
+.oc-glow-pulse { animation: oc-glow-pulse 5s ease-in-out infinite; }
