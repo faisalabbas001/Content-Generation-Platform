@@ -1,10 +1,39 @@
-# OGz Studios
+<img width="1825" height="946" alt="Pasted image (10)" src="https://github.com/user-attachments/assets/e4a9755e-ea08-4dcf-9ffb-6747169f808e" /># OGz Studios
 
 Arabic-first AI content generation platform for Saudi SME brands. Onboarding → BrandDNA build → calendar generation → QC → publishing, governed by a multi-agent system (CEO/COO/CCO/DeepSeek) with PDPL-compliant data isolation.
 
 > Confidential — weiBlocks. The canonical product spec lives in `doc.txt` (project root). This README only documents how to **run** the codebase locally.
 
 ---
+
+<img width="1825" height="946" alt="Pasted image" src="https://github.com/user-attachments/assets/7c3fdc1f-b754-4134-a0a6-8528b983be99" />
+
+<img width="1825" height="946" alt="Pasted image (2)" src="https://github.com/user-attachments/assets/19280697-69ca-47af-a038-bb476a91b655" />
+
+<img width="1825" height="946" alt="Pasted image (3)" src="https://github.com/user-attachments/assets/43fd223a-c698-403e-8ee1-c7d329b4f621" />
+
+<img width="1825" height="946" alt="Pasted image (4)" src="https://github.com/user-attachments/assets/3d5c3ee1-74a8-44b4-b31a-6e00ee83b6cc" />
+
+<img width="1825" height="946" alt="Pasted image (5)" src="https://github.com/user-attachments/assets/0fa8a77d-aa24-4190-8e04-b46be0c75e3d" />
+
+<img width="1825" height="946" alt="Pasted image (6)" src="https://github.com/user-attachments/assets/4bd90bec-cec5-4809-a89f-e24da3538a97" />
+
+<img width="1825" height="946" alt="Pasted image (7)" src="https://github.com/user-attachments/assets/ed879891-fc15-4366-9e00-2009fa27c581" />
+
+<img width="1825" height="946" alt="Pasted image (8)" src="https://github.com/user-attachments/assets/d3d2365c-48de-4755-9bd4-3d589b831bc2" />
+
+<img width="1825" height="946" alt="Pasted image (9)" src="https://github.com/user-attachments/assets/1ae22c84-e2e9-4f1e-81d9-f8c9373c51dd" />
+
+<img width="1825" height="946" alt="Pasted image (10)" src="https://github.com/user-attachments/assets/a98aa5f5-2427-4070-8dd3-037e3675ceb9" />
+
+<img width="1825" height="946" alt="Pasted image (11)" src="https://github.com/user-attachments/assets/4dbf3c60-c9a7-4905-a5b9-79e395f206d9" />
+
+<img width="1825" height="946" alt="Pasted image (12)" src="https://github.com/user-attachments/assets/64af18ef-eea1-42cb-bbb8-750a6c8b2a60" />
+
+
+
+
+
 
 ## What's in here
 
