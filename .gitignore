@@ -36,3 +36,7 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+# Stray local logs / Claude Code artifacts (never commit)
+*.log
+.claude/
+*scorecard-prefetch.log
